@@ -498,12 +498,9 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
         self.absx = None
         self.Cache = {}
         
-        distancerange = [d for d in range(1, lateralField+1)]
-        timerange = [t for t in range(1, flowLayerCache+1)]
-        self.decayWithDistance = math.exp(- (distancerange - 1) / self.alpha)
-        self.decayWithTime = math.exp(- (timerange - 1) / self.tau)
+        self.decayWithTime = [math.exp(- (t) * 1) for t in range(1, flowLayerCache + 1)]
         
-        self.offsets = [dx for dx in range(-LateralField, LateralField+1) if not (dx == 0)]
+        self.offsets = [dx for dx in range(-lateralField, lateralField+1) if not (dx == 0)]
 
     def forward(self, x):
         """
