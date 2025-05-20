@@ -13,8 +13,7 @@ from nn.Retina_d_3rd import (
     ,EdgeDetectionLayer
 )
 
-decayWithTime = []
-for t in range(1, 10):
-    decayWithTime[t-1] = math.exp(- (t) * 1)
+decayWithTime = [math.exp(- (t) * 1) for t in range(1, 10)]
 
-print(decayWithTime[0])
+
+print(decayWithTime)

@@ -565,8 +565,8 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
 
             influence_x = influence_y = torch.zeros(1, 1, H, W)
             for t in range(self.flowLayerCache):
-               influence_x += self.decayWithTime[self.flowLayerCache - t - 1] * strength_kj[:, :, :, :, self.flowLayerCache - t - 1] ?
-               influence_y += self.decayWithTime[self.flowLayerCache - t - 1] * strength_il[:, :, :, :, self.flowLayerCache - t - 1] ?
+               influence_x += self.decayWithTime[self.flowLayerCache - t - 1] * strength_kj[:, :, :, :, self.flowLayerCache - t - 1]
+               influence_y += self.decayWithTime[self.flowLayerCache - t - 1] * strength_il[:, :, :, :, self.flowLayerCache - t - 1]
 
             # 累加到总影响
             sum_influence_x += influence_x * self.decayWithDistance[dx - 1]
