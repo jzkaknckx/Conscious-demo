@@ -1,0 +1,20 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision.transforms as T
+import math
+
+from trail.pic_tools import *
+from trail.matrix_tools import *
+
+from nn.Retina_d_3rd import (
+    PreprocessLayer
+    ,ProjectionLayer
+    ,EdgeDetectionLayer
+)
+
+decayWithTime = []
+for t in range(1, 10):
+    decayWithTime[t-1] = math.exp(- (t) * 1)
+
+print(decayWithTime[0])
