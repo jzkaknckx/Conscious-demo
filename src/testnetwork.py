@@ -363,6 +363,7 @@ class EdgeFlowLayerN(nn.Module):
         
         dim = len(grad)
         if dim == 2:
+            grad_x, grad_y = grad
             grad_tensor = torch.sqrt(grad_x ** 2 + grad_y ** 2)
         else:
             grad_tensor = grad
@@ -616,19 +617,19 @@ class ClickHandler:
             output, flowvelocity = self.model(self.input_img, x_running, y_running)
             # output, flowvelocity = self.model(self.input_img, x, y)
             
-            if s == step :
-                # 更新输出显示
-                self.output_ax0.clear()
-                self.output_ax0.imshow(tensor_to_image(output))
-                self.output_ax0.set_title("output")
-                self.output_ax1.clear()
-                self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
-                self.output_ax1.set_title("flowvelocity0")
-                self.output_ax2.clear()
-                self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
-                self.output_ax2.set_title("flowvelocity1")
-                
-                event.canvas.draw()
+            
+            # 更新输出显示
+            self.output_ax0.clear()
+            self.output_ax0.imshow(tensor_to_image(output))
+            self.output_ax0.set_title("output")
+            self.output_ax1.clear()
+            self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
+            self.output_ax1.set_title("flowvelocity0")
+            self.output_ax2.clear()
+            self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
+            self.output_ax2.set_title("flowvelocity1")
+            
+            event.canvas.draw()
         
         self.x_old = x
         self.y_old = y
