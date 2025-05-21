@@ -608,25 +608,27 @@ class ClickHandler:
         step = int(delta_x // self.centerVelocity)
         
         for s in range(0, step + 1):
-            print(f"Running: {s} / {step})")
             x_running = self.x_old + s * self.centerVelocity
-            y_running = self.y_old + s * self.centerVelocity * delta_y // delta_x
+            y_running = self.y_old + s * self.centerVelocity * delta_y // delta_x 
+            
+            print(f"Running: {s} / {step}. Curruent Center: ({x_running:.1f}, {y_running:.1f})")
             
             output, flowvelocity = self.model(self.input_img, x_running, y_running)
             # output, flowvelocity = self.model(self.input_img, x, y)
             
-            # 更新输出显示
-            self.output_ax0.clear()
-            self.output_ax0.imshow(tensor_to_image(output))
-            self.output_ax0.set_title("output")
-            self.output_ax1.clear()
-            self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
-            self.output_ax1.set_title("flowvelocity0")
-            self.output_ax2.clear()
-            self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
-            self.output_ax2.set_title("flowvelocity1")
-            
-            event.canvas.draw()
+            if s == step :
+                # 更新输出显示
+                self.output_ax0.clear()
+                self.output_ax0.imshow(tensor_to_image(output))
+                self.output_ax0.set_title("output")
+                self.output_ax1.clear()
+                self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
+                self.output_ax1.set_title("flowvelocity0")
+                self.output_ax2.clear()
+                self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
+                self.output_ax2.set_title("flowvelocity1")
+                
+                event.canvas.draw()
         
         self.x_old = x
         self.y_old = y
@@ -705,7 +707,7 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(2, 2, figsize=(10, 5))
     
     # 准备输入
-    image_path = 'src/picture/OIP-C.jpg'  # [1, 3, 1280, 1920]
+    image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
     tensor, oringinal_image = image_to_tensor(image_path)
     # axes[0,0].imshow(oringinal_image)
     # axes[0,0].set_title('')
