@@ -497,9 +497,11 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
         self.tau = tau  
 
         self.absx = None
+        self.xold = None
+        self.firstFrame = True
         self.Cache = []
         
-        self.decayWithTime = [math.exp(- (f) * tau) for f in range(0, flowLayerCache + lateralField)] # 衰减序列参数预计算
+        self.decayWithTime = [math.exp(- (f) * tau) for f in range(0, flowLayerCache + 2 * lateralField + 1)] # 衰减序列参数预计算
         
         self.offsets = [dx for dx in range(-lateralField, lateralField+1)] # frame = -lF -> 0 -> lF (2*lF + 1 in total)
 
@@ -537,93 +539,112 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
         # initialize sum_influence_x and sum_influence_y
         sum_influence_x = sum_influence_y = torch.zeros(1, 1, H, W)  # (H, W)
         
-        # 插帧存入 Cache
-        runFrame = len(self.Cache)
-        if runFrame == 0:   # 第一帧不运算
-            self.absx = x 
-            return sum_influence_x, sum_influence_y
+        
+        if self.firstFrame == True:   # 第一帧不运算
+            self.firstFrame = False
+            print("First Frame")
         else: 
-            self.absx = torch.abs(x - self.absx)
-        
-        self.Cache.append(self.absx)
-        
-        if runFrame > self.FlowLayerCache:  
-            self.Cache.pop(0)
-            imCache = tensor.stack(self.Cache, dim = -1)
+            self.absx = torch.abs(x - self.xold)
+            self.Cache.append(self.absx)
+            runFrame = len(self.Cache)
             
-            # sum for each frame -> sum for each dx
-            for dx in self.offsets:
+            if runFrame > self.flowLayerCache:  
+                self.Cache.pop(0)
+                imCache = torch.stack(self.Cache, dim = -1)
+                
+                # sum for each frame -> sum for each dx
+                for dx in self.offsets:
 
-                # 邻域像素的坐标 (k, l)
-                i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
-                k = i + dx
-                l = j + dx
+                    # 邻域像素的坐标 (k, l)
+                    i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
+                    k = i + dx
+                    l = j + dx
 
-                valid_x = (k >= 0) & (k < H)
-                valid_y = (l >= 0) & (l < W)
+                    valid_x = (k >= 0) & (k < H)
+                    valid_y = (l >= 0) & (l < W)
 
-                # 对应x+dx和y+dx的强度
-                strength_kj = strength_il = torch.zeros(1, 1, H, W, self.FlowLayerCache)
-                strength_kj[valid_x] = imCache[0, 0, k[valid_x], j, :]
-                strength_il[valid_y] = imCache[0, 0, i, l[valid_y], :]
+                    # 对应x+dx和y+dx的强度
+                    strength_kj = strength_il = torch.zeros(1, 1, H, W, self.flowLayerCache)
+                    strength_kj[valid_x.view(1, 1, H, W)] = imCache[0, 0, k[valid_x], j[valid_x]]
+                    strength_il[valid_y.view(1, 1, H, W)] = imCache[0, 0, i[valid_y], l[valid_y]]
 
-                influence_x = influence_y = torch.zeros(1, 1, H, W)
-                for f in range(self.flowLayerCache):
-                    influence_x += self.decayWithTime[self.flowLayerCache - t + self.lateralField + dx] * strength_kj[:, :, :, :, f]
-                    influence_y += self.decayWithTime[self.flowLayerCache - t + self.lateralField + dx] * strength_il[:, :, :, :, f]
+                    influence_x = influence_y = torch.zeros(1, 1, H, W)
+                    for f in range(self.flowLayerCache):
+                        influence_x += self.decayWithTime[self.flowLayerCache - f + self.lateralField + dx] * strength_kj[:, :, :, :, f]
+                        influence_y += self.decayWithTime[self.flowLayerCache - f + self.lateralField + dx] * strength_il[:, :, :, :, f]
 
-                sum_influence_x += influence_x
-                sum_influence_y += influence_y
+                    sum_influence_x += influence_x
+                    sum_influence_y += influence_y
+            else:   print("not Enough Frames")
+        
+        self.xold = x
         
         return sum_influence_x, sum_influence_y
 
 class ClickHandler:
-    def __init__(self, ax, model, input_img, output_ax0, output_ax1, output_ax2):
+    def __init__(self, ax, model, input_img, centerVelocity, output_ax0, output_ax1, output_ax2):
         self.ax = ax
         self.model = model
         self.input_img = input_img
+        self.centerVelocity = centerVelocity
         self.output_ax0 = output_ax0
         self.output_ax1 = output_ax1
         self.output_ax2 = output_ax2
+        B, C, H, W = input_img.shape
+        self.x_old = W // 2
+        self.y_old = H // 2
         self.cid = ax.figure.canvas.mpl_connect('button_press_event', self.on_click)
         
     def on_click(self, event):
         if event.inaxes != self.ax:
             return
-        
+
         # 获取点击坐标
-        x, y = event.xdata, event.ydata
-        print(f"\n点击坐标: ({x:.1f}, {y:.1f})")
+        x, y = int(event.xdata), int(event.ydata)
+        print(f"New Center: ({x:.1f}, {y:.1f})")
         
-        # 运行神经网络
-        output, flowvelocity = self.model(self.input_img, x, y)
+        delta_x = x - self.x_old
+        delta_y = y - self.y_old
+        step = int(delta_x // self.centerVelocity)
         
-        # 更新输出显示
-        self.output_ax0.clear()
-        self.output_ax0.imshow(tensor_to_image(output))
-        self.output_ax0.set_title("flowvelocity0")
-        self.output_ax1.clear()
-        self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
-        self.output_ax1.set_title("flowvelocity0")
-        self.output_ax2.clear()
-        self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
-        self.output_ax2.set_title("flowvelocity1")
+        for s in range(0, step + 1):
+            print(f"Running: {s} / {step})")
+            x_running = self.x_old + s * self.centerVelocity
+            y_running = self.y_old + s * self.centerVelocity * delta_y // delta_x
+            
+            output, flowvelocity = self.model(self.input_img, x_running, y_running)
+            # output, flowvelocity = self.model(self.input_img, x, y)
+            
+            # 更新输出显示
+            self.output_ax0.clear()
+            self.output_ax0.imshow(tensor_to_image(output))
+            self.output_ax0.set_title("output")
+            self.output_ax1.clear()
+            self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
+            self.output_ax1.set_title("flowvelocity0")
+            self.output_ax2.clear()
+            self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
+            self.output_ax2.set_title("flowvelocity1")
+            
+            event.canvas.draw()
         
-        event.canvas.draw()
+        self.x_old = x
+        self.y_old = y
 
 class RetinaModel(nn.Module):
     def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=5, flowLayerCache=5, flowLayertau=1.0):
         super().__init__()
         self.preprocess = PreprocessLayer(cropped_size)
         self.projection = ProjectionLayer(output_size, center_size, projectiontau)
-        # self.edge_detection = EdgeDetectionLayer()
+        self.edge_detection = EdgeDetectionLayer()
         self.flow = LateralInfulentialOpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
         
     def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)
         x = self.projection(x)
-        # grad_x, grad_y = self.edge_detection(x)
-        flowvelocity = self.flow(x)
+        grad = self.edge_detection(x)
+        # flowvelocity = self.flow(x)
+        flowvelocity = self.flow(grad)
         
         return x, flowvelocity
 
@@ -684,7 +705,7 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(2, 2, figsize=(10, 5))
     
     # 准备输入
-    image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
+    image_path = 'src/picture/OIP-C.jpg'  # [1, 3, 1280, 1920]
     tensor, oringinal_image = image_to_tensor(image_path)
     # axes[0,0].imshow(oringinal_image)
     # axes[0,0].set_title('')
@@ -693,7 +714,7 @@ if __name__ == "__main__":
     
     axes[0,0].imshow(tensor_to_image(tensor))
     
-    handler = ClickHandler(axes[0,0], r, tensor, axes[0,1], axes[1,0], axes[1,1])
+    handler = ClickHandler(axes[0,0], r, tensor, 1, axes[0,1], axes[1,0], axes[1,1])
     
     plt.show()
     
