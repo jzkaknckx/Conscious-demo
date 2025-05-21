@@ -20,7 +20,7 @@ class PreprocessLayer(nn.Module):
         只能输入B = 1
         未限制(center_x, center_y)输入大小
     '''
-    def __init__(self, cropped_size):
+    def __init__(self, cropped_size=1024):
         super().__init__()
         self.cropped_size = cropped_size
         self.resize = T.Resize(
@@ -34,7 +34,7 @@ class PreprocessLayer(nn.Module):
         B, C, H, W = x.shape
         device = x.device
         
-        if(center_x > H or center_y > W):
+        if(center_x > W or center_y > H):
             print("Invalid Center")
             
         if(center_x == -1 ): center_x = W//2
@@ -95,7 +95,7 @@ class ProjectionLayer(nn.Module):
         未缓存
     
     '''
-    def __init__(self, output_size, center_size, tau):
+    def __init__(self, output_size=512, center_size=256, tau=0.01):
         super().__init__()
         self.output_size = output_size
         self.center_size = center_size
@@ -164,13 +164,20 @@ class EdgeDetectionLayer(nn.Module):
 
 class RetinaModel(nn.Module):
     def __init__(self, cropped_size=1024, output_size=512, center_size=256, tau=0.01):
+        '''
+        较好的projectiontau
+            cropped_size = 1024
+            output_size = 512
+            center_size = 256
+            tau = 0.01
+        '''
         super().__init__()
         self.preprocess = PreprocessLayer(cropped_size)
         self.projection = ProjectionLayer(output_size, center_size, tau)
         self.edge_detection = EdgeDetectionLayer()
         # self.optical_flow = OpticalflowLayer(scale_factor=scale_factor)
         
-    def forward(self, x, center_x, center_y):
+    def forward(self, x, center_x=-1, center_y=-1):
         x = self.preprocess(x, center_x, center_y)
         x = self.projection(x)
         grad_x, grad_y = self.edge_detection(x)

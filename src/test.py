@@ -14,6 +14,6 @@ from nn.Retina_d_3rd import (
 )
 
 decayWithTime = [math.exp(- (t) * 1) for t in range(1, 10)]
+x = [t for t in range(1, 10)]
 
-
-print(decayWithTime)
+print(x)

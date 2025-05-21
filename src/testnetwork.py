@@ -486,21 +486,22 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
 
             参数:
                 LateralField (int): LateralField 的半径，光流节点的感受野，默认值为 5
-                alpha (float): 距离衰减参数，控制节点对周围像素的敏感程度，默认值为
-                beta (float): 时间衰减参数, 默认值为
+                flowLayerCache(int): 缓存帧数，默认值为 5
+                alpha (float): 暂时没用
+                beta (float): 时间衰减参数, 默认值为 1.0
         """
         super(LateralInfulentialOpticalFlowLayer, self).__init__()
-        self.lateralField = lateralField  # LateralField 的半径
-        self.alpha = alpha  # 距离衰减参数
-        self.tau = tau  # 时间衰减参数
-        self.flowLayerCache = flowLayerCache # FlowLayer 的缓存
+        self.lateralField = lateralField  
+        self.flowLayerCache = flowLayerCache 
+        self.alpha = alpha  
+        self.tau = tau  
 
         self.absx = None
-        self.Cache = {}
+        self.Cache = []
         
-        self.decayWithTime = [math.exp(- (t) * 1) for t in range(1, flowLayerCache + 1)]
+        self.decayWithTime = [math.exp(- (f) * tau) for f in range(0, flowLayerCache + lateralField)] # 衰减序列参数预计算
         
-        self.offsets = [dx for dx in range(-lateralField, lateralField+1) if not (dx == 0)]
+        self.offsets = [dx for dx in range(-lateralField, lateralField+1)] # frame = -lF -> 0 -> lF (2*lF + 1 in total)
 
     def forward(self, x):
         """
@@ -533,59 +534,98 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
         
         assert B == 1, "Only One Batch Once"
         
+        # initialize sum_influence_x and sum_influence_y
+        sum_influence_x = sum_influence_y = torch.zeros(1, 1, H, W)  # (H, W)
+        
         # 插帧存入 Cache
         runFrame = len(self.Cache)
-        if runFrame == 0:   self.absx = x
-        else:               self.absx = torch.abs(x - self.absx)
+        if runFrame == 0:   # 第一帧不运算
+            self.absx = x 
+            return sum_influence_x, sum_influence_y
+        else: 
+            self.absx = torch.abs(x - self.absx)
+        
         self.Cache.append(self.absx)
-        if runFrame > self.FlowLayerCache:  self.Cache.pop(0)
         
+        if runFrame > self.FlowLayerCache:  
+            self.Cache.pop(0)
+            imCache = tensor.stack(self.Cache, dim = -1)
+            
+            # sum for each frame -> sum for each dx
+            for dx in self.offsets:
+
+                # 邻域像素的坐标 (k, l)
+                i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
+                k = i + dx
+                l = j + dx
+
+                valid_x = (k >= 0) & (k < H)
+                valid_y = (l >= 0) & (l < W)
+
+                # 对应x+dx和y+dx的强度
+                strength_kj = strength_il = torch.zeros(1, 1, H, W, self.FlowLayerCache)
+                strength_kj[valid_x] = imCache[0, 0, k[valid_x], j, :]
+                strength_il[valid_y] = imCache[0, 0, i, l[valid_y], :]
+
+                influence_x = influence_y = torch.zeros(1, 1, H, W)
+                for f in range(self.flowLayerCache):
+                    influence_x += self.decayWithTime[self.flowLayerCache - t + self.lateralField + dx] * strength_kj[:, :, :, :, f]
+                    influence_y += self.decayWithTime[self.flowLayerCache - t + self.lateralField + dx] * strength_il[:, :, :, :, f]
+
+                sum_influence_x += influence_x
+                sum_influence_y += influence_y
         
-        # 初始化当前 batch 的总影响
-        sum_influence_x = sum_influence_y = torch.zeros(1, 1, H, W)  # (H, W)
-
-        # 对每个偏移计算邻域影响
-        for dx in self.offsets:
-
-            # 邻域像素的坐标 (k, l)
-            i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
-            k = i + dx
-            l = j + dx
-
-            valid_x = (k >= 0) & (k < H)
-            valid_y = (l >= 0) & (l < W)
-
-            # 获取邻域像素的边缘强度 strength_kl
-            strength_kj = strength_il = torch.zeros(1, 1, H, W, self.FlowLayerCache)
-            strength_kj[valid_x] = self.absx[0, 0, k[valid_x], j, :]
-            strength_il[valid_y] = self.absx[0, 0, i, l[valid_y], :]
-
-            influence_x = influence_y = torch.zeros(1, 1, H, W)
-            for t in range(self.flowLayerCache):
-               influence_x += self.decayWithTime[self.flowLayerCache - t - 1] * strength_kj[:, :, :, :, self.flowLayerCache - t - 1]
-               influence_y += self.decayWithTime[self.flowLayerCache - t - 1] * strength_il[:, :, :, :, self.flowLayerCache - t - 1]
-
-            # 累加到总影响
-            sum_influence_x += influence_x * self.decayWithDistance[dx - 1]
-            sum_influence_y += influence_y * self.decayWithDistance[dx - 1]
-
         return sum_influence_x, sum_influence_y
 
+class ClickHandler:
+    def __init__(self, ax, model, input_img, output_ax0, output_ax1, output_ax2):
+        self.ax = ax
+        self.model = model
+        self.input_img = input_img
+        self.output_ax0 = output_ax0
+        self.output_ax1 = output_ax1
+        self.output_ax2 = output_ax2
+        self.cid = ax.figure.canvas.mpl_connect('button_press_event', self.on_click)
+        
+    def on_click(self, event):
+        if event.inaxes != self.ax:
+            return
+        
+        # 获取点击坐标
+        x, y = event.xdata, event.ydata
+        print(f"\n点击坐标: ({x:.1f}, {y:.1f})")
+        
+        # 运行神经网络
+        output, flowvelocity = self.model(self.input_img, x, y)
+        
+        # 更新输出显示
+        self.output_ax0.clear()
+        self.output_ax0.imshow(tensor_to_image(output))
+        self.output_ax0.set_title("flowvelocity0")
+        self.output_ax1.clear()
+        self.output_ax1.imshow(edge_to_image(flowvelocity[0]))
+        self.output_ax1.set_title("flowvelocity0")
+        self.output_ax2.clear()
+        self.output_ax2.imshow(edge_to_image(flowvelocity[1]))
+        self.output_ax2.set_title("flowvelocity1")
+        
+        event.canvas.draw()
+
 class RetinaModel(nn.Module):
-    def __init__(self, cropped_size=1024, output_size=512, center_size=256, tau=0.01, flowLayerCacheMax=5, EdgeFlowLayerNtau = 10):
+    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=5, flowLayerCache=5, flowLayertau=1.0):
         super().__init__()
         self.preprocess = PreprocessLayer(cropped_size)
-        self.projection = ProjectionLayer(output_size, center_size, tau)
-        self.edge_detection = EdgeDetectionLayer()
-        self.edge_flow = EdgeFlowLayerN(flowLayerCacheMax, EdgeFlowLayerNtau)
+        self.projection = ProjectionLayer(output_size, center_size, projectiontau)
+        # self.edge_detection = EdgeDetectionLayer()
+        self.flow = LateralInfulentialOpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
         
     def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)
         x = self.projection(x)
-        grad_x, grad_y = self.edge_detection(x)
-        velocity = self.edge_flow(grad_x, grad_y)
+        # grad_x, grad_y = self.edge_detection(x)
+        flowvelocity = self.flow(x)
         
-        return x, grad_x, grad_y, velocity
+        return x, flowvelocity
 
 class RetinaModelO(nn.Module):
     def __init__(self, cropped_size=1024, output_size=512, center_size=256, tau=0.01, window_size=5, sigma=1.0, OpticalflowLayerCacheMax=10):
@@ -639,48 +679,27 @@ class RetinaModelO(nn.Module):
     
 # 验证测试
 if __name__ == "__main__":
-    '''
-    较好的tau
-        cropped_size = 1024
-        output_size = 512
-        center_size = 256
-        tau = 0.01
-    '''
+
     
     fig, axes = plt.subplots(2, 2, figsize=(10, 5))
     
     # 准备输入
-    image_path = 'picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
+    image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
     tensor, oringinal_image = image_to_tensor(image_path)
     # axes[0,0].imshow(oringinal_image)
     # axes[0,0].set_title('')
     
-    cropped_size = 1024
-    output_size = 512
-    center_size = 256
-    tau = 0.01
-    flowLayerCacheMax=10
-    EdgeFlowLayerNtau = 100
+    r = RetinaModel()
     
-    preprocess = PreprocessLayer(cropped_size) 
-    projection = ProjectionLayer(output_size, center_size, tau)
-    edge_detection = EdgeDetectionLayer()
-    layer = EnhancedEdgeDetectionLayer(R=10, alpha=2, beta=2)
-    edge_flow1 = EdgeFlowLayerN()
-    edge_flow2 = EdgeFlowLayerN()
+    axes[0,0].imshow(tensor_to_image(tensor))
     
-    for i in range(1,15):
-        x = preprocess(tensor, -1, -1)
-        x = projection(x)
-        grad_x, grad_y = edge_detection(x)
-        enhanced = layer(grad_x, grad_y)
-        velocity1 = edge_flow1([grad_x, grad_y])
-        velocity2 = edge_flow2(enhanced)
+    handler = ClickHandler(axes[0,0], r, tensor, axes[0,1], axes[1,0], axes[1,1])
     
-    axes[0,0].imshow(edge_to_image(torch.sqrt(grad_x**2 + grad_y**2)))
-    axes[0,1].imshow(edge_to_image(enhanced))
-    axes[1,0].imshow(edge_to_image(velocity1[2]))
-    axes[1,1].imshow(edge_to_image(velocity2[2]))
+    plt.show()
+    
+    # axes[0,1].imshow(edge_to_image(enhanced))
+    # axes[1,0].imshow(edge_to_image(flow[0]))
+    # axes[1,1].imshow(edge_to_image(flow[1]))
     
     '''
     model = RetinaModel()
@@ -712,5 +731,4 @@ if __name__ == "__main__":
     # axes[1,1].set_title('')
     '''
     
-    plt.show()
     
