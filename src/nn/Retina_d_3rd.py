@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
+import math
+from collections import deque
 
 from trail.pic_tools import *
 from trail.matrix_tools import *

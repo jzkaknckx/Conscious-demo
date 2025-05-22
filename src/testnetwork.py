@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
 import math
+from collections import deque
 
 from trail.pic_tools import *
 from trail.matrix_tools import *
@@ -582,7 +583,118 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
         
         return sum_influence_x, sum_influence_y
 
-class ClickHandler:
+class FrameDifferenceLayer(nn.Module):
+    '''
+    
+    '''
+    def __init__(self):
+        super(FrameDifferenceLayer, self).__init__()
+        self.x_old = None
+        self.first_frame = True
+    
+    def forward(self, x):
+        if self.first_frame:
+            self.x_old = torch.zeros_like(x) 
+            self.first_frame = False
+        
+        diff = torch.abs(x - self.x_old)
+        self.x_old = x
+        return diff
+
+class InfluenceSumLayer(nn.Module):
+    def __init__(self, lateralField=2, flowLayerCache=5, tau=1.0):
+        """
+        初始化 LateralInfulentialOpticalFlowLayer 模块。
+
+            参数:
+                LateralField(int): LateralField 的半径，光流节点的感受野，默认值为 2
+                flowLayerCache(int): 缓存帧数，默认值为 5
+                tau(float): 信号衰减
+        """
+        super(InfluenceSumLayer, self).__init__()
+        self.lateralField = lateralField
+        self.flowLayerCache = flowLayerCache
+        self.tau = tau
+        
+        assert flowLayerCache > 2 * lateralField, "flowLayerCache and lateralField has to satisfy: flowLayerCache >= 2 * lateralField + 1"
+        
+        self.cache = []
+        self.offsets = [dx for dx in range(-lateralField, lateralField+1)] # frame = -lF -> 0 -> lF  ,2*lF+1 in total
+    
+    def forward(self, x):
+        """
+        计算光流的xy分量。
+
+            Warning:
+                仅支持单批次输入
+            
+            输入:
+                支持:
+                    grad_x (torch.Tensor): (B, 1, H, W) + grad_y (torch.Tensor): (B, 1, H, W)
+                    grad (torch.Tensor): (B, 1, H, W)
+                    RGB (torch.Tensor): (B, 3, H, W)
+                            B == 1
+            输出:
+                sum_influence_x, sum_influence_y
+        """
+        
+        # 输入 -> (B, 1, H, W)
+        dim = len(x)
+        if dim == 2:
+            grad_x, grad_y = x
+            B, C, H, W = grad_x.shape
+            x = torch.sqrt(grad_x ** 2 + grad_y ** 2)
+        elif dim == 1:
+            B, C, H, W = x.shape
+            if C == 3:
+                togray = T.Grayscale()
+                x = togray(x)
+        
+        assert B == 1, "Only One Batch Once"
+        
+        # influence by this frame
+        influence = torch.zeros(1, 1, H, W, self.lateralField * 2 + 1, 2)
+        for dx in self.offsets:
+
+            # 邻域像素的坐标 (k, l)
+            i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
+            k = i + dx
+            l = j + dx
+
+            valid_x = (k >= 0) & (k < H)
+            valid_y = (l >= 0) & (l < W)
+
+            # 对应x+dx和y+dx的强度
+            strength_kj = strength_il = torch.zeros(1, 1, H, W)
+            strength_kj[valid_x.view(1, 1, H, W)] = x[0, 0, k[valid_x], j[valid_x]]
+            strength_il[valid_y.view(1, 1, H, W)] = x[0, 0, i[valid_y], l[valid_y]]
+            
+            influence[..., dx + self.lateralField, 0] += strength_kj
+            influence[..., dx + self.lateralField, 1] += strength_il
+        
+        # stack of influence
+        # (1, 1, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, 1, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
+        #  B  C  H  W  - lateralField -> dx -> lateralField    horizontal/vertical      1 -> frame -> flowLayerCache
+        # (1, 1, H, W,        self.lateralField * 2 + 1,               2,                   self.flowLayerCache) 
+        self.cache.append(influence)
+        
+        sum_influence_x = sum_influence_y = torch.zeros(1, 1, H, W, 2)
+        if len(self.cache) > self.flowLayerCache:
+            self.cache.pop(0)
+            imCache = torch.stack(self.cache, dim = -1)
+            for sample in range(0, self.lateralField * 2 + 1):
+                sum_influence_x[..., 0] += imCache[..., sample, 0, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_x[..., 1] += imCache[..., sample, 0, self.flowLayerCache - sample - 1]
+                sum_influence_y[..., 0] += imCache[..., sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_y[..., 1] += imCache[..., sample, 1, self.flowLayerCache - sample - 1]
+        else: print("not Enough Frames")
+                
+        factor = torch.exp(-self.tau * torch.ones_like(influence))
+        self.cache = [tensor * factor for tensor in self.cache]
+                
+        return sum_influence_x[..., 0], sum_influence_x[..., 1], sum_influence_y[..., 0], sum_influence_y[..., 1]
+
+class ClickHandlerO:
     def __init__(self, ax, model, input_img, centerVelocity, output_ax0, output_ax1, output_ax2):
         self.ax = ax
         self.model = model
@@ -634,20 +746,77 @@ class ClickHandler:
         self.x_old = x
         self.y_old = y
 
+class ClickHandler:
+    '''
+    创建中心点移动序列
+        to be optimized
+    '''
+    def __init__(self, ax, input_shape, center_velocity, callback):
+        self.ax = ax
+        self.input_shape = input_shape  # (H, W) 格式
+        self.center_velocity = center_velocity
+        self.callback = callback
+        self.x_old = input_shape[1] // 2  # W//2
+        self.y_old = input_shape[0] // 2  # H//2
+        self.cid = ax.figure.canvas.mpl_connect('button_press_event', self.on_click)
+
+    def on_click(self, event):
+        """处理点击事件并生成坐标序列"""
+        if event.inaxes != self.ax:
+            return
+
+        # 获取新坐标
+        x_new = int(event.xdata)
+        y_new = int(event.ydata)
+        print(f"\nNew Center: ({x_new}, {y_new})")
+
+        # 计算坐标变化量
+        delta_x = x_new - self.x_old
+        delta_y = y_new - self.y_old
+        
+        # 计算步数并生成坐标序列
+        coordinates = []
+        if delta_x != 0:  # 水平方向移动
+            step = int(delta_x // self.center_velocity)
+            for s in range(0, step + 1):
+                x = self.x_old + s * self.center_velocity
+                y = self.y_old + s * self.center_velocity * delta_y // delta_x
+                coordinates.append((x, y))
+                print(f"Step {s}/{step}: ({x}, {y})")
+        else:  # 垂直方向移动特殊处理
+            step = abs(int(delta_y // self.center_velocity))
+            step = step if delta_y >= 0 else -step
+            for s in range(0, step + 1):
+                x = self.x_old
+                y = self.y_old + s * self.center_velocity * (1 if delta_y >=0 else -1)
+                coordinates.append((x, y))
+                print(f"Step {s}/{step}: ({x}, {y})")
+
+        # 执行回调函数传递坐标序列
+        if self.callback:
+            self.callback(coordinates)
+
+        # 更新坐标记录
+        self.x_old = x_new
+        self.y_old = y_new
+
 class RetinaModel(nn.Module):
-    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=5, flowLayerCache=5, flowLayertau=1.0):
+    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=2, flowLayerCache=5, flowLayertau=1.0):
         super().__init__()
         self.preprocess = PreprocessLayer(cropped_size)
         self.projection = ProjectionLayer(output_size, center_size, projectiontau)
         self.edge_detection = EdgeDetectionLayer()
-        self.flow = LateralInfulentialOpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
+        self.frameDiff = FrameDifferenceLayer()
+        # self.flow = LateralInfulentialOpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
+        self.flow = InfluenceSumLayer(lateralField, flowLayerCache, flowLayertau)
         
     def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)
         x = self.projection(x)
         grad = self.edge_detection(x)
+        diff = self.frameDiff(x)
         # flowvelocity = self.flow(x)
-        flowvelocity = self.flow(grad)
+        flowvelocity = self.flow(diff)
         
         return x, flowvelocity
 
@@ -705,7 +874,7 @@ class RetinaModelO(nn.Module):
 if __name__ == "__main__":
 
     
-    fig, axes = plt.subplots(2, 2, figsize=(10, 5))
+    fig, axes = plt.subplots(3, 2, figsize=(10, 5))
     
     # 准备输入
     image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
@@ -717,7 +886,46 @@ if __name__ == "__main__":
     
     axes[0,0].imshow(tensor_to_image(tensor))
     
-    handler = ClickHandler(axes[0,0], r, tensor, 1, axes[0,1], axes[1,0], axes[1,1])
+    def update_display(coordinates):
+        for x, y in coordinates:
+            print(f"Stepping = ({x}, {y})")
+            output, flowvelocity = r(tensor, x, y)
+            print(torch.max(flowvelocity[0]))
+            print(torch.max(flowvelocity[1]))
+            print(torch.max(flowvelocity[2]))
+            print(torch.max(flowvelocity[3]))
+            # 更新输出显示
+            axes[0,1].clear()
+            axes[0,1].imshow(tensor_to_image(output))
+            axes[0,1].set_title("Output")
+            
+            axes[1,0].clear()
+            axes[1,0].imshow(edge_to_image(flowvelocity[0]))
+            axes[1,0].set_title("Flow X+")
+            
+            axes[1,1].clear()
+            axes[1,1].imshow(edge_to_image(flowvelocity[1]))
+            axes[1,1].set_title("Flow X-")
+            
+            axes[2,0].clear()
+            axes[2,0].imshow(edge_to_image(flowvelocity[2]))
+            axes[2,0].set_title("Flow Y+")
+            
+            axes[2,1].clear()
+            axes[2,1].imshow(edge_to_image(flowvelocity[3]))
+            axes[2,1].set_title("Flow Y-")
+            # 强制刷新画布
+            plt.gcf().canvas.draw()
+            plt.pause(0.001)  # 允许GUI处理事件
+
+    # 创建点击处理器
+    B, C, H, W = tensor.shape
+    click_handler = ClickHandler(
+        ax=axes[0,0],
+        input_shape=(H, W),
+        center_velocity=1,  # 示例值
+        callback=update_display
+    )
     
     plt.show()
     

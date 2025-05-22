@@ -14,20 +14,11 @@ from nn.Retina_d_3rd import (
 )
 
 
-H = 512
-W = 512
-dx = dy = -5
-i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
-k = i + dx
-l = j + dy
+a = b = torch.ones(1, 1, 5, 5, 2)
+c = a[0, 0, :, :, 0] - b[0, 0, :, :, 0]
+d = a[:, :, :, :, 0] - b[:, :, :, :, 0]
+e = a[..., 0] - b[..., 0]
 
-
-valid = (k >= 0) & (k < H) & (l >= 0) & (l < W)
-valid4 = valid.view(1, 1, H, W)
-
-strength_kl = torch.zeros(1, 1, H, W, 5) 
-strength = torch.zeros(1, 1, H, W, 5)
-strength_kl[valid4] = strength[0, 0, k[valid], l[valid]]
-
-print(i.shape, j.shape)
-print(k.shape, l.shape)
+print(c.shape)
+print(d.shape)
+print(e.shape)
