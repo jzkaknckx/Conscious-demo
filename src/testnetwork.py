@@ -620,6 +620,28 @@ class InfluenceSumLayer(nn.Module):
         
         self.cache = []
         self.offsets = [dx for dx in range(-lateralField, lateralField+1)] # frame = -lF -> 0 -> lF  ,2*lF+1 in total
+        
+        self.valid = None
+        self.j = None
+        self.i = None
+    
+    def gird_precompute(self, H, W):
+    
+        valid = torch.tensor([False] * H * W * (2 * self.lateralField + 1) * 4, dtype=torch.bool).reshape(H, W, 2 * self.lateralField + 1, 4)
+        j ,i = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
+        
+        for dx in range(-self.lateralField, self.lateralField+1):
+            grid_in_x = i + dx # x
+            grid_in_y = j + dx # y
+            grid_out_x = i - dx # x
+            grid_out_y = j - dx # y     
+            
+            valid[...,dx + self.lateralField, 0] = (grid_in_x >= 0) & (grid_in_x < W)
+            valid[...,dx + self.lateralField, 1] = (grid_in_y >= 0) & (grid_in_y < H)
+            valid[...,dx + self.lateralField, 2] = (grid_out_x >= 0) & (grid_out_x < W)
+            valid[...,dx + self.lateralField, 3] = (grid_out_y >= 0) & (grid_out_y < H)
+            
+        return valid, j, i
     
     def forward(self, x):
         """
@@ -652,25 +674,20 @@ class InfluenceSumLayer(nn.Module):
         
         assert B == 1, "Only One Batch Once"
         
+        if self.valid is None:
+            self.valid, self.j, self.i = self.gird_precompute(H, W)
+        
         # influence by this frame
         influence = torch.zeros(1, 1, H, W, self.lateralField * 2 + 1, 2)
         for dx in self.offsets:
 
-            # 邻域像素的坐标 (k, l)
-            i, j = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
-            k = i + dx
-            l = j + dx
-
-            valid_x = (k >= 0) & (k < H)
-            valid_y = (l >= 0) & (l < W)
-
             # 对应x+dx和y+dx的强度
-            strength_kj = strength_il = torch.zeros(1, 1, H, W)
-            strength_kj[valid_x.view(1, 1, H, W)] = x[0, 0, k[valid_x], j[valid_x]]
-            strength_il[valid_y.view(1, 1, H, W)] = x[0, 0, i[valid_y], l[valid_y]]
+            strength_x = strength_y = torch.zeros(1, 1, H, W)
+            strength_x[self.valid[...,dx + self.lateralField, 2].view(1, 1, H, W)] = x[0, 0, self.j[self.valid[...,dx + 2, 0]], self.i[self.valid[...,dx + self.lateralField, 0]]]
+            strength_y[self.valid[...,dx + self.lateralField, 3].view(1, 1, H, W)] = x[0, 0, self.j[self.valid[...,dx + 2, 1]], self.i[self.valid[...,dx + self.lateralField, 1]]]
             
-            influence[..., dx + self.lateralField, 0] += strength_kj
-            influence[..., dx + self.lateralField, 1] += strength_il
+            influence[..., dx + self.lateralField, 0] += strength_x
+            influence[..., dx + self.lateralField, 1] += strength_y
         
         # stack of influence
         # (1, 1, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, 1, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
@@ -782,7 +799,7 @@ class ClickHandler:
                 x = self.x_old + s * self.center_velocity
                 y = self.y_old + s * self.center_velocity * delta_y // delta_x
                 coordinates.append((x, y))
-                print(f"Step {s}/{step}: ({x}, {y})")
+                # print(f"Step {s}/{step}: ({x}, {y})")
         else:  # 垂直方向移动特殊处理
             step = abs(int(delta_y // self.center_velocity))
             step = step if delta_y >= 0 else -step
@@ -790,7 +807,7 @@ class ClickHandler:
                 x = self.x_old
                 y = self.y_old + s * self.center_velocity * (1 if delta_y >=0 else -1)
                 coordinates.append((x, y))
-                print(f"Step {s}/{step}: ({x}, {y})")
+                # print(f"Step {s}/{step}: ({x}, {y})")
 
         # 执行回调函数传递坐标序列
         if self.callback:
