@@ -13,9 +13,10 @@ from nn.Retina_d_3rd import (
     ,EdgeDetectionLayer
 )
 
-H = 5
-W = 5
-
+H = 10
+W = 10
+lateralField = 2
+offsets = [dx for dx in range(-lateralField, lateralField+1)]
 
 x = torch.ones(1, 1, H, W)
 for q in range(H):
@@ -44,9 +45,11 @@ def gird_precompute(H, W):
     return valid
 
 valid = gird_precompute(H, W)
+j ,i = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
 
+'''
 for dx in range(-2, 3):
-    j ,i = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
+    
     # grid_in_x = i + dx # x
     # grid_in_y = j + dx # y
     # grid_out_x = i - dx # x
@@ -63,8 +66,33 @@ for dx in range(-2, 3):
     strength_x = strength_y = torch.zeros(1, 1, H, W)
     strength_x[0, 0, j[valid[...,dx + 2, 2]], i[valid[...,dx + 2, 2]]] = x[0, 0, j[valid[...,dx + 2, 0]], i[valid[...,dx + 2, 0]]]
     strength_y[0, 0, j[valid[...,dx + 2, 3]], i[valid[...,dx + 2, 3]]] = x[0, 0, j[valid[...,dx + 2, 1]], i[valid[...,dx + 2, 1]]]
-    print(j[valid[...,dx + 2, 2]], i[valid[...,dx + 2, 2]])
+    print(valid[...,dx + 2, 0])
+    print(j[valid[...,dx + 2, 0]], i[valid[...,dx + 2, 0]])
+    print(valid[...,dx + 2, 1])
     print(j[valid[...,dx + 2, 1]], i[valid[...,dx + 2, 1]])
+    print(valid[...,dx + 2, 2])
+    print(j[valid[...,dx + 2, 2]], i[valid[...,dx + 2, 2]])
+    print(valid[...,dx + 2, 3])
+    print(j[valid[...,dx + 2, 3]], i[valid[...,dx + 2, 3]])
     # print(strength_x)
-    print(strength_y)
+    # print(strength_y)
+'''
+for dx_idx, dx in enumerate(offsets):
+    ################################ 修改部分 ################################
+    # 获取有效区域掩码
+    mask_x = valid[..., dx_idx, 0]  # x方向偏移dx的有效区域 (H,W)
+    mask_y = valid[..., dx_idx, 1]  # y方向偏移dx的有效区域 (H,W)
     
+    # 计算平移后的坐标
+    i_shifted = i + dx  # x方向平移后的x坐标
+    j_shifted = j + dx  # y方向平移后的y坐标
+    
+    # 初始化强度矩阵
+    strength_x = torch.zeros_like(x[0, 0])  # (H,W)
+    strength_y = torch.zeros_like(x[0, 0])
+    
+    # 应用平移：将x向右平移dx，y向下平移dx
+    strength_x[mask_x] = x[0, 0, j[mask_x], i_shifted[mask_x]]
+    strength_y[mask_y] = x[0, 0, j_shifted[mask_y], i[mask_y]]
+    print(strength_x)
+    print(strength_y)

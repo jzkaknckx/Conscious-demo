@@ -677,6 +677,7 @@ class InfluenceSumLayer(nn.Module):
         if self.valid is None:
             self.valid, self.j, self.i = self.gird_precompute(H, W)
         
+        '''
         # influence by this frame
         influence = torch.zeros(1, 1, H, W, self.lateralField * 2 + 1, 2)
         for dx in self.offsets:
@@ -688,6 +689,31 @@ class InfluenceSumLayer(nn.Module):
             
             influence[..., dx + self.lateralField, 0] += strength_x
             influence[..., dx + self.lateralField, 1] += strength_y
+        '''
+        
+        # influence by this frame
+        influence = torch.zeros(1, 1, H, W, self.lateralField*2+1, 2)
+        for dx_idx, dx in enumerate(self.offsets):
+            ################################ 修改部分 ################################
+            # 获取有效区域掩码
+            mask_x = self.valid[..., dx_idx, 0]  # x方向偏移dx的有效区域 (H,W)
+            mask_y = self.valid[..., dx_idx, 1]  # y方向偏移dx的有效区域 (H,W)
+            
+            # 计算平移后的坐标
+            i_shifted = self.i + dx  # x方向平移后的x坐标
+            j_shifted = self.j + dx  # y方向平移后的y坐标
+            
+            # 初始化强度矩阵
+            strength_x = torch.zeros_like(x[0, 0])  # (H,W)
+            strength_y = torch.zeros_like(x[0, 0])
+            
+            # 应用平移：将x向右平移dx，y向下平移dx
+            strength_x[mask_x] = x[0, 0, self.j[mask_x], i_shifted[mask_x]]
+            strength_y[mask_y] = x[0, 0, j_shifted[mask_y], self.i[mask_y]]
+            
+            # 将结果存入influence张量
+            influence[..., dx_idx, 0] = strength_x.unsqueeze(0).unsqueeze(0)  # 添加batch和channel维度
+            influence[..., dx_idx, 1] = strength_y.unsqueeze(0).unsqueeze(0)
         
         # stack of influence
         # (1, 1, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, 1, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
@@ -700,10 +726,10 @@ class InfluenceSumLayer(nn.Module):
             self.cache.pop(0)
             imCache = torch.stack(self.cache, dim = -1)
             for sample in range(0, self.lateralField * 2 + 1):
-                sum_influence_x[..., 0] += imCache[..., sample, 0, self.flowLayerCache - self.lateralField * 2 + sample - 1]
-                sum_influence_x[..., 1] += imCache[..., sample, 0, self.flowLayerCache - sample - 1]
-                sum_influence_y[..., 0] += imCache[..., sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
-                sum_influence_y[..., 1] += imCache[..., sample, 1, self.flowLayerCache - sample - 1]
+                sum_influence_x[0, 0, :, :, 0] += imCache[0, 0, :, :, sample, 0, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_x[0, 0, :, :, 1] += imCache[0, 0, :, :, sample, 0, self.flowLayerCache - sample - 1]
+                sum_influence_y[0, 0, :, :, 0] += imCache[0, 0, :, :, sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_y[0, 0, :, :, 1] += imCache[0, 0, :, :, sample, 1, self.flowLayerCache - sample - 1]
         else: print("not Enough Frames")
                 
         factor = torch.exp(-self.tau * torch.ones_like(influence))
@@ -768,6 +794,57 @@ class ClickHandler:
     创建中心点移动序列
         to be optimized
     '''
+    # 使用方法
+    '''
+    def update_display(coordinates):
+        for x, y in coordinates:
+            print(f"Stepping = ({x}, {y})")
+            output, flowvelocity, diff = r(tensor, x, y)
+            print(torch.max(flowvelocity[0]))
+            print(torch.max(flowvelocity[1]))
+            print(torch.max(flowvelocity[2]))
+            print(torch.max(flowvelocity[3]))
+            
+            # flowv = torch.stack([flowvelocity[0] - flowvelocity[1], flowvelocity[2] - flowvelocity[3]], dim = -1).squeeze(0) 
+            # print(flowv.shape)
+            # stream_draw(flowv)
+            # 更新输出显示
+            axes[0,1].clear()
+            axes[0,1].imshow(tensor_to_image(output))
+            axes[0,1].set_title("Output")
+            
+            axes[1,0].clear()
+            axes[1,0].imshow(edge_to_image(flowvelocity[0]))
+            axes[1,0].set_title("Flow X+")
+            
+            axes[1,1].clear()
+            axes[1,1].imshow(edge_to_image(flowvelocity[1]))
+            axes[1,1].set_title("Flow X-")
+            
+            axes[2,0].clear()
+            axes[2,0].imshow(edge_to_image(flowvelocity[2]))
+            axes[2,0].set_title("Flow Y+")
+            
+            axes[2,1].clear()
+            axes[2,1].imshow(edge_to_image(flowvelocity[3]))
+            axes[2,1].set_title("Flow Y-")
+            
+            axes[0,2].clear()
+            axes[0,2].imshow(tensor_to_image(diff))
+            axes[0,2].set_title("Flow Y-")
+            # 强制刷新画布
+            plt.gcf().canvas.draw()
+            plt.pause(0.001)  # 允许GUI处理事件
+    
+    # 创建点击处理器
+    B, C, H, W = tensor.shape
+    click_handler = ClickHandler(
+        ax=axes[0,0],
+        input_shape=(H, W),
+        center_velocity=1,  
+        callback=update_display
+    )
+    '''
     def __init__(self, ax, input_shape, center_velocity, callback):
         self.ax = ax
         self.input_shape = input_shape  # (H, W) 格式
@@ -817,6 +894,19 @@ class ClickHandler:
         self.x_old = x_new
         self.y_old = y_new
 
+def smooth_moving(input1, input2, velocity):
+    center_x0, center_y0 = input1
+    center_x1, center_y1 = input2
+    dx = center_x1 - center_x0
+    dy = center_y1 - center_y0
+    distance = np.sqrt(dx**2 + dy**2)
+    steps = int(distance // velocity)
+    x = np.linspace(center_x0, center_x1, steps)
+    y = np.linspace(center_y0, center_y1, steps)
+    return x, y
+
+
+
 class RetinaModel(nn.Module):
     def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=2, flowLayerCache=5, flowLayertau=1.0):
         super().__init__()
@@ -835,7 +925,7 @@ class RetinaModel(nn.Module):
         # flowvelocity = self.flow(x)
         flowvelocity = self.flow(diff)
         
-        return x, flowvelocity
+        return x, flowvelocity, diff
 
 class RetinaModelO(nn.Module):
     def __init__(self, cropped_size=1024, output_size=512, center_size=256, tau=0.01, window_size=5, sigma=1.0, OpticalflowLayerCacheMax=10):
@@ -891,7 +981,7 @@ class RetinaModelO(nn.Module):
 if __name__ == "__main__":
 
     
-    fig, axes = plt.subplots(3, 2, figsize=(10, 5))
+    fig, axes = plt.subplots(3, 3, figsize=(10, 5))
     
     # 准备输入
     image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
@@ -903,46 +993,14 @@ if __name__ == "__main__":
     
     axes[0,0].imshow(tensor_to_image(tensor))
     
-    def update_display(coordinates):
-        for x, y in coordinates:
-            print(f"Stepping = ({x}, {y})")
-            output, flowvelocity = r(tensor, x, y)
-            print(torch.max(flowvelocity[0]))
-            print(torch.max(flowvelocity[1]))
-            print(torch.max(flowvelocity[2]))
-            print(torch.max(flowvelocity[3]))
-            # 更新输出显示
-            axes[0,1].clear()
-            axes[0,1].imshow(tensor_to_image(output))
-            axes[0,1].set_title("Output")
-            
-            axes[1,0].clear()
-            axes[1,0].imshow(edge_to_image(flowvelocity[0]))
-            axes[1,0].set_title("Flow X+")
-            
-            axes[1,1].clear()
-            axes[1,1].imshow(edge_to_image(flowvelocity[1]))
-            axes[1,1].set_title("Flow X-")
-            
-            axes[2,0].clear()
-            axes[2,0].imshow(edge_to_image(flowvelocity[2]))
-            axes[2,0].set_title("Flow Y+")
-            
-            axes[2,1].clear()
-            axes[2,1].imshow(edge_to_image(flowvelocity[3]))
-            axes[2,1].set_title("Flow Y-")
-            # 强制刷新画布
-            plt.gcf().canvas.draw()
-            plt.pause(0.001)  # 允许GUI处理事件
-
-    # 创建点击处理器
-    B, C, H, W = tensor.shape
-    click_handler = ClickHandler(
-        ax=axes[0,0],
-        input_shape=(H, W),
-        center_velocity=1,  # 示例值
-        callback=update_display
-    )
+    input_center0 = (960, 640)
+    input_center1 = (980, 640)
+    
+    centers_x, centers_y = smooth_moving(input_center0, input_center1, 1)
+    
+    for x, y in zip(centers_x, centers_y):
+        _, velocity, diff = r(tensor, x, y)
+    
     
     plt.show()
     
