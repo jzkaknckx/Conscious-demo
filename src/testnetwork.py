@@ -737,6 +737,9 @@ class InfluenceSumLayer(nn.Module):
                 
         return sum_influence_x[..., 0], sum_influence_x[..., 1], sum_influence_y[..., 0], sum_influence_y[..., 1]
 
+
+
+
 class ClickHandlerO:
     def __init__(self, ax, model, input_img, centerVelocity, output_ax0, output_ax1, output_ax2):
         self.ax = ax

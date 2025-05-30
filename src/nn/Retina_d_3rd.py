@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
 import math
+from typing import List, Optional, Tuple, Union
 from collections import deque
 
 from trail.pic_tools import *
