@@ -2,160 +2,71 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
+import numpy as np
+import math
 
-from trail.pic_trail import *
-torch.set_printoptions(profile="full",linewidth=1000)
+from trail.pic_tools import *
+from trail.matrix_tools import *
 
-image_path = 'picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # 替换为你的图像路径'
-tensor, oringinal_image = image_to_tensor(image_path)
-x = tensor
+from nn.Retina_d_3rd import (
+    PreprocessLayer
+    ,ProjectionLayer
+    ,EdgeDetectionLayer
+)
+from typing import List, Optional, Tuple, Union, Any, Dict
 
-fig, axes = plt.subplots(2, 2, figsize=(10, 5))
+lateralField=2
+offsets = [dx for dx in range(-lateralField, lateralField+1)]
 
-cropped_size = 1024
-output_size = 512
-center_size = 256
-tau = 0.01
-center_x = torch.tensor([128.0])
-center_y = torch.tensor([128.0])
-
-
-
-class PreprocessLayer(nn.Module):
-    '''
-        预处理
-            切割为cropped_size*cropped_size,以(center_x, center_y)为中心,其余补零
-            
-        只能输入B = 1
-        未限制(center_x, center_y)输入大小
-    '''
-    def __init__(self, cropped_size):
-        super().__init__()
-        self.cropped_size = cropped_size
-        self.resize = T.Resize(
-            cropped_size,
-            interpolation=T.InterpolationMode.BILINEAR,
-            antialias=True
-        )
-
-    def forward(self, x, center_x, center_y):
-        
-        B, C, H, W = x.shape
-        device = x.device
-        
-        if(center_x > H or center_y > W):
-            print("Invalid Center")
-            
-        if(center_x == -1 ): center_x = W//2
-        if(center_y == -1 ): center_y = H//2
-
-        # 计算动态裁切窗口
-        # crop_h = min(self.cropped_size, H)
-        # crop_w = min(self.cropped_size, W)
-        crop_h = crop_w = self.cropped_size
-        
-        # 计算裁切区域坐标
-        # start_x = torch.clamp(torch.tensor(center_x - crop_w//2), 0, W - crop_w)
-        # start_y = torch.clamp(torch.tensor(center_y - crop_h//2), 0, H - crop_h)
-        start_x = center_x - crop_w//2
-        start_y = center_y - crop_h//2
-
-        if(center_x < crop_w//2 or W - center_x < crop_w//2 or center_y < crop_h//2 or H - center_y < crop_h//2 or H < crop_h or W < crop_w):
-            x = F.pad(x, (crop_w//2, crop_w//2, crop_h//2, crop_h//2))
-            start_x += crop_w//2
-            start_y += crop_h//2
-        
-        # 执行裁切
-        cropped = []
-        
-        crop = x[0, :, 
-                    int(start_y):int(start_y+crop_h),
-                    int(start_x):int(start_x+crop_w)]
-        
-        # 等比缩放并保持原始比例
-        scale = min(self.cropped_size/crop_h, self.cropped_size/crop_w)
-        new_h = int(crop_h * scale)
-        new_w = int(crop_w * scale)
-        
-        resized = T.functional.resize(
-            crop, 
-            size=[new_h, new_w],
-            interpolation=T.InterpolationMode.BILINEAR,
-            antialias=True
-        )
-        
-        # 边缘填充
-        pad_h = (self.cropped_size - new_h)
-        pad_w = (self.cropped_size - new_w)
-        padded = T.functional.pad(
-            resized,
-            padding=[pad_w//2, pad_h//2, pad_w - pad_w//2, pad_h - pad_h//2],
-            padding_mode='edge'
-        )
-        cropped.append(padded)
-        
-        return torch.cat(cropped, dim=0).unsqueeze(0)    
+def gird_precompute( H, W):
     
-preprocess = PreprocessLayer(cropped_size)
-x = preprocess(x, -1, -1)
-
-axes[0,0].imshow(oringinal_image)
-axes[0,0].set_title('')
-axes[1,0].imshow(tensor_to_image(x))
-axes[1,0].set_title('')
+    valid = torch.tensor([False] * H * W * (2 *  lateralField + 1) * 4, dtype=torch.bool).reshape(H, W, 2 *  lateralField + 1, 4)
+    j ,i = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
     
-'''
-    trail for ProjectionLayer
-'''
-B, C, H_in, W_in = x.shape
-device = x.device
-assert H_in == W_in, "Input must be square"
-cropped_size = H_in
+    for dx in range(- lateralField,  lateralField+1):
+        grid_in_x = i + dx # x
+        grid_in_y = j + dx # y
+        grid_out_x = i - dx # x
+        grid_out_y = j - dx # y     
+        
+        valid[...,dx +  lateralField, 0] = (grid_in_x >= 0) & (grid_in_x < W)
+        valid[...,dx +  lateralField, 1] = (grid_in_y >= 0) & (grid_in_y < H)
+        valid[...,dx +  lateralField, 2] = (grid_out_x >= 0) & (grid_out_x < W)
+        valid[...,dx +  lateralField, 3] = (grid_out_y >= 0) & (grid_out_y < H)
+        
+    return valid, j, i
 
-# 生成输出网格坐标
-i, j = torch.meshgrid(torch.arange(output_size, device=device, dtype=torch.float),
-                        torch.arange(output_size, device=device, dtype=torch.float),
-                        indexing='ij')  # (output_size, output_size)
-center_out = (output_size - 1) / 2.0
-dx = i - center_out
-dy = j - center_out
+H=W=20
+valid, j, i = gird_precompute(H, W)
+x = torch.ones(1, 1, H, W)
 
-# 计算极坐标
-r_out = torch.sqrt(dx**2 + dy**2)
-theta = torch.atan2(dy, dx)
+for a in range(H):
+    for b in range(W):
+        x[0, 0, a, b] = a+b*0.1
+print(x)
 
-# 计算输入半径r_in
-mask = r_out > center_size
-delta_r = torch.where(mask, r_out - center_size, torch.zeros_like(r_out))
-r_in = torch.where(mask, tau * (delta_r) ** 3 / 6 + r_out, r_out)
-
-# 转换为输入坐标
-center_in = (cropped_size - 1) / 2.0
-x_in = center_in + r_in * torch.cos(theta)
-y_in = center_in + r_in * torch.sin(theta)
-'''
-trail
-'''
-grid_0 = torch.stack([y_in, x_in], dim=-1).unsqueeze(0).expand(B, -1, -1, -1)  # (B, o, o, 2)
-# gridtensor_print(grid_0)
-
-# 归一化到[-1, 1]
-x_norm = (x_in / (cropped_size - 1)) * 2 - 1
-y_norm = (y_in / (cropped_size - 1)) * 2 - 1
-
-# 生成采样网格
-grid = torch.stack([y_norm, x_norm], dim=-1).unsqueeze(0).expand(B, -1, -1, -1)  # (B, o, o, 2)
-
-# gridtensor_print(grid)
-
-
-# 应用网格采样
-projected = F.grid_sample(x, grid, padding_mode='zeros', align_corners=True)
-
-
-axes[1,1].imshow(tensor_to_image(projected))
-axes[1,1].set_title('')
-'''
-    end
-'''
-plt.show()
+influence = torch.zeros(1, 1, H, W,  lateralField*2+1, 2)
+for dx_idx, dx in enumerate( offsets):
+    print(dx_idx, dx)
+    
+    # 获取有效区域掩码
+    mask_x =  valid[..., dx_idx, 0]  # x方向偏移dx的有效区域 (H,W)
+    mask_y =  valid[..., dx_idx, 1]  # y方向偏移dx的有效区域 (H,W)
+    
+    # 计算平移后的坐标
+    i_shifted =  i + dx  # x方向平移后的x坐标
+    j_shifted =  j + dx  # y方向平移后的y坐标
+    
+    # 初始化强度矩阵
+    strength_x = torch.zeros_like(x[0, 0])  # (H,W)
+    strength_y = torch.zeros_like(x[0, 0])
+    
+    # 应用平移：将x向右平移dx，y向下平移dx
+    strength_x[mask_x] = x[0, 0,  j[mask_x], i_shifted[mask_x]]
+    strength_y[mask_y] = x[0, 0, j_shifted[mask_y],  i[mask_y]]
+    
+    # 将结果存入influence张量
+    influence[..., dx_idx, 0] = strength_x.unsqueeze(0).unsqueeze(0)  # 添加batch和channel维度
+    influence[..., dx_idx, 1] = strength_y.unsqueeze(0).unsqueeze(0)
+    
+    print(influence[...,dx_idx,1])

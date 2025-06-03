@@ -20,10 +20,6 @@ import torch
 from typing import List, Optional, Tuple, Union, Any, Dict
 import numpy as np
 
-import torch
-import numpy as np
-from typing import List, Optional, Tuple, Union
-
 class TensorSlicer:
     def __init__(self, tensor: torch.Tensor):
         """
@@ -83,7 +79,7 @@ class TensorSlicer:
         content_dims: List[int],
         coord_ranges: Optional[Tuple[Union[slice, Tuple[int, int, int]], ...]] = None,
         content_ranges: Optional[List[Union[slice, Tuple[int, int, int]]]] = None,
-        max_elements_per_cell: int = 5,
+        max_elements_per_cell: int = 50,
         max_cell_width: int = 30,
         precision: int = 4,
         show_coordinates: bool = True
@@ -312,6 +308,6 @@ slicer.display_slice_grid(
     content_dims=[0, 1, 4],  # 选择 batch, channel, feature 作为内容
     coord_ranges=[slice(0, 3), slice(0, 4)],  # 高度取0-2，宽度取0-3
     max_elements_per_cell=40,  # 每个单元格最多显示4个元素
-    max_cell_width=30,        # 单元格最大宽度
+    max_cell_width=300,        # 单元格最大宽度
     precision=2               # 浮点数精度为2位
 )

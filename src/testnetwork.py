@@ -714,6 +714,8 @@ class InfluenceSumLayer(nn.Module):
             # 将结果存入influence张量
             influence[..., dx_idx, 0] = strength_x.unsqueeze(0).unsqueeze(0)  # 添加batch和channel维度
             influence[..., dx_idx, 1] = strength_y.unsqueeze(0).unsqueeze(0)
+            
+        # print(influence[0, 0, 20, :, :].reshape(self.lateralField*2+1, 2, 20))
         
         # stack of influence
         # (1, 1, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, 1, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
@@ -730,6 +732,36 @@ class InfluenceSumLayer(nn.Module):
                 sum_influence_x[0, 0, :, :, 1] += imCache[0, 0, :, :, sample, 0, self.flowLayerCache - sample - 1]
                 sum_influence_y[0, 0, :, :, 0] += imCache[0, 0, :, :, sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
                 sum_influence_y[0, 0, :, :, 1] += imCache[0, 0, :, :, sample, 1, self.flowLayerCache - sample - 1]
+            
+            '''trail'''
+            
+            slicer = TensorSlicer(imCache[:, :, 10, :, :, 0, :])
+            slicer.set_dimension_names(["batch", "channel", "x", "feature", "time"])
+            slicer.display_slice_grid(
+                coord_dims=(2, 4),       
+                content_dims=[0, 1, 3],  
+                # coord_ranges=[slice(256-20, 256+20), slice(0, 5)], 
+                max_elements_per_cell=40,  
+                max_cell_width=50,        # 单元格最大宽度
+                precision=2               # 浮点数精度为2位
+            )
+            '''
+            slicer = TensorSlicer(imCache[:, :, :, 10, :, 0, :])
+            slicer.set_dimension_names(["batch", "channel", "y", "feature", "time"])
+            slicer.display_slice_grid(
+                coord_dims=(2, 4),       # 选择 height 和 width 作为坐标
+                content_dims=[0, 1, 3],  # 选择 batch, channel, feature 作为内容
+                # coord_ranges=[slice(256-20, 256+20), slice(0, 5)], 
+                max_elements_per_cell=40,  # 每个单元格最多显示4个元素
+                max_cell_width=80,        # 单元格最大宽度
+                precision=2               # 浮点数精度为2位
+            )
+            '''
+            # print(sum_influence_x[0,0,256-20:256+20,256-20:256+20,0])
+            # print(sum_influence_x[0,0,256-20:256+20,256-20:256+20,1])
+            # print(sum_influence_y[0,0,256-20:256+20,256-20:256+20,0])
+            # print(sum_influence_y[0,0,256-20:256+20,256-20:256+20,1])
+            
         else: print("not Enough Frames")
                 
         factor = torch.exp(-self.tau * torch.ones_like(influence))
@@ -904,8 +936,8 @@ def smooth_moving(input1, input2, velocity):
     dy = center_y1 - center_y0
     distance = np.sqrt(dx**2 + dy**2)
     steps = int(distance // velocity)
-    x = np.linspace(center_x0, center_x1, steps)
-    y = np.linspace(center_y0, center_y1, steps)
+    x = np.linspace(center_x0, center_x1, steps+1)
+    y = np.linspace(center_y0, center_y1, steps+1)
     return x, y
 
 
@@ -922,7 +954,7 @@ class RetinaModel(nn.Module):
         
     def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)
-        x = self.projection(x)
+        # x = self.projection(x)
         grad = self.edge_detection(x)
         diff = self.frameDiff(x)
         # flowvelocity = self.flow(x)
@@ -984,7 +1016,7 @@ class RetinaModelO(nn.Module):
 if __name__ == "__main__":
 
     
-    fig, axes = plt.subplots(3, 3, figsize=(10, 5))
+    fig, axes = plt.subplots(2,2, figsize=(10, 5))
     
     # 准备输入
     image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
@@ -992,25 +1024,33 @@ if __name__ == "__main__":
     # axes[0,0].imshow(oringinal_image)
     # axes[0,0].set_title('')
     
-    r = RetinaModel()
+    tensor = generate_graph_tensor(H=40, W=40, graph="Triangle", R=10)
+    
+    r = RetinaModel(cropped_size = 20)
     
     axes[0,0].imshow(tensor_to_image(tensor))
     
-    input_center0 = (960, 640)
-    input_center1 = (980, 640)
+    input_center0 = (10, 20)
+    input_center1 = (30, 20)
     
     centers_x, centers_y = smooth_moving(input_center0, input_center1, 1)
-    
+   
+    window = 20
+     
     for x, y in zip(centers_x, centers_y):
-        _, velocity, diff = r(tensor, x, y)
+        print(x, y)
+        out, velocity, diff = r(tensor, x, y)
     
     
+   
+    
+    # axes[0,1].imshow(tensor_to_image(diff[:, :, 256-window : 256+window, 256-window : 256+window]))
+    # axes[1,0].imshow(tensor_to_image(out[:, :, 256-window : 256+window, 256-window : 256+window]))
+    # axes[1,1].imshow(tensor_to_image(out))
+    axes[0,1].imshow(tensor_to_image(diff))
+    axes[1,0].imshow(tensor_to_image(out))
+    axes[1,1].imshow(tensor_to_image(out))
     plt.show()
-    
-    # axes[0,1].imshow(edge_to_image(enhanced))
-    # axes[1,0].imshow(edge_to_image(flow[0]))
-    # axes[1,1].imshow(edge_to_image(flow[1]))
-    
     '''
     model = RetinaModel()
     # output, _, _, _ = model(tensor, 960, 640)
