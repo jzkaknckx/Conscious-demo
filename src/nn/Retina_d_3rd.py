@@ -20,8 +20,8 @@ class PreprocessLayer(nn.Module):
         预处理
             切割为cropped_size*cropped_size,以(center_x, center_y)为中心,其余补零
             
-        只能输入B = 1
-        未限制(center_x, center_y)输入大小
+            只能输入B = 1
+            未限制(center_x, center_y)输入大小
     '''
     def __init__(self, cropped_size=1024):
         super().__init__()
@@ -95,7 +95,7 @@ class ProjectionLayer(nn.Module):
         前向投射
             要求输入正方形
             
-        未缓存
+            未缓存
     
     '''
     def __init__(self, output_size=512, center_size=256, tau=0.01):
@@ -165,8 +165,175 @@ class EdgeDetectionLayer(nn.Module):
         grad_y = F.conv2d(x, self.sobel_y, padding=1, groups=1)
         return grad_x, grad_y
 
+class FrameDifferenceLayer(nn.Module):
+    '''
+    差帧
+    '''
+    def __init__(self):
+        super(FrameDifferenceLayer, self).__init__()
+        self.x_old = None
+        self.first_frame = True
+    
+    def forward(self, x):
+        if self.first_frame:
+            self.x_old = torch.zeros_like(x) 
+            self.first_frame = False
+        
+        diff = torch.abs(x - self.x_old)
+        self.x_old = x
+        return diff
+
+'''
+todo 添加max_in_field冗余
+'''
+
+class OpticalFlowLayer(nn.Module):
+    def __init__(self, lateralField=2, flowLayerCache=5, tau=0.5):
+        """
+        初始化 LateralInfulentialOpticalFlowLayer 模块。
+
+            参数:
+                LateralField(int): LateralField 的半径，光流节点的感受野，默认值为 2
+                flowLayerCache(int): 缓存帧数，默认值为 5
+                tau(float): 信号衰减
+        """
+        super(OpticalFlowLayer, self).__init__()
+        self.lateralField = lateralField
+        self.flowLayerCache = flowLayerCache
+        self.tau = tau
+        self.threshold = None
+        
+        assert flowLayerCache > 2 * lateralField, "flowLayerCache and lateralField has to satisfy: flowLayerCache >= 2 * lateralField + 1"
+        
+        self.cache = []
+        self.cacheforMaxpooling = []
+        self.offsets = [dx for dx in range(-lateralField, lateralField+1)] # frame = -lF -> 0 -> lF  ,2*lF+1 in total
+        
+        self.valid = None
+        self.j = None
+        self.i = None
+    
+    def gird_precompute(self, H, W):
+        '''
+        计算偏移网格
+        '''
+
+        valid = torch.tensor([False] * H * W * (2 * self.lateralField + 1) * 4, dtype=torch.bool).reshape(H, W, 2 * self.lateralField + 1, 4)
+        j ,i = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
+        
+        for dx in range(-self.lateralField, self.lateralField+1):
+            grid_in_x = i + dx # x
+            grid_in_y = j + dx # y
+            grid_out_x = i - dx # x
+            grid_out_y = j - dx # y     
+            
+            valid[...,dx + self.lateralField, 0] = (grid_in_x >= 0) & (grid_in_x < W)
+            valid[...,dx + self.lateralField, 1] = (grid_in_y >= 0) & (grid_in_y < H)
+            valid[...,dx + self.lateralField, 2] = (grid_out_x >= 0) & (grid_out_x < W)
+            valid[...,dx + self.lateralField, 3] = (grid_out_y >= 0) & (grid_out_y < H)
+            
+        return valid, j, i
+    
+    def forward(self, x, max_in_field):
+        """
+        计算光流的xy分量。
+
+            Warning:
+                仅支持单批次输入
+            
+            输入:
+                支持:
+                    grad_x (torch.Tensor): (B, 1, H, W) + grad_y (torch.Tensor): (B, 1, H, W)
+                    grad (torch.Tensor): (B, 1, H, W)
+                    RGB (torch.Tensor): (B, 3, H, W)
+                            B == 1
+            输出:
+                sum_influence_x, sum_influence_y
+        """
+        
+        # 输入 -> (B, 1, H, W)
+        dim = len(x)
+        if dim == 2:
+            grad_x, grad_y = x
+            B, C, H, W = grad_x.shape
+            x = torch.sqrt(grad_x ** 2 + grad_y ** 2)
+        
+        elif dim == 1:
+            B, C, H, W = x.shape
+            # if C == 3:
+            #     togray = T.Grayscale()
+            #     x = togray(x)
+        assert B == 1, "Only One Batch Once"
+        
+        if self.valid is None:
+            self.valid, self.j, self.i = self.gird_precompute(H, W)
+        
+        # influence by this frame
+        influence = torch.zeros_like(x).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1, 1, self.lateralField*2+1, 2)
+        # influence = torch.zeros(1, 1, H, W, self.lateralField*2+1, 2)
+        for dx_idx, dx in enumerate(self.offsets):
+            
+            mask_x = self.valid[..., dx_idx, 0]
+            mask_y = self.valid[..., dx_idx, 1]
+            
+            i_shifted = self.i + dx
+            j_shifted = self.j + dx
+            
+            for c in range(C):
+                strength_x = torch.zeros_like(x[0, 0])
+                strength_y = torch.zeros_like(x[0, 0])
+                
+                strength_x[mask_x] = x[0, c, self.j[mask_x], i_shifted[mask_x]]
+                strength_y[mask_y] = x[0, c, j_shifted[mask_y], self.i[mask_y]]
+                
+                influence[0, c, :, :, dx_idx, 0] = strength_x.unsqueeze(0).unsqueeze(0)  
+                influence[0, c, :, :, dx_idx, 1] = strength_y.unsqueeze(0).unsqueeze(0)
+        
+        
+        # stack of influence
+        # (1, C, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, C, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
+        #  B  C  H  W  - lateralField -> dx -> lateralField    horizontal/vertical      1 -> frame -> flowLayerCache
+        # (1, C, H, W,        self.lateralField * 2 + 1,               2,                   self.flowLayerCache) 
+        self.cache.append(influence)
+        self.cacheforMaxpooling.append(max_in_field)
+        
+        sum_influence_x = torch.zeros_like(x).unsqueeze(-1).repeat(1, 1, 1, 1, 2)
+        sum_influence_y = torch.zeros_like(x).unsqueeze(-1).repeat(1, 1, 1, 1, 2)
+        # sum_influence_x = torch.zeros(1, 1, H, W, 2)
+        # sum_influence_y = torch.zeros(1, 1, H, W, 2)
+        max_in_fieldandtime = torch.zeros_like(x)
+        flow = torch.zeros_like(x).unsqueeze(-1).repeat(1, 1, 1, 1, 4)
+
+        frames = len(self.cache)
+        assert frames == len(self.cacheforMaxpooling), "Max pooling layer has to be engaged in the network at the same time as the flow layer"
+        if frames > self.flowLayerCache:
+            self.cache.pop(0)
+            self.cacheforMaxpooling.pop(0)
+            imCache = torch.stack(self.cache, dim = -1)
+            poolingCache = torch.stack(self.cacheforMaxpooling, dim = -1)
+            
+            for sample in range(0, self.lateralField * 2 + 1):
+                sum_influence_x[0, :, :, :, 0] += imCache[0, :, :, :, sample, 0, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_x[0, :, :, :, 1] += imCache[0, :, :, :, sample, 0, self.flowLayerCache - sample - 1]
+                sum_influence_y[0, :, :, :, 0] += imCache[0, :, :, :, sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_y[0, :, :, :, 1] += imCache[0, :, :, :, sample, 1, self.flowLayerCache - sample - 1]
+            
+            max_result = torch.max(poolingCache, dim=4)
+            max_in_fieldandtime = max_result.values 
+            flow[..., 0] = torch.relu(sum_influence_x[0, :, :, :, 0] - max_in_fieldandtime)
+            flow[..., 1] = torch.relu(sum_influence_x[0, :, :, :, 1] - max_in_fieldandtime)
+            flow[..., 2] = torch.relu(sum_influence_y[0, :, :, :, 0] - max_in_fieldandtime)
+            flow[..., 3] = torch.relu(sum_influence_y[0, :, :, :, 1] - max_in_fieldandtime)
+            
+        else: print("not Enough Frames")
+                
+        factor = torch.exp(-self.tau * torch.ones_like(influence))
+        self.cache = [tensor * factor for tensor in self.cache]
+
+        return flow
+
 class RetinaModel(nn.Module):
-    def __init__(self, cropped_size=1024, output_size=512, center_size=256, tau=0.01):
+    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=2, flowLayerCache=5, flowLayertau=0.5):
         '''
         较好的projectiontau
             cropped_size = 1024
@@ -176,49 +343,19 @@ class RetinaModel(nn.Module):
         '''
         super().__init__()
         self.preprocess = PreprocessLayer(cropped_size)
-        self.projection = ProjectionLayer(output_size, center_size, tau)
+        self.projection = ProjectionLayer(output_size, center_size, projectiontau)
         self.edge_detection = EdgeDetectionLayer()
-        # self.optical_flow = OpticalflowLayer(scale_factor=scale_factor)
+        self.frame_diff = FrameDifferenceLayer()
+        self.flow = OpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
+        self.maxpooling_for_flowlayer = nn.MaxPool2d(kernel_size=lateralField * 2 + 1, stride=1, padding=lateralField)
         
-    def forward(self, x, center_x=-1, center_y=-1):
+    def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)
         x = self.projection(x)
-        grad_x, grad_y = self.edge_detection(x)
+        grad = self.edge_detection(x)
+        diff = self.frame_diff(x)
+        max_in_field = self.maxpooling_for_flowlayer(diff)
+        flowvelocity = self.flow(diff, max_in_field)
         
-        return x, grad_x, grad_y
+        return x, flowvelocity, diff
     
-'''
-# 验证测试
-if __name__ == "__main__":
-    
-    cropped_size = 1024
-    output_size = 512
-    center_size = 256
-    tau = 0.01
-
-    image_path = 'picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # 替换为你的图像路径'
-    tensor, oringinal_image = image_to_tensor(image_path)
-
-    # 初始化模型
-    model = RetinaModel(cropped_size, output_size, center_size, tau)
-
-    center_x = torch.tensor([128.0])
-    center_y = torch.tensor([128.0])
-
-     # 前向传播
-    output = model(tensor, -1, -1)
-    
-    
-    fig, axes = plt.subplots(2, 2, figsize=(10, 5))
-    axes[0,0].imshow(oringinal_image)
-    axes[0,0].set_title('Original')
-    axes[0,1].imshow(tensor_to_image(output[0]))
-    axes[0,1].set_title('')
-    axes[1,0].imshow(edge_to_image(output[1]))
-    axes[1,0].set_title('')
-    axes[1,1].imshow(edge_to_image(output[2]))
-    axes[1,1].set_title('')
-    
-    plt.show()
-    
-'''  

@@ -585,7 +585,7 @@ class LateralInfulentialOpticalFlowLayer(nn.Module):
 
 class FrameDifferenceLayer(nn.Module):
     '''
-    
+    差帧
     '''
     def __init__(self):
         super(FrameDifferenceLayer, self).__init__()
@@ -602,7 +602,7 @@ class FrameDifferenceLayer(nn.Module):
         return diff
 
 class InfluenceSumLayer(nn.Module):
-    def __init__(self, lateralField=2, flowLayerCache=5, tau=1.0):
+    def __init__(self, lateralField=2, flowLayerCache=5, tau=0.5):
         """
         初始化 LateralInfulentialOpticalFlowLayer 模块。
 
@@ -615,10 +615,12 @@ class InfluenceSumLayer(nn.Module):
         self.lateralField = lateralField
         self.flowLayerCache = flowLayerCache
         self.tau = tau
+        self.threshold = None
         
         assert flowLayerCache > 2 * lateralField, "flowLayerCache and lateralField has to satisfy: flowLayerCache >= 2 * lateralField + 1"
         
         self.cache = []
+        self.cacheforMaxpooling = []
         self.offsets = [dx for dx in range(-lateralField, lateralField+1)] # frame = -lF -> 0 -> lF  ,2*lF+1 in total
         
         self.valid = None
@@ -626,7 +628,10 @@ class InfluenceSumLayer(nn.Module):
         self.i = None
     
     def gird_precompute(self, H, W):
-    
+        '''
+        计算偏移网格
+        '''
+
         valid = torch.tensor([False] * H * W * (2 * self.lateralField + 1) * 4, dtype=torch.bool).reshape(H, W, 2 * self.lateralField + 1, 4)
         j ,i = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
         
@@ -643,7 +648,7 @@ class InfluenceSumLayer(nn.Module):
             
         return valid, j, i
     
-    def forward(self, x):
+    def forward(self, x, max_in_field):
         """
         计算光流的xy分量。
 
@@ -666,110 +671,80 @@ class InfluenceSumLayer(nn.Module):
             grad_x, grad_y = x
             B, C, H, W = grad_x.shape
             x = torch.sqrt(grad_x ** 2 + grad_y ** 2)
+        
         elif dim == 1:
             B, C, H, W = x.shape
-            if C == 3:
-                togray = T.Grayscale()
-                x = togray(x)
-        
+            # if C == 3:
+            #     togray = T.Grayscale()
+            #     x = togray(x)
         assert B == 1, "Only One Batch Once"
         
         if self.valid is None:
             self.valid, self.j, self.i = self.gird_precompute(H, W)
         
-        '''
         # influence by this frame
-        influence = torch.zeros(1, 1, H, W, self.lateralField * 2 + 1, 2)
-        for dx in self.offsets:
-
-            # 对应x+dx和y+dx的强度
-            strength_x = strength_y = torch.zeros(1, 1, H, W)
-            strength_x[self.valid[...,dx + self.lateralField, 2].view(1, 1, H, W)] = x[0, 0, self.j[self.valid[...,dx + 2, 0]], self.i[self.valid[...,dx + self.lateralField, 0]]]
-            strength_y[self.valid[...,dx + self.lateralField, 3].view(1, 1, H, W)] = x[0, 0, self.j[self.valid[...,dx + 2, 1]], self.i[self.valid[...,dx + self.lateralField, 1]]]
-            
-            influence[..., dx + self.lateralField, 0] += strength_x
-            influence[..., dx + self.lateralField, 1] += strength_y
-        '''
-        
-        # influence by this frame
-        influence = torch.zeros(1, 1, H, W, self.lateralField*2+1, 2)
+        influence = torch.zeros_like(x).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1, 1, self.lateralField*2+1, 2)
+        # influence = torch.zeros(1, 1, H, W, self.lateralField*2+1, 2)
         for dx_idx, dx in enumerate(self.offsets):
-            ################################ 修改部分 ################################
-            # 获取有效区域掩码
-            mask_x = self.valid[..., dx_idx, 0]  # x方向偏移dx的有效区域 (H,W)
-            mask_y = self.valid[..., dx_idx, 1]  # y方向偏移dx的有效区域 (H,W)
             
-            # 计算平移后的坐标
-            i_shifted = self.i + dx  # x方向平移后的x坐标
-            j_shifted = self.j + dx  # y方向平移后的y坐标
+            mask_x = self.valid[..., dx_idx, 0]
+            mask_y = self.valid[..., dx_idx, 1]
             
-            # 初始化强度矩阵
-            strength_x = torch.zeros_like(x[0, 0])  # (H,W)
-            strength_y = torch.zeros_like(x[0, 0])
+            i_shifted = self.i + dx
+            j_shifted = self.j + dx
             
-            # 应用平移：将x向右平移dx，y向下平移dx
-            strength_x[mask_x] = x[0, 0, self.j[mask_x], i_shifted[mask_x]]
-            strength_y[mask_y] = x[0, 0, j_shifted[mask_y], self.i[mask_y]]
-            
-            # 将结果存入influence张量
-            influence[..., dx_idx, 0] = strength_x.unsqueeze(0).unsqueeze(0)  # 添加batch和channel维度
-            influence[..., dx_idx, 1] = strength_y.unsqueeze(0).unsqueeze(0)
-            
-        # print(influence[0, 0, 20, :, :].reshape(self.lateralField*2+1, 2, 20))
+            for c in range(C):
+                strength_x = torch.zeros_like(x[0, 0])
+                strength_y = torch.zeros_like(x[0, 0])
+                
+                strength_x[mask_x] = x[0, c, self.j[mask_x], i_shifted[mask_x]]
+                strength_y[mask_y] = x[0, c, j_shifted[mask_y], self.i[mask_y]]
+                
+                influence[0, c, :, :, dx_idx, 0] = strength_x.unsqueeze(0).unsqueeze(0)  
+                influence[0, c, :, :, dx_idx, 1] = strength_y.unsqueeze(0).unsqueeze(0)
+        
         
         # stack of influence
-        # (1, 1, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, 1, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
+        # (1, C, H, W, self.lateralField * 2 + 1, 2) * self.flowLayerCache  --stack-->  (1, C, H, W, self.lateralField * 2 + 1, 2, self.flowLayerCache) 
         #  B  C  H  W  - lateralField -> dx -> lateralField    horizontal/vertical      1 -> frame -> flowLayerCache
-        # (1, 1, H, W,        self.lateralField * 2 + 1,               2,                   self.flowLayerCache) 
+        # (1, C, H, W,        self.lateralField * 2 + 1,               2,                   self.flowLayerCache) 
         self.cache.append(influence)
+        self.cacheforMaxpooling.append(max_in_field)
         
-        sum_influence_x = sum_influence_y = torch.zeros(1, 1, H, W, 2)
-        if len(self.cache) > self.flowLayerCache:
+        sum_influence_x = torch.zeros_like(x).unsqueeze(-1).repeat(1, 1, 1, 1, 2)
+        sum_influence_y = torch.zeros_like(x).unsqueeze(-1).repeat(1, 1, 1, 1, 2)
+        # sum_influence_x = torch.zeros(1, 1, H, W, 2)
+        # sum_influence_y = torch.zeros(1, 1, H, W, 2)
+        max_in_fieldandtime = torch.zeros_like(x)
+        flow = torch.zeros_like(x).unsqueeze(-1).repeat(1, 1, 1, 1, 4)
+
+        frames = len(self.cache)
+        assert frames == len(self.cacheforMaxpooling), "Max pooling layer has to be engaged in the network at the same time as the flow layer"
+        if frames > self.flowLayerCache:
             self.cache.pop(0)
+            self.cacheforMaxpooling.pop(0)
             imCache = torch.stack(self.cache, dim = -1)
+            poolingCache = torch.stack(self.cacheforMaxpooling, dim = -1)
+            
             for sample in range(0, self.lateralField * 2 + 1):
-                sum_influence_x[0, 0, :, :, 0] += imCache[0, 0, :, :, sample, 0, self.flowLayerCache - self.lateralField * 2 + sample - 1]
-                sum_influence_x[0, 0, :, :, 1] += imCache[0, 0, :, :, sample, 0, self.flowLayerCache - sample - 1]
-                sum_influence_y[0, 0, :, :, 0] += imCache[0, 0, :, :, sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
-                sum_influence_y[0, 0, :, :, 1] += imCache[0, 0, :, :, sample, 1, self.flowLayerCache - sample - 1]
+                sum_influence_x[0, :, :, :, 0] += imCache[0, :, :, :, sample, 0, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_x[0, :, :, :, 1] += imCache[0, :, :, :, sample, 0, self.flowLayerCache - sample - 1]
+                sum_influence_y[0, :, :, :, 0] += imCache[0, :, :, :, sample, 1, self.flowLayerCache - self.lateralField * 2 + sample - 1]
+                sum_influence_y[0, :, :, :, 1] += imCache[0, :, :, :, sample, 1, self.flowLayerCache - sample - 1]
             
-            '''trail'''
-            
-            slicer = TensorSlicer(imCache[:, :, 10, :, :, 0, :])
-            slicer.set_dimension_names(["batch", "channel", "x", "feature", "time"])
-            slicer.display_slice_grid(
-                coord_dims=(2, 4),       
-                content_dims=[0, 1, 3],  
-                # coord_ranges=[slice(256-20, 256+20), slice(0, 5)], 
-                max_elements_per_cell=40,  
-                max_cell_width=50,        # 单元格最大宽度
-                precision=2               # 浮点数精度为2位
-            )
-            '''
-            slicer = TensorSlicer(imCache[:, :, :, 10, :, 0, :])
-            slicer.set_dimension_names(["batch", "channel", "y", "feature", "time"])
-            slicer.display_slice_grid(
-                coord_dims=(2, 4),       # 选择 height 和 width 作为坐标
-                content_dims=[0, 1, 3],  # 选择 batch, channel, feature 作为内容
-                # coord_ranges=[slice(256-20, 256+20), slice(0, 5)], 
-                max_elements_per_cell=40,  # 每个单元格最多显示4个元素
-                max_cell_width=80,        # 单元格最大宽度
-                precision=2               # 浮点数精度为2位
-            )
-            '''
-            # print(sum_influence_x[0,0,256-20:256+20,256-20:256+20,0])
-            # print(sum_influence_x[0,0,256-20:256+20,256-20:256+20,1])
-            # print(sum_influence_y[0,0,256-20:256+20,256-20:256+20,0])
-            # print(sum_influence_y[0,0,256-20:256+20,256-20:256+20,1])
+            max_result = torch.max(poolingCache, dim=4)
+            max_in_fieldandtime = max_result.values 
+            flow[..., 0] = torch.relu(sum_influence_x[0, :, :, :, 0] - max_in_fieldandtime)
+            flow[..., 1] = torch.relu(sum_influence_x[0, :, :, :, 1] - max_in_fieldandtime)
+            flow[..., 2] = torch.relu(sum_influence_y[0, :, :, :, 0] - max_in_fieldandtime)
+            flow[..., 3] = torch.relu(sum_influence_y[0, :, :, :, 1] - max_in_fieldandtime)
             
         else: print("not Enough Frames")
                 
         factor = torch.exp(-self.tau * torch.ones_like(influence))
         self.cache = [tensor * factor for tensor in self.cache]
-                
-        return sum_influence_x[..., 0], sum_influence_x[..., 1], sum_influence_y[..., 0], sum_influence_y[..., 1]
 
-
+        return flow
 
 
 class ClickHandlerO:
@@ -943,22 +918,22 @@ def smooth_moving(input1, input2, velocity):
 
 
 class RetinaModel(nn.Module):
-    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=2, flowLayerCache=5, flowLayertau=1.0):
+    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=2, flowLayerCache=5, flowLayertau=0.5):
         super().__init__()
         self.preprocess = PreprocessLayer(cropped_size)
         self.projection = ProjectionLayer(output_size, center_size, projectiontau)
         self.edge_detection = EdgeDetectionLayer()
-        self.frameDiff = FrameDifferenceLayer()
-        # self.flow = LateralInfulentialOpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
+        self.frame_diff = FrameDifferenceLayer()
         self.flow = InfluenceSumLayer(lateralField, flowLayerCache, flowLayertau)
+        self.maxpooling_for_flowlayer = nn.MaxPool2d(kernel_size=lateralField * 2 + 1, stride=1, padding=lateralField)
         
     def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)
-        # x = self.projection(x)
+        x = self.projection(x)
         grad = self.edge_detection(x)
-        diff = self.frameDiff(x)
-        # flowvelocity = self.flow(x)
-        flowvelocity = self.flow(diff)
+        diff = self.frame_diff(x)
+        max_in_field = self.maxpooling_for_flowlayer(diff)
+        flowvelocity = self.flow(diff, max_in_field)
         
         return x, flowvelocity, diff
 
@@ -1016,7 +991,7 @@ class RetinaModelO(nn.Module):
 if __name__ == "__main__":
 
     
-    fig, axes = plt.subplots(2,2, figsize=(10, 5))
+    fig, axes = plt.subplots(3,3, figsize=(10, 5))
     
     # 准备输入
     image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
@@ -1024,32 +999,50 @@ if __name__ == "__main__":
     # axes[0,0].imshow(oringinal_image)
     # axes[0,0].set_title('')
     
-    tensor = generate_graph_tensor(H=40, W=40, graph="Triangle", R=10)
+    # tensor = generate_graph_tensor(H=40, W=40, graph="Circle", R=10)
     
-    r = RetinaModel(cropped_size = 20)
+    r = RetinaModel()
     
     axes[0,0].imshow(tensor_to_image(tensor))
     
-    input_center0 = (10, 20)
-    input_center1 = (30, 20)
+    input_center0 = (920, 920)
+    input_center1 = (950, 920)
     
     centers_x, centers_y = smooth_moving(input_center0, input_center1, 1)
    
     window = 20
+    windowx = 362
+    windowy = 279
      
     for x, y in zip(centers_x, centers_y):
         print(x, y)
         out, velocity, diff = r(tensor, x, y)
     
+    # stream_draw(torch.stack([vx, vy], dim=-1))
+    # edge_to_image()
     
-   
+    axes[0,1].imshow(tensor_to_image(out))
+    axes[0,2].imshow(tensor_to_image(diff[:, :, windowy-window : windowy+window, windowx-window : windowx+window]))
+    axes[1,0].imshow(tensor_to_image(out[:, :, windowy-window : windowy+window, windowx-window : windowx+window]))
+    axes[1,1].imshow(tensor_to_image(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1].unsqueeze(0)))
+    axes[1,2].imshow(edge_to_image(velocity[:, 0, :, :, 0].unsqueeze(0)))
+    axes[2,0].imshow(edge_to_image(velocity[:, 0, :, :, 1].unsqueeze(0)))
+    axes[2,1].imshow(edge_to_image(velocity[:, 0, :, :, 2].unsqueeze(0)))
+    axes[2,2].imshow(edge_to_image(velocity[:, 0, :, :, 3].unsqueeze(0)))
     
-    # axes[0,1].imshow(tensor_to_image(diff[:, :, 256-window : 256+window, 256-window : 256+window]))
-    # axes[1,0].imshow(tensor_to_image(out[:, :, 256-window : 256+window, 256-window : 256+window]))
-    # axes[1,1].imshow(tensor_to_image(out))
-    axes[0,1].imshow(tensor_to_image(diff))
-    axes[1,0].imshow(tensor_to_image(out))
-    axes[1,1].imshow(tensor_to_image(out))
+    index = torch.argmax(velocity[:, 0, ..., 0])
+    print(index) #279 362
+    print(velocity[0,0,windowy,windowx,0])
+    print(velocity[0,0,windowy,windowx,1])
+    print(velocity[0,0, windowy-window : windowy+window, windowx-window : windowx+window,0])
+    print(velocity[0,0, windowy-window : windowy+window, windowx-window : windowx+window,1])
+
+    # maxv, index = torch.max(velocity[..., 1])
+    # print(index.item())
+    # maxv, index = torch.max(velocity[..., 2])
+    # print(index.item())
+    # maxv, index = torch.max(velocity[..., 3])
+    # print(index.item())
     plt.show()
     '''
     model = RetinaModel()
