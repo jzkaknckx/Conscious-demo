@@ -87,6 +87,23 @@ def tensor_to_image(tensor):
     transform = transforms.ToPILImage()
     return transform(tensor)
 
+def tensor_to_image_1channel(tensor):
+    """
+    将张量转换为 PIL 图像。
+    
+    参数:
+        tensor (Tensor): 图像张量。
+    
+    返回:
+        PIL.Image: 图像对象。
+    """
+    B, C, H, W = tensor.shape
+    assert C == 1, "Dimension2 must be 1, use tensor_to_image if RGB images"
+    # 移除 batch 维度并确保值在 [0, 1] 范围内
+    tensor = tensor.squeeze(0).repeat(3, 1, 1).clamp(0, 1)
+    transform = transforms.ToPILImage()
+    return transform(tensor)
+
 def edge_to_image(tensor):
     """
     将channel=1的tensor转换为 PIL 图像。
