@@ -357,6 +357,17 @@ class OpticalFlowLayer(nn.Module):
 
         return flow
 
+def smooth_moving(input1, input2, velocity):
+    center_x0, center_y0 = input1
+    center_x1, center_y1 = input2
+    dx = center_x1 - center_x0
+    dy = center_y1 - center_y0
+    distance = np.sqrt(dx**2 + dy**2)
+    steps = int(distance // velocity)
+    x = np.linspace(center_x0, center_x1, steps+1)
+    y = np.linspace(center_y0, center_y1, steps+1)
+    return x, y
+
 class RetinaModel(nn.Module):
     def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01, lateralField=2, flowLayerCache=5, flowLayertau=0.5):
         '''
@@ -376,13 +387,13 @@ class RetinaModel(nn.Module):
         self.flow = OpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
         
     def forward(self, x, center_x, center_y):
-        x = self.preprocess(x, center_x, center_y)
-        x = self.projection(x)
-        grad = self.edge_detection(x)
-        h = self.rgb2h(x)
-        diff = self.frame_diff(x)
-        max_in_field = self.maxpooling_for_flowlayer(diff)
-        flowvelocity = self.flow(diff, max_in_field)
+        x = self.preprocess(x, center_x, center_y)          # [1, C, H0, W0]
+        x = self.projection(x)                              # [1, C, H, W]
+        grad = self.edge_detection(x)                       # {[1, 1, H, W] * 2}
+        h = self.rgb2h(x)                                   # [1, 1, H, W]
+        diff = self.frame_diff(x)                           # [1, C, H, W]
+        max_in_field = self.maxpooling_for_flowlayer(diff)  #
+        flowvelocity = self.flow(diff, max_in_field)        # [1, C, H, W, 4]
         
-        return x, flowvelocity, diff
+        return x, grad, h, diff, flowvelocity
     
