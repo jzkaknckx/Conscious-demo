@@ -6,6 +6,7 @@ from nns.Retina import (
     ,RetinaModel
 )
 
+
 class Visual(nn.Module):
     def __init__(self):
         super().__init__()

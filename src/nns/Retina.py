@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
+import numpy as np
 import math
 from typing import List, Optional, Tuple, Union, Any, Dict
 from collections import deque
@@ -155,7 +156,8 @@ class EdgeDetectionLayer(nn.Module):
         '''todo 改成F.conv2d'''
         grad_x = F.conv2d(x, self.sobel_x, padding=1, groups=1)
         grad_y = F.conv2d(x, self.sobel_y, padding=1, groups=1)
-        return grad_x, grad_y
+        grad = torch.stack([grad_x, grad_y], dim=-1)
+        return grad
 
 class RGB2H(nn.Module):
     def __init__(self):
@@ -389,7 +391,7 @@ class RetinaModel(nn.Module):
     def forward(self, x, center_x, center_y):
         x = self.preprocess(x, center_x, center_y)          # [1, C, H0, W0]
         x = self.projection(x)                              # [1, C, H, W]
-        grad = self.edge_detection(x)                       # {[1, 1, H, W] * 2}
+        grad = self.edge_detection(x)                       # [1, 1, H, W, 2]
         h = self.rgb2h(x)                                   # [1, 1, H, W]
         diff = self.frame_diff(x)                           # [1, C, H, W]
         max_in_field = self.maxpooling_for_flowlayer(diff)  #
@@ -397,3 +399,4 @@ class RetinaModel(nn.Module):
         
         return x, grad, h, diff, flowvelocity
     
+            
