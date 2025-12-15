@@ -389,14 +389,14 @@ class RetinaModel(nn.Module):
         self.flow = OpticalFlowLayer(lateralField, flowLayerCache, flowLayertau)
         
     def forward(self, x, center_x, center_y):
-        x = self.preprocess(x, center_x, center_y)          # [1, C, H0, W0]
-        x = self.projection(x)                              # [1, C, H, W]
+        cropped = self.preprocess(x, center_x, center_y)          # [1, C, H0, W0]
+        x = self.projection(cropped)                              # [1, C, H, W]
         grad = self.edge_detection(x)                       # [1, 1, H, W, 2]
         h = self.rgb2h(x)                                   # [1, 1, H, W]
         diff = self.frame_diff(x)                           # [1, C, H, W]
         max_in_field = self.maxpooling_for_flowlayer(diff)  #
         flowvelocity = self.flow(diff, max_in_field)        # [1, C, H, W, 4]
         
-        return x, grad, h, diff, flowvelocity
+        return x, grad, h, diff, flowvelocity, cropped
     
             

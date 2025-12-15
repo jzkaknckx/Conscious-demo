@@ -71,6 +71,7 @@ def image_to_tensor(image_path):
 '''
 张量输出
 '''
+'''
 def tensor_to_image(tensor):
     """
     将张量转换为 PIL 图像。
@@ -86,6 +87,31 @@ def tensor_to_image(tensor):
     tensor = tensor.squeeze(0).clamp(0, 1)
     transform = transforms.ToPILImage()
     return transform(tensor)
+'''
+def tensor_to_image(tensor, save=False, filename="output.png"):
+    """
+    将张量转换为 PIL 图像，并可选择保存图像。
+    
+    参数:
+        tensor (Tensor): 图像张量。
+        save (bool): 是否保存图像，默认为False。
+        filename (str): 保存图像的文件名，默认为"output.png"。
+    
+    返回:
+        PIL.Image: 图像对象。
+    """
+    # 移除 batch 维度并确保值在 [0, 1] 范围内
+    tensor = tensor.squeeze(0).clamp(0, 1)
+    transform = transforms.ToPILImage()
+    image = transform(tensor)
+    
+    # 如果需要保存图像
+    if save:
+        # 确保目录存在
+        image.save(filename)
+        print(f"图像已保存为 {filename}")
+    
+    return image
 
 def tensor_to_image_1channel(tensor):
     """
@@ -104,7 +130,7 @@ def tensor_to_image_1channel(tensor):
     transform = transforms.ToPILImage()
     return transform(tensor)
 
-def edge_to_image(tensor):
+def edge_to_image(tensor, save=False, filename="output.png"):
     """
     将channel=1的tensor转换为 PIL 图像。
     
@@ -133,7 +159,48 @@ def edge_to_image(tensor):
     scaled_tensor[1,:,:] = negEdgeTensor
         
     transform = transforms.ToPILImage()
-    return transform(scaled_tensor)
+    image = transform(scaled_tensor)
+    
+    if save:
+        # 确保目录存在
+        image.save(filename)
+        print(f"图像已保存为 {filename}")
+        
+    return image
+
+def edge_to_image_with_max(tensor, maxedge, save=False, filename="output.png"):
+    """
+    将channel=1的tensor转换为 PIL 图像。
+    
+    参数:
+        tensor (Tensor): 图像张量。
+    
+    返回:
+        PIL.Image: 图像对象。
+    """
+    
+    B, C, H, W = tensor.shape
+    scaled_tensor = torch.zeros(3, H, W)
+    
+    assert C == 1, "Dimension2 must be 1"
+    
+    # 正向边缘与反向边缘归一化
+    # posEdgeTensor = tensor.squeeze(0).clamp(0, 1) 
+    # negEdgeTensor = tensor.squeeze(0).clamp(-1, 0) * (-1) 
+    posEdgeTensor = tensor.squeeze(0).clamp(0, maxedge) *2 / maxedge
+    negEdgeTensor = tensor.squeeze(0).clamp((-1)*maxedge, 0) *(-2) / maxedge
+    scaled_tensor[0,:,:] = posEdgeTensor
+    scaled_tensor[1,:,:] = negEdgeTensor
+        
+    transform = transforms.ToPILImage()
+    image = transform(scaled_tensor)
+    
+    if save:
+        # 确保目录存在
+        image.save(filename)
+        print(f"图像已保存为 {filename}")
+        
+    return image
 
 def generate_graph_tensor(H: int, W: int, graph: str, R: float) -> torch.Tensor:
     """

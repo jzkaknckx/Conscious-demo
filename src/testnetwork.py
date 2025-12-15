@@ -14,6 +14,7 @@ from nns.Retina import (
     PreprocessLayer
     ,ProjectionLayer
     ,EdgeDetectionLayer
+    ,RetinaModel
 )
 
 
@@ -191,51 +192,87 @@ def smooth_moving(input1, input2, velocity):
 if __name__ == "__main__":
 
     
-    fig, axes = plt.subplots(3,3, figsize=(10, 5))
+    fig, axes = plt.subplots(3, 3, figsize=(10, 5))
     
     # 准备输入
-    image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
+    image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg' 
     tensor, oringinal_image = image_to_tensor(image_path)
     # axes[0,0].imshow(oringinal_image)
     # axes[0,0].set_title('')
     
     # tensor = generate_graph_tensor(H=40, W=40, graph="Circle", R=10)
-    
+
     r = RetinaModel()
     
     axes[0,0].imshow(tensor_to_image(tensor))
     
-    input_center0 = (920, 920)
+    input_center0 = (920, 890)
     input_center1 = (950, 920)
     
     centers_x, centers_y = smooth_moving(input_center0, input_center1, 1)
    
-    window = 20
-    windowx = 362
-    windowy = 279
+    window = 40
+    windowx = 190
+    windowy = 310
      
     for x, y in zip(centers_x, centers_y):
         print(x, y)
-        out, velocity, diff = r(tensor, x, y)
+        
+        out, grad, h, diff, velocity, cropped = r(tensor, x, y)
+        
     
-    # stream_draw(torch.stack([vx, vy], dim=-1))
-    # edge_to_image()
     
-    axes[0,1].imshow(tensor_to_image(out))
-    axes[0,2].imshow(tensor_to_image(diff[:, :, windowy-window : windowy+window, windowx-window : windowx+window]))
-    axes[1,0].imshow(tensor_to_image(out[:, :, windowy-window : windowy+window, windowx-window : windowx+window]))
-    axes[1,1].imshow(tensor_to_image(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1].unsqueeze(0)))
-    axes[1,2].imshow(edge_to_image(velocity[:, 0, :, :, 0].unsqueeze(0)))
-    axes[2,0].imshow(edge_to_image(velocity[:, 0, :, :, 1].unsqueeze(0)))
-    axes[2,1].imshow(edge_to_image(velocity[:, 0, :, :, 2].unsqueeze(0)))
-    axes[2,2].imshow(edge_to_image(velocity[:, 0, :, :, 3].unsqueeze(0)))
+    min_vals = torch.min(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 0]) 
+    max_vals = torch.max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 0])
+    maxedge = torch.max((-1)*min_vals, max_vals)
+    print(maxedge)
     
-    index = torch.argmax(velocity[:, 0, ..., 0])
-    print(index) #279 362
-    print(velocity[0,0,windowy,windowx,0])
-    print(velocity[0,0,windowy,windowx,1])
-    print(velocity[0,0, windowy-window : windowy+window, windowx-window : windowx+window,0])
-    print(velocity[0,0, windowy-window : windowy+window, windowx-window : windowx+window,1])
+    min_vals = torch.min(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1]) 
+    max_vals = torch.max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1])
+    maxedge0 = torch.max((-1)*min_vals, max_vals)
+    maxedge = torch.max(maxedge, maxedge0)
+    print(maxedge)
+    
+    min_vals = torch.min(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 2]) 
+    max_vals = torch.max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 2])
+    maxedge0 = torch.max((-1)*min_vals, max_vals)
+    maxedge = torch.max(maxedge, maxedge0)
+    print(maxedge)
+    
+    min_vals = torch.min(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 3]) 
+    max_vals = torch.max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 3])
+    maxedge0 = torch.max((-1)*min_vals, max_vals)
+    maxedge = torch.max(maxedge, maxedge0)
+    print(maxedge)
+    
+    # axes[0,0].imshow(tensor_to_image(tensor))
+    # axes[0,1].imshow(tensor_to_image(out))
+    # axes[0,2].imshow(tensor_to_image(diff[:, :, windowy-window : windowy+window, windowx-window : windowx+window]))
+    # axes[1,0].imshow(tensor_to_image(out[:, :, windowy-window : windowy+window, windowx-window : windowx+window]))
+    # axes[1,1].imshow(tensor_to_image(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1].unsqueeze(0)))
+    # axes[1,2].imshow(edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 0].unsqueeze(0), maxedge))
+    # axes[2,0].imshow(edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1].unsqueeze(0), maxedge))
+    # axes[2,1].imshow(edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 2].unsqueeze(0), maxedge))
+    # axes[2,2].imshow(edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 3].unsqueeze(0), maxedge))
+    
+    tensor_to_image(out, save=True, filename="retina.png")
+    tensor_to_image(out[:, :, windowy-window : windowy+window, windowx-window : windowx+window], save=True, filename="retina0.png")
+    tensor_to_image(cropped, save=True, filename="cropped.png")
+    tensor_to_image(h[:, :, windowy-window : windowy+window, windowx-window : windowx+window], save=True, filename="h.png")
+    tensor_to_image(diff[:, :, windowy-window : windowy+window, windowx-window : windowx+window], save=True, filename="diff.png")
+    
+    edge_to_image(grad[:, :, windowy-window : windowy+window, windowx-window : windowx+window, 0], save=True, filename="grad0.png")
+    edge_to_image(grad[:, :, windowy-window : windowy+window, windowx-window : windowx+window, 1], save=True, filename="grad1.png")
+    
+    edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 0].unsqueeze(0), maxedge, save=True, filename="v0.png")
+    edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 1].unsqueeze(0), maxedge, save=True, filename="v1.png")
+    edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 2].unsqueeze(0), maxedge, save=True, filename="v2.png")
+    edge_to_image_with_max(velocity[:, 0, windowy-window : windowy+window, windowx-window : windowx+window, 3].unsqueeze(0), maxedge, save=True, filename="v3.png")
+    
+    # print(velocity[0,0,windowy,windowx,0])
+    # print(velocity[0,0,windowy,windowx,1])
+    # print(velocity[0,0, windowy-window : windowy+window, windowx-window : windowx+window,0])
+    # print(velocity[0,0, windowy-window : windowy+window, windowx-window : windowx+window,1])
 
     # maxv, index = torch.max(velocity[..., 1])
     # print(index.item())
@@ -244,27 +281,21 @@ if __name__ == "__main__":
     # maxv, index = torch.max(velocity[..., 3])
     # print(index.item())
     plt.show()
-    '''
-    model = RetinaModel()
+    
+    # model = RetinaModel()
     # output, _, _, _ = model(tensor, 960, 640)
     # axes[0,1].imshow(tensor_to_image(output))
     # axes[0,1].set_title('')
     
-    output, grid_x, gris_y, _ = model(tensor, 970, 650)
+    # output, grad, h, diff, flowvelocity, cropped= model(tensor, -1, -1)
     # axes[1,0].imshow(tensor_to_image(output))
-    grid = torch.sqrt(grid_x**2 + gris_y**2)
+
     
-    for i in range(1,15):
-        output, _, _, velocity = model(tensor, 970, 650)
+    # axes[0,1].imshow(tensor_to_image(cropped))
+    # axes[0,2].imshow(tensor_to_image(output))
     
-    # print(velocity[0].var(), torch.max(velocity[0]), torch.min(velocity[0]))
-    # print(velocity[1].var(), torch.max(velocity[1]), torch.min(velocity[1]))
-    print(velocity[2].var(), torch.max(velocity[2]), torch.min(velocity[2]))
-    print(velocity[3].var(), torch.max(velocity[3]), torch.min(velocity[3]))
-    axes[0,0].imshow(edge_to_image(velocity[0]))
-    axes[0,1].imshow(edge_to_image(grid))
-    axes[1,0].imshow(edge_to_image(velocity[2]))
-    axes[1,1].imshow(edge_to_image(velocity[3]))
+    # plt.show()
+    # axes[1,1].imshow(edge_to_image(velocity[3]))
 
     # axes[0,1].imshow()
     # axes[0,1].set_title('')
@@ -272,6 +303,6 @@ if __name__ == "__main__":
     # axes[1,0].set_title('')
     # axes[1,1].imshow()
     # axes[1,1].set_title('')
-    '''
+
     
     
