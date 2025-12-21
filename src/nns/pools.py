@@ -77,6 +77,17 @@ class HighOrderFeatureLayer(nn.Module):
         out = torch.cat([curvature, rectangle], dim=1)  # [B,2,H,W]
         return out
 
+class FixationPointShifting():
+    def __init__(self, vision_size=512):
+        self.vision_size = vision_size
+        
+    def fixation_shift(self, interest):
+        H, W = interest.shape[-2:]
+        if H != self.vision_size or W != self.vision_size:
+            raise ValueError("interest map must be of size {}x{}".format(self.vision_size, self.vision_size))
+        _, max_index = torch.max(interest.view(-1), dim=0)
+        y, x = max_index // W, max_index % W
+        return x, y
 
 # ---------------------------
 # Feature fusion helper
