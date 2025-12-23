@@ -212,3 +212,260 @@ class CurvaturePyramidModule(nn.Module):
 #  - write either agg or integ channels as part of your "高级子模态" that feed into the graph memory layer
 
 # end additions
+
+
+
+
+
+
+# ----------------------------
+# === Aspect-ratio sensitive modules ===
+# ----------------------------
+class AspectRatioFilter(nn.Module):
+    """Estimate a signed aspect-ratio response for a single receptive field (scale).
+    Output: [B, 1, H, W]
+    Behavior:
+      - returns 0 when local major/minor axis lengths are equal (ratio ~1)
+      - returns positive values when major axis is vertical (tall), negative when horizontal (wide)
+      - magnitude grows with axis ratio (log-scaled)
+    Implementation:
+      - compute structure tensor components (smoothed gradient products)
+      - compute eigenvalues lambda1 >= lambda2 and principal orientation theta
+      - ratio = sqrt(lambda1/(lambda2 + eps)), value = sign(theta) * log(ratio + 1e-3)
+    """
+    def __init__(self, sigma: float=1.0, kernel_size: int=None, channels: int=1):
+        super().__init__()
+        if kernel_size is None:
+            kernel_size = max(3, int(2 * math.ceil(3 * sigma) + 1))
+        self.sigma = sigma
+        self.kernel_size = kernel_size
+        self.channels = channels
+        kernel = make_gaussian_kernel(self.kernel_size, self.sigma, channels)
+        self.register_buffer('gauss', kernel)
+        sobel_x = torch.tensor([[1., 0., -1.],[2., 0., -2.],[1., 0., -1.]])
+        sobel_y = sobel_x.t()
+        sobel_x = sobel_x.view(1, 1, 3, 3).repeat(channels, 1, 1, 1)
+        sobel_y = sobel_y.view(1, 1, 3, 3).repeat(channels, 1, 1, 1)
+        self.register_buffer('sobel_x', sobel_x)
+        self.register_buffer('sobel_y', sobel_y)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [B, C, H, W]
+        B, C, H, W = x.shape
+        if C > 1:
+            x = 0.2989 * x[:,0:1] + 0.5870 * x[:,1:2] + 0.1140 * x[:,2:3]
+        padding = self.kernel_size // 2
+        x_smooth = F.conv2d(x, self.gauss, padding=padding, groups=self.channels)
+        dx = F.conv2d(x_smooth, self.sobel_x, padding=1, groups=self.channels)
+        dy = F.conv2d(x_smooth, self.sobel_y, padding=1, groups=self.channels)
+        # compute structure tensor components (smoothed outer products)
+        Jxx = F.conv2d(dx * dx, self.gauss, padding=padding, groups=self.channels)
+        Jyy = F.conv2d(dy * dy, self.gauss, padding=padding, groups=self.channels)
+        Jxy = F.conv2d(dx * dy, self.gauss, padding=padding, groups=self.channels)
+        # eigenvalues analytic
+        trace = Jxx + Jyy
+        disc = torch.clamp(trace * trace * 0.25 - (Jxx * Jyy - Jxy * Jxy), min=0.0)
+        sqrt_disc = torch.sqrt(disc)
+        lambda1 = 0.5 * trace + sqrt_disc
+        lambda2 = 0.5 * trace - sqrt_disc
+        ratio = torch.sqrt((lambda1 + 1e-12) / (lambda2 + 1e-12))  # >=1
+        # principal orientation theta (radians) in range [-pi/2, pi/2]
+        theta = 0.5 * torch.atan2(2.0 * Jxy, (Jxx - Jyy) + 1e-12)
+        # sign: positive if major axis more vertical -> |sin(theta)| > |cos(theta)|
+        sin_t = torch.sin(theta)
+        cos_t = torch.cos(theta)
+        verticalness = torch.abs(sin_t) - torch.abs(cos_t)  # >0 -> more vertical
+        sign = torch.sign(verticalness)
+        val = sign * torch.log(ratio + 1e-6)
+        # normalize per-sample for stability
+        maxv = val.view(B, -1).abs().max(dim=1)[0].view(B,1,1,1) + 1e-6
+        val = val / maxv
+        return val
+
+class MultiScaleAspectBank(nn.Module):
+    def __init__(self, scales: List[float]):
+        super().__init__()
+        self.scales = scales
+        self.filters = nn.ModuleList([AspectRatioFilter(sigma=s) for s in scales])
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        outs = []
+        for f in self.filters:
+            outs.append(f(x))
+        return torch.cat(outs, dim=1)  # [B, S, H, W]
+
+class AspectAggregator(nn.Module):
+    """Aggregate multi-scale aspect responses into K channels (same API as ScaleAggregator)"""
+    def __init__(self, in_scales: int, out_k: int=2, mode: str='attn'):
+        super().__init__()
+        assert mode in ('max', 'attn', 'conv')
+        self.mode = mode
+        self.in_scales = in_scales
+        if mode == 'attn':
+            self.attn_net = nn.Sequential(
+                nn.Conv2d(in_scales, max(in_scales, 16), kernel_size=1),
+                nn.ReLU(),
+                nn.Conv2d(max(in_scales, 16), in_scales * out_k, kernel_size=1)
+            )
+            self.out_k = out_k
+        elif mode == 'conv':
+            self.conv1x1 = nn.Conv2d(in_scales, out_k, kernel_size=1)
+        else:
+            self.out_k = out_k
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, S, H, W = x.shape
+        if self.mode == 'max':
+            out_max = torch.max(x, dim=1, keepdim=False)[0]
+            out_min = torch.min(x, dim=1, keepdim=False)[0]
+            out = torch.where(out_max < 0, out_min, out_max)
+            # out = torch.where(out_min > 0, out_max, out_min)
+            return out.unsqueeze(1).repeat(1, self.out_k, 1, 1)
+        elif self.mode == 'conv':
+            return self.conv1x1(x)
+        else:
+            logits = self.attn_net(x)
+            logits = logits.view(B, self.out_k, S, H, W)
+            att = torch.softmax(logits, dim=2)
+            x_exp = x.unsqueeze(1).expand(B, self.out_k, S, H, W)
+            weighted = (att * x_exp).sum(dim=2)
+            return weighted
+
+class AspectIntegrator(nn.Module):
+    def __init__(self, in_k: int, out_m: int=1, mode: str='fusion'):
+        super().__init__()
+        self.mode = mode
+        if mode == 'fusion':
+            self.conv = nn.Conv2d(in_k, out_m, kernel_size=1)
+        elif mode == 'invariant':
+            self.fc = nn.Conv2d(in_k, out_m, kernel_size=1)
+        else:
+            self.out_m = in_k
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.mode == 'per_aspect':
+            return x
+        elif self.mode == 'fusion':
+            return self.conv(x)
+        else:
+            # combine magnitude and learned
+            mag = torch.sqrt((x**2).sum(dim=1, keepdim=True) + 1e-8)
+            learned = self.fc(x)
+            return torch.cat([mag, learned], dim=1)
+
+# ----------------------------
+# === Angle / Orientation sensitive modules ===
+# ----------------------------
+class OrientationFilter(nn.Module):
+    """Compute local dominant orientation (theta) as a map for a single receptive field (scale).
+    Output: [B, 1, H, W] where values are normalized in [-1,1] representing angle in [-pi/2, pi/2].
+    Implementation: structure tensor -> principal orientation theta -> normalized value theta/(pi/2)
+    """
+    def __init__(self, sigma: float=1.0, kernel_size: int=None, channels: int=1):
+        super().__init__()
+        if kernel_size is None:
+            kernel_size = max(3, int(2 * math.ceil(3 * sigma) + 1))
+        self.sigma = sigma
+        self.kernel_size = kernel_size
+        self.channels = channels
+        kernel = make_gaussian_kernel(self.kernel_size, self.sigma, channels)
+        self.register_buffer('gauss', kernel)
+        sobel_x = torch.tensor([[1., 0., -1.],[2., 0., -2.],[1., 0., -1.]])
+        sobel_y = sobel_x.t()
+        sobel_x = sobel_x.view(1, 1, 3, 3).repeat(channels, 1, 1, 1)
+        sobel_y = sobel_y.view(1, 1, 3, 3).repeat(channels, 1, 1, 1)
+        self.register_buffer('sobel_x', sobel_x)
+        self.register_buffer('sobel_y', sobel_y)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, C, H, W = x.shape
+        if C > 1:
+            x = 0.2989 * x[:,0:1] + 0.5870 * x[:,1:2] + 0.1140 * x[:,2:3]
+        padding = self.kernel_size // 2
+        x_smooth = F.conv2d(x, self.gauss, padding=padding, groups=self.channels)
+        dx = F.conv2d(x_smooth, self.sobel_x, padding=1, groups=self.channels)
+        dy = F.conv2d(x_smooth, self.sobel_y, padding=1, groups=self.channels)
+        Jxx = F.conv2d(dx * dx, self.gauss, padding=padding, groups=self.channels)
+        Jyy = F.conv2d(dy * dy, self.gauss, padding=padding, groups=self.channels)
+        Jxy = F.conv2d(dx * dy, self.gauss, padding=padding, groups=self.channels)
+        theta = 0.5 * torch.atan2(2.0 * Jxy, (Jxx - Jyy) + 1e-12)  # [-pi/2, pi/2]
+        out = theta / (math.pi / 2.0)  # normalize to [-1,1]
+        return out
+
+class MultiScaleOrientationBank(nn.Module):
+    def __init__(self, scales: List[float]):
+        super().__init__()
+        self.scales = scales
+        self.filters = nn.ModuleList([OrientationFilter(sigma=s) for s in scales])
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        outs = []
+        for f in self.filters:
+            outs.append(f(x))
+        return torch.cat(outs, dim=1)  # [B, S, H, W]
+
+class OrientationAggregator(nn.Module):
+    """Aggregate multi-scale orientation responses into K channels. We treat angles carefully:
+    we convert to sin/cos components per scale to avoid discontinuity and then aggregate.
+    """
+    def __init__(self, in_scales: int, out_k: int=4, mode: str='attn'):
+        super().__init__()
+        self.in_scales = in_scales
+        self.out_k = out_k
+        self.mode = mode
+        # we'll aggregate using the same attention/net approach but operate on sin/cos
+        if mode == 'attn':
+            self.attn_net = nn.Sequential(
+                nn.Conv2d(in_scales*2, max(in_scales*2, 32), kernel_size=1),
+                nn.ReLU(),
+                nn.Conv2d(max(in_scales*2, 32), in_scales * out_k, kernel_size=1)
+            )
+        elif mode == 'conv':
+            self.conv = nn.Conv2d(in_scales*2, out_k, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [B, S, H, W] with values in [-1,1] representing normalized angles
+        B, S, H, W = x.shape
+        # convert to sin/cos channels
+        angle = x * (math.pi / 2.0)
+        s = torch.sin(angle)
+        c = torch.cos(angle)
+        comb = torch.cat([s, c], dim=1)  # [B, 2S, H, W]
+        if self.mode == 'conv':
+            out = self.conv(comb)
+            return out
+        else:
+            logits = self.attn_net(comb)  # [B, S*out_k, H, W]
+            logits = logits.view(B, self.out_k, S, H, W)
+            att = torch.softmax(logits, dim=2)
+            comb_exp = comb.unsqueeze(1).expand(B, self.out_k, 2*S, H, W)
+            # reshape comb_exp to [B, K, S, 2, H, W]
+            comb_exp = comb_exp.view(B, self.out_k, S, 2, H, W)
+            att = att.unsqueeze(3)  # [B,K,S,1,H,W]
+            weighted = (att * comb_exp).sum(dim=2)  # [B,K,2,H,W]
+            # convert back to angle per channel
+            s_agg = weighted[:, :, 0, :, :]
+            c_agg = weighted[:, :, 1, :, :]
+            theta = torch.atan2(s_agg, c_agg)  # [-pi, pi], but expected near [-pi/2, pi/2]
+            return theta / (math.pi / 2.0)  # [B, K, H, W]
+
+class OrientationIntegrator(nn.Module):
+    def __init__(self, in_k: int, out_m: int=2, mode: str='per_channel'):
+        super().__init__()
+        self.mode = mode
+        if mode == 'per_channel':
+            self.out_m = in_k
+        else:
+            self.conv = nn.Conv2d(in_k, out_m, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [B, K, H, W] normalized angles
+        if self.mode == 'per_channel':
+            return x
+        else:
+            return self.conv(x)
+
+# append to existing end marker
+
+# end additions
+

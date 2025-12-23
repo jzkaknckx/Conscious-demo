@@ -290,7 +290,7 @@ def main():
     
     # 生成并显示图像
     image = generator.generate_all_arcs()
-    generator.visualize(image, save_path="arcs_pattern.png")
+    generator.visualize(image, save_path="pattern_arcs.png")
     
     # # 示例2：不同的参数设置
     # print("\n生成高分辨率图案...")
