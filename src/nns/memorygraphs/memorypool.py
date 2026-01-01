@@ -1,4 +1,4 @@
-# foveated_training.py
+# memorypool.py
 import math
 import random
 import time
