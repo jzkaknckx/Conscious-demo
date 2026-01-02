@@ -759,9 +759,11 @@ class RetinaModel(nn.Module):
         x = self.projection(cropped)                              # [1, C, H, W]
         grad = self.edge_detection(x)                       # [1, 1, H, W, 2]
         h = self.rgb2h(x)                                   # [1, 1, H, W]
-        diff = self.frame_diff(x)                           # [1, C, H, W]
-        max_in_field = self.maxpooling_for_flowlayer(diff)  #
-        flowvelocity = self.flow(diff, max_in_field)        # [1, C, H, W, 4]
+        diff = torch.zeros_like(h)
+        # diff = self.frame_diff(x)                           # [1, C, H, W]
+        flowvelocity = torch.zeros_like(h)
+        # max_in_field = self.maxpooling_for_flowlayer(diff)  #
+        # flowvelocity = self.flow(diff, max_in_field)        # [1, C, H, W, 4]
         
         # Return `cropped` as well so advanced_feature can accept the preprocessed tensor
         return x, grad, h, diff, flowvelocity, cropped

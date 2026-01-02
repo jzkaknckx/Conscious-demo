@@ -493,3 +493,21 @@ class FoveatedGraphMemory:
             self.attn.update_map()
 
 # End of module
+'''
+当前的问题:
+    run_one_step中  每次眼跳:检测一次->学习一次
+    最好是          眼跳一次->检测--(match)-->加强
+                              |-(unmatch)-->学习(多次眼跳)
+    即每次检测进入模式识别 match后加强并继续眼跳; unmatch后学习,允许多次眼跳,直到跳出循环
+    
+    眼跳的范围动态调整 
+    学习时attention矩阵
+    扫视范围跳过attention,在矩阵外侧选取 首先取反,叠加以注视点为中心的高斯函数
+    
+    attention_map的更新问题,新图/新注视点触发更新 写明触发点
+    
+    position参数的意义是否存在 edge中存储方向利于匹配算法 
+    
+    现在的学习算法是否太敏感,持续学习纹理信息而抓不住主要的边缘.
+
+'''
