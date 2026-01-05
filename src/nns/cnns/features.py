@@ -728,7 +728,7 @@ def smooth_moving(input1, input2, velocity):
 
 
 class RetinaModel(nn.Module):
-    def __init__(self, cropped_size=1024, output_size=512, center_size=256, projectiontau=0.01,
+    def __init__(self, cropped_size=512, output_size=512, center_size=256, projectiontau=0.01,
                  lateralField=2, flowLayerCache=5, flowLayertau=0.5,
                  edge_apply_gaussian: bool = False, edge_gauss_kernel_size: int = 5, edge_gauss_sigma: float = 1.0):
         '''
@@ -756,7 +756,8 @@ class RetinaModel(nn.Module):
         
     def forward(self, x, center_x, center_y):
         cropped = self.preprocess(x, center_x, center_y)          # [1, C, H0, W0]
-        x = self.projection(cropped)                              # [1, C, H, W]
+        x = cropped
+        # x = self.projection(cropped)                              # [1, C, H, W]
         grad = self.edge_detection(x)                       # [1, 1, H, W, 2]
         h = self.rgb2h(x)                                   # [1, 1, H, W]
         diff = torch.zeros_like(h)

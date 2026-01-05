@@ -14,7 +14,7 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(3,3, figsize=(10, 5))
     
     # 准备输入
-    image_path = 'src/picture/v2-a2184227abddb98b3b7405e6033651ff_r.jpg'  # [1, 3, 1280, 1920]
+    image_path = 'src/picture/OIP-C.jpg'  # [1, 3, 1280, 1920]
     tensor, oringinal_image = image_to_tensor(image_path)
     axes[0,0].imshow(tensor_to_image(tensor))
  

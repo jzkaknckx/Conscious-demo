@@ -185,6 +185,7 @@ def draw_aggregated_blocks(ax, mem, img_shape: Tuple[int,int], block_size:int=4,
             gx = x // block_size; gy = y // block_size
             if 0 <= gy < bh and 0 <= gx < bw:
                 grid[gy, gx] = 3
+    '''           
     for nid in matched_nodes:
         if nid in mem.graph0.nodes:
             n = mem.graph0.nodes[nid]
@@ -192,6 +193,7 @@ def draw_aggregated_blocks(ax, mem, img_shape: Tuple[int,int], block_size:int=4,
             gx = x // block_size; gy = y // block_size
             if 0 <= gy < bh and 0 <= gx < bw:
                 grid[gy, gx] = 2
+    ''' 
 
     # build RGBA image small then resize
     canvas = np.zeros((bh, bw, 4), dtype=np.uint8)
@@ -226,7 +228,7 @@ def visualize_step(image: Any,
                    save_path: Optional[str] = None,
                    show: bool = True,
                    node_detail_threshold: int = 2000,
-                   block_size: int = 4):
+                   block_size: int = 2):
 
     img = _to_numpy_image(image)
     H, W = img.shape[:2]
@@ -246,6 +248,7 @@ def visualize_step(image: Any,
     total_nodes = len(mem.graph0.nodes)
     aggregated = total_nodes > node_detail_threshold
     aggregated = True
+    matched_nodes = None
 
     # draw edges and nodes (detailed or aggregated)
     if not aggregated:
@@ -254,7 +257,8 @@ def visualize_step(image: Any,
     else:
         # aggregated mode: draw colored blocks representing occupancy / matched / learned
         match_info = result.get('match_info', {}) if result else {}
-        matched_nodes = match_info.get('matched_mem_ids', [])
+        if match_info:
+            matched_nodes = match_info.get('matched_mem_ids', [])
         learned_nodes = result.get('learned_nodes', []) if result else []
         draw_aggregated_blocks(ax, mem, (H, W), block_size=block_size, matched_nodes=matched_nodes, learned_nodes=learned_nodes)
 
@@ -271,7 +275,7 @@ def visualize_step(image: Any,
 
     # Fixation and saccade
     if current_fix is not None:
-        ax.plot(current_fix[0], current_fix[1], marker='+', color='yellow', markersize=14, mew=2)
+        ax.plot(current_fix[0], current_fix[1], marker='+', color='yellow', markersize=7, mew=2)
 
     mv = result.get('move') if result else None
     if mv and len(mv) >= 3 and current_fix is not None:
@@ -281,7 +285,7 @@ def visualize_step(image: Any,
 
     # Legend (adjust for aggregated vs detailed)
     legend_ax = fig.add_axes([0.78, 0.1, 0.2, 0.8])
-    legend_ax.axis('off')
+    legend_ax.axis('on')
     if not aggregated:
         legend_items = [
             Patch(facecolor='lime', edgecolor='black', label='Matched nodes'),
