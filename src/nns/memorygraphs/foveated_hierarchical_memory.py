@@ -606,7 +606,7 @@ class FoveatedMemory:
         hue_mean = F.conv2d(hmap[None,None], kernel, padding=pad)[0,0]
         hue_patch_mean = hue_mean[y0:y1+1, x0:x1+1]
         sal_patch = torch.abs(hue_patch - hue_patch_mean)
-        sal_patch_masked = sal_patch.clone(); sal_patch_masked[~unvisited_patch] = float('-inf')
+        sal_patch_masked = sal_patch.clone(); sal_patch_masked[unvisited_patch] = float('-inf')
         flat = sal_patch_masked.flatten()
         topk = min(self.cfg.topk_per_modality, int((sal_patch_masked != float('-inf')).sum().item()))
         if topk > 0:
@@ -633,7 +633,7 @@ class FoveatedMemory:
             Cb, Hfull, Wfull = b.shape
             patch = b[:, y0:y1+1, x0:x1+1]  # [C, Hpatch, Wpatch]
             sal = torch.norm(patch, dim=0)
-            sal_masked = sal.clone(); sal_masked[~unvisited_patch] = float('-inf')
+            sal_masked = sal.clone(); sal_masked[unvisited_patch] = float('-inf')
             flat = sal_masked.flatten()
             topk = min(self.cfg.topk_per_modality, int((sal_masked != float('-inf')).sum().item()))
             if topk > 0:
@@ -901,6 +901,7 @@ class FoveatedMemory:
     def learn(self, feats:List[Dict[str,Any]], activated_nodes:set, proto_matches:List[Tuple[int,int,float]], ts:int=0):
         ncols = len(self.graphI)
         new_nodes_by_collection = [ [] for _ in range(ncols) ]
+        # add new nodes
         for f in feats:
             mod = int(f['modality']); idx = mod % ncols
             coll = self.graphI[idx]
@@ -916,63 +917,38 @@ class FoveatedMemory:
                 nid = coll.add_or_merge_node(sig, mod, (x,y), f['value'], ts)
                 new_nodes_by_collection[idx].append(nid)
         for idx, coll in enumerate(self.graphI):
+            # group by bucket
             groups: Dict[Tuple[int,int], List[int]] = {}
             for nid in new_nodes_by_collection[idx]:
                 n = coll.nodes.get(nid); 
                 if n is None: continue
                 b = coll._bucket_coord(n.pos[0], n.pos[1])
                 groups.setdefault(b, []).append(nid)
+            # proto formation
             for bucket_key, members in groups.items():
                 if len(members) >= self.cfg.proto_form_thresh:
                     pid = coll.add_proto(members)
                     p = coll.protos.get(pid)
                     p.count = 1; p.strength = 1.0; p.last_updated = ts
+                    # merge if similar
                     for other_pid, other_p in list(coll.protos.items()):
                         if other_pid == pid: continue
                         inter = (p.bitset & other_p.bitset).bit_count()
                         union = (p.bitset | other_p.bitset).bit_count()
                         ratio = inter / max(1, union)
                         if ratio >= self.cfg.proto_merge_thresh:
-                            other_p.members = list(set(other_p.members) | set(p.members))
-                            other_p.update_bitset = None
-                            # merge: simplistic - just delete new proto (we don't recompute bitset for speed)
-                            if pid in coll.protos: del coll.protos[pid]
+                            new_bset = 0
+                            for m in other_p.members:
+                                if m in coll.nodes:
+                                    sig = coll.nodes[m].signature
+                                    bitpos = (hash(sig) & (coll.cfg.bitset_bits - 1))
+                                    new_bset |= (1 << bitpos)
+                            other_p.bitset = new_bset
+                            # optionally update counts/strength
+                            # other_p.count = other_p.count + p.count  # 视设计决定是否合并计数
+                            if pid in coll.protos: 
+                                del coll.protos[pid]
                             break
-
-    # --------------------------
-    # Helpers: select radius by interest density & feats in window
-    # --------------------------
-    def _choose_radius_by_interest(self, center:Tuple[int,int]) -> Optional[int]:
-        """
-        For each candidate r in saccade_radii compute: sum(interest in 2r x 2r window) / area.
-        Choose r that maximizes this value. If all windows sum ~0 return None.
-        """
-        H, W = self.saccade.interest.shape
-        cx, cy = int(center[0]), int(center[1])
-        best_r = None; best_score = -1.0
-        for r in self.cfg.saccade_radii:
-            half = r
-            x0 = max(0, cx - half); x1 = min(W-1, cx + half)
-            y0 = max(0, cy - half); y1 = min(H-1, cy + half)
-            region = self.saccade.interest[y0:y1+1, x0:x1+1]
-            if region.numel() == 0: continue
-            s = float(region.sum().item())
-            area = region.numel()
-            score = s / area
-            if score > best_score:
-                best_score = score; best_r = r
-        if best_score <= 0.0:
-            return None
-        return best_r
-
-    def _feats_in_window(self, center:Tuple[int,int], r:int) -> List[Dict[str,Any]]:
-        cx, cy = int(center[0]), int(center[1])
-        res = []
-        for f in self.last_feats:
-            fx, fy = int(f['pos'][0]), int(f['pos'][1])
-            if abs(fx - cx) <= r and abs(fy - cy) <= r:
-                res.append(f)
-        return res
 
     def _limit_feats_per_modality(self, feats:List[Dict[str,Any]], per_mod_limit:int) -> List[Dict[str,Any]]:
         grouped: Dict[int, List[Dict[str,Any]]] = {}
@@ -1028,10 +1004,21 @@ if __name__ == '__main__':
 
 '''
 改进:
-    learn时的眼跳机制需要修改 现在是根据interest-path
-        应该改成不同尺度下的interest-path相互竞争 
-        将匹配时的下采样结果复用
-    (done)extract_features针对全图,改为window内或缓存或增量式
-    graph1或更高图更新原理需要优化
-        改为单向边同时优化saccade 针对边缘/闭合曲线
+    graph0:
+        learn时的眼跳机制(center和r的选择)需要修改 现在是根据interest-path
+            应该改成不同尺度下的interest-path相互竞争 
+            将匹配时的下采样结果复用
+            
+        通过高层级graph的重现情况作为梯度反向修正embedding ?    
+        
+        _limit_feats_per_modality选择某个模态突出的特征点
+        
+        (done)extract_features针对全图,改为window内或缓存或增量式   
+    
+    graph1:
+        graph1或更高图更新原理需要优化
+            改为单向边同时优化saccade 针对边缘/闭合曲线
+    
+    graph2:
+        单向边
 '''
