@@ -18,36 +18,36 @@ class Config:
     descriptor_C = 32
     scales = [8, 4, 2, 1]
     base_bucket_size = 8
-
+    
     graphs_per_layer = {'graphI': 5}
     bitset_bits = 64
-
-    # retrieval / matching
+    
     topk_per_scale = {8: 128, 4: 64, 2: 32, 1: 16}
-    topk_per_modality = 200000
+    topk_per_modality = 20000
     proto_form_thresh = 3
     proto_merge_thresh = 0.7
-    strengthen_threshold = 0.45
+    strengthen_threshold = 8 # to enhance
     proto_match_thresh = 0.08
-
+    
     max_nodes_per_collection = 50000
     max_edges_per_node = 12
-
+    
     max_candidates_per_step = 512
     max_activated_per_collection = 128
 
-    # Saccade / window / learning params
-    saccade_radii = [32, 64, 96]  # radii in pixels
-    learn_saccades_N = 4
-    max_writes_per_modality = 5  # per saccade, per modality
-    interest_end_thresh = 0.45
-    path_sigma = 3.0  # gaussian sigma for marking path
-    device = torch.device('cpu')
+    # Saccade params
+    saccade_radii = [32, 64] # to enhance
+    learn_saccades_N = 0
+    max_writes_per_modality = 32
+    interest_end_thresh = 0.02
+    path_sigma = 3.0
 
     # interest weights
     w_grad = 0.5
     w_hue = 0.3
     w_cont = 0.2
+
+    device = torch.device('cpu')
 
 class Saccade:
     """
@@ -57,162 +57,211 @@ class Saccade:
     def __init__(self, cfg: Config, device=None):
         self.cfg = cfg
         self.device = device or cfg.device
-        self.alpha = 1.2
 
+        # per-image state
         self.interest: Optional[torch.Tensor] = None  # H x W
         self.path: Optional[torch.Tensor] = None      # H x W
-
-        self.mode: str = 'wander'   # wander | learn | end
-        self.current_center: Optional[Tuple[int, int]] = None
+        self.visited: Optional[torch.Tensor] = None   # H x W binary: 1 = already observed
+        # mode & counters
+        self.mode: str = 'wander'
+        self.current_center: Optional[Tuple[int,int]] = None
         self.learn_saccades_left: int = 0
 
-    # -------------------------------------------------
-    # Image-level reset
-    # -------------------------------------------------
-    def reset(self,
-              grad: torch.Tensor,
-              hue: torch.Tensor):
-        H, W = hue.shape[-2], hue.shape[-1]
-        self.path = torch.zeros((H, W), device=self.device)
+    # --------------------------
+    # reset on new image
+    # --------------------------
+    def reset(self, grad: torch.Tensor, hue: torch.Tensor):
+        """Initialize interest/path/visited for a new image. Use grad/hue to compute interest."""
+        H = int(hue.shape[-2]); W = int(hue.shape[-1])
+        self.path = torch.zeros((H, W), device=self.device, dtype=torch.float32)
+        self.visited = torch.zeros((H, W), device=self.device, dtype=torch.uint8)
         self.interest = self._compute_interest(grad, hue)
+        # clip to [0,1]
+        self.interest = torch.clamp(self.interest, 0.0, 1.0)
         self.mode = 'wander'
         self.current_center = None
         self.learn_saccades_left = 0
 
-    # -------------------------------------------------
-    # Interest map
-    # -------------------------------------------------
-    def _compute_interest(self, grad, hue):
+    # --------------------------
+    # compute interest field
+    # --------------------------
+    def _compute_interest(self, grad: torch.Tensor, hue: torch.Tensor) -> torch.Tensor:
+        """
+        Compute interest from grad and hue. Returns (H,W) float tensor on device.
+        """
+        # grad shape handling
         g = grad.squeeze(0)
-        g = g.squeeze(0) if g.ndim == 4 else g
-        gx, gy = g[..., 0], g[..., 1]
-        grad_mag = torch.sqrt(gx * gx + gy * gy)
+        if g.ndim == 4 and g.shape[-1] == 2:
+            g = g.squeeze(0)
+        if g.ndim == 3 and g.shape[-1] == 2:
+            gx = g[..., 0].to(self.device); gy = g[..., 1].to(self.device)
+        else:
+            gx = torch.zeros((self.cfg.H, self.cfg.W), device=self.device)
+            gy = torch.zeros_like(gx)
+        grad_mag = torch.sqrt(gx*gx + gy*gy)
 
         # hue contrast
-        h = hue.squeeze(0).squeeze(0)
-        kernel = torch.ones((1, 1, 7, 7), device=self.device) / 49.0
-        h_mean = F.conv2d(h[None, None], kernel, padding=3)[0, 0]
-        hue_contrast = torch.abs(h - h_mean)
+        h = hue.squeeze(0).squeeze(0).to(self.device)
+        k = 7; pad = k // 2
+        kernel = torch.ones((1,1,k,k), device=self.device) / (k*k)
+        hue_mean = F.conv2d(h[None,None], kernel, padding=pad)[0,0]
+        hue_contrast = torch.abs(h - hue_mean)
 
-        # normalize
-        def norm(x):
-            return (x - x.min()) / (x.max() - x.min() + 1e-6)
-        
-        interest = (
-            self.cfg.w_grad * norm(grad_mag) +
-            self.cfg.w_hue * norm(hue_contrast)
-        )
-        interest = norm(interest)
-        
-        return torch.exp((interest - 1) / self.alpha).clamp(0.0, 1.0)
+        # normalize each map to [0,1]
+        def norm_map(t):
+            tmin = float(t.min().item()); tmax = float(t.max().item())
+            if tmax - tmin < 1e-9:
+                return torch.zeros_like(t)
+            return (t - tmin) / (tmax - tmin + 1e-12)
 
-    # -------------------------------------------------
-    # Path bump (radius-aware)
-    # -------------------------------------------------
-    def add_path_bump(self, center: Tuple[int, int], window_radius: int):
-        """
-        Gaussian bump radius proportional to window_radius.
-        """
-        cx, cy = center
+        gm = norm_map(grad_mag)
+        hc = norm_map(hue_contrast)
+        # simple interest = weighted sum
+        interest = self.cfg.w_grad * gm + self.cfg.w_hue * hc
+        return interest.clamp(0.0, 1.0)
+
+    # --------------------------
+    # add path bump (radius proportional to window_radius)
+    # --------------------------
+    def add_path_bump(self, center: Tuple[int,int], window_radius: int):
+        """Add a Gaussian bump to path. Gaussian sigma proportional to window_radius."""
+        if self.path is None:
+            return
+        cx, cy = int(center[0]), int(center[1])
         H, W = self.path.shape
+        # sigma proportional to window_radius
+        sigma = max(1.0, float(window_radius) * 0.5)
+        radius = int(math.ceil(3.0 * sigma))
+        # clip bounding box
+        x0 = max(0, cx - radius); x1 = min(W - 1, cx + radius)
+        y0 = max(0, cy - radius); y1 = min(H - 1, cy + radius)
+        if x1 < x0 or y1 < y0:
+            return
+        xs = torch.arange(x0, x1+1, device=self.device, dtype=torch.float32)
+        ys = torch.arange(y0, y1+1, device=self.device, dtype=torch.float32)
+        dx2 = (xs - float(cx)) ** 2
+        dy2 = (ys - float(cy)) ** 2
+        denom = 2.0 * (sigma * sigma + 1e-12)
+        g = torch.exp(-(dy2.unsqueeze(1) + dx2.unsqueeze(0)) / denom)
+        # add and clamp
+        self.path[y0:y1+1, x0:x1+1] = torch.clamp(self.path[y0:y1+1, x0:x1+1] + g, 0.0, 1.0)
 
-        sigma = max(1.0, window_radius * 0.5)
-        radius = int(math.ceil(3 * sigma))
+    # --------------------------
+    # mark visited window (set visited=1 for the whole square)
+    # --------------------------
+    def mark_visited(self, center: Tuple[int,int], r: int):
+        """Mark the entire 2r x 2r (square) window centered at center as visited (1)."""
+        if self.visited is None:
+            return
+        cx, cy = int(center[0]), int(center[1])
+        H, W = self.visited.shape
+        x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
+        y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
+        self.visited[y0:y1+1, x0:x1+1] = 1
 
-        x0 = max(0, cx - radius)
-        x1 = min(W - 1, cx + radius)
-        y0 = max(0, cy - radius)
-        y1 = min(H - 1, cy + radius)
+    # --------------------------
+    # get unvisited mask in window (boolean)
+    # --------------------------
+    def unvisited_mask_in_window(self, center: Tuple[int,int], r: int) -> torch.Tensor:
+        """Return boolean mask for unvisited pixels inside the window (Hwin x Wwin) on device."""
+        cx, cy = int(center[0]), int(center[1])
+        H, W = self.visited.shape
+        x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
+        y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
+        patch = self.visited[y0:y1+1, x0:x1+1]
+        # return True where not visited
+        return (patch == 0)
 
-        xs = torch.arange(x0, x1 + 1, device=self.device)
-        ys = torch.arange(y0, y1 + 1, device=self.device)
-
-        dx2 = (xs - cx).float() ** 2
-        dy2 = (ys - cy).float() ** 2
-        g = torch.exp(-(dy2[:, None] + dx2[None, :]) / (2 * sigma * sigma))
-
-        self.path[y0:y1 + 1, x0:x1 + 1] = torch.clamp(
-            self.path[y0:y1 + 1, x0:x1 + 1] + g,
-            0.0, 1.0
-        )
-
-    # -------------------------------------------------
-    # Fixation selection
-    # -------------------------------------------------
-    def _prob_map(self):
+    # --------------------------
+    # compute prob map and choose fixation
+    # --------------------------
+    def prob_map(self) -> torch.Tensor:
         return F.relu(self.interest - self.path)
 
-    def choose_fixation(self):
-        prob = self._prob_map()
-        vmax = float(prob.max())
-        if vmax < self.cfg.interest_end_thresh:
+    def choose_fixation(self) -> Optional[Tuple[int,int]]:
+        pm = self.prob_map()
+        if float(pm.max().item()) <= 0.0:
             return None
-        idx = int(torch.argmax(prob))
-        W = prob.shape[1]
+        idx = int(torch.argmax(pm.flatten()).item())
+        W = pm.shape[1]
         return (idx % W, idx // W)
 
-    # -------------------------------------------------
-    # Radius selection
-    # -------------------------------------------------
-    def choose_radius(self, center):
-        cx, cy = center
-        best_r, best_score = None, -1.0
+    # --------------------------
+    # choose radius by interest density
+    # --------------------------
+    def choose_radius(self, center: Tuple[int,int]) -> Optional[int]:
+        cx, cy = int(center[0]), int(center[1])
+        best_r = None; best_score = -1.0
+        H, W = self.interest.shape
         for r in self.cfg.saccade_radii:
-            x0 = max(0, cx - r)
-            x1 = min(self.interest.shape[1] - 1, cx + r)
-            y0 = max(0, cy - r)
-            y1 = min(self.interest.shape[0] - 1, cy + r)
-            region = self.interest[y0:y1 + 1, x0:x1 + 1]
-            score = float(region.mean())
+            x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
+            y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
+            region = self.interest[y0:y1+1, x0:x1+1]
+            if region.numel() == 0:
+                continue
+            score = float(region.sum().item()) / float(region.numel())
             if score > best_score:
-                best_score, best_r = score, r
-        return best_r if best_score > 0 else None
+                best_score = score; best_r = r
+        if best_score <= 0:
+            return None
+        return best_r
 
-    # -------------------------------------------------
-    # Main step
-    # -------------------------------------------------
-    def step(self):
+    # --------------------------
+    # main step to pick or continue learning
+    # --------------------------
+    def step(self) -> Tuple[str, Optional[Tuple[int,int]], Optional[int]]:
+        """
+        Return (mode, center, r):
+        - If returns ('end', None, None) -> finished image
+        - If returns ('wander', center, None) -> no useful window chosen this call
+        - If returns ('learn', center, r) -> do learning at this window
+        - If returns ('strengthen', center, r) -> (not used here) leave strengthen decision to FoveatedMemory
+        """
         if self.mode == 'wander':
             center = self.choose_fixation()
             if center is None:
                 self.mode = 'end'
                 return 'end', None, None
-
             r = self.choose_radius(center)
             if r is None:
+                # nothing to do right now, keep wandering
                 return 'wander', center, None
-
-            self.mode = 'learn'
+            # enter learn stage
             self.current_center = center
             self.learn_saccades_left = self.cfg.learn_saccades_N
+            # mark path bump proportional to r
             self.add_path_bump(center, r)
-            return 'learn', center, r
+            # mark visited region now (we mark whole window visited to avoid recomputing)
+            self.mark_visited(center, r)
+            return 'wander', center, r
 
         elif self.mode == 'learn':
             if self.learn_saccades_left <= 0:
                 self.mode = 'wander'
                 self.current_center = None
                 return 'wander', None, None
-
-            r = self.choose_radius(self.current_center)
-            self.add_path_bump(self.current_center, r)
+            center = self.current_center
+            if center is None:
+                # fallback: pick new fixation
+                center = self.choose_fixation()
+                if center is None:
+                    self.mode = 'end'
+                    return 'end', None, None
+                self.current_center = center
+            r = self.choose_radius(center)
+            if r is None:
+                # nothing to learn at this center -> finish this learn sequence
+                self.mode = 'wander'
+                self.current_center = None
+                return 'wander', None, None
+            # each learn saccade: bump path & mark visited
+            self.add_path_bump(center, r)
+            self.mark_visited(center, r)
             self.learn_saccades_left -= 1
-            return 'learn', self.current_center, r
-
-        return 'end', None, None
-
-    # -------------------------
-    # Utility: feats in window (filter by pos) - uses feats list maintained externally
-    # -------------------------
-    @staticmethod
-    def feats_in_window(center: Tuple[int,int], r: int, feats: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
-        cx, cy = int(center[0]), int(center[1])
-        res = []
-        for f in feats:
-            fx, fy = int(f['pos'][0]), int(f['pos'][1])
-            if abs(fx - cx) <= r and abs(fy - cy) <= r:
-                res.append(f)
-        return res
+            return 'learn', center, r
+        
+        else:
+            return 'end', None, None
 
     # -------------------------
     # Mode helpers
@@ -385,7 +434,8 @@ class FoveatedMemory:
         self.graphI: List[GraphCollection] = [GraphCollection(cfg.base_bucket_size, cfg) for _ in range(n_col)]
 
         # saccade-related state
-        self.saccade = Saccade(self.cfg, device=self.device)
+        self.saccade = Saccade(cfg = self.cfg, device=self.device)
+        self.cached_feats: List[Dict[str,Any]] = []
         
         self.path = None            # H x W tensor, accumulated gaussian bumps
         self.interest = None        # H x W tensor, computed per image
@@ -394,57 +444,229 @@ class FoveatedMemory:
         self.saccades_left = 0
         self.current_center = None  # current fixation (x,y)
         self.timestep = 0
-
+        
+    # --------------------------
+    # reset image (clear caches & reset saccade)
+    # --------------------------
+    def reset_image(self, grad, hue, curvature_bank=None, aspect_bank=None, orient_bank=None):
+        # reset descriptor maps & counts
+        for s in self.cfg.scales:
+            self.desc_maps[s].zero_(); self.desc_counts[s].zero_()
+        # clear cached feats
+        self.cached_feats = []
+        # reset saccade controller (interest/path/visited)
+        self.saccade.reset(grad, hue)
+        
     # --------------------------
     # Public API (run_one_step)
     # --------------------------
-    def run_one_step(self, grad, hue, curvature_bank, aspect_bank, orient_bank,
-                    reset_image=True, ts=None):
-
+    def run_one_step(self,
+                     grad: torch.Tensor,
+                     hue: torch.Tensor,
+                     curvature_bank: Optional[torch.Tensor] = None,
+                     aspect_bank: Optional[torch.Tensor] = None,
+                     orient_bank: Optional[torch.Tensor] = None,
+                     reset_image: bool = False,
+                     ts: Optional[int] = None):
+        """
+        High-level coordinator:
+        - If reset_image: reset saccade & clear cache
+        - Call saccade.step() to get (mode, center, r)
+        - Call extract_features(center,r) to get window-local feats (only newly computed parts are processed)
+        - Call retrieve_candidates on returned feats and decide strengthen vs learn as before
+        """
         if ts is None:
             ts = self.timestep
         self.timestep += 1
 
         if reset_image:
-            self.saccade.reset(grad, hue)
+            self.reset_image(grad, hue, curvature_bank, aspect_bank, orient_bank)
 
-        feats = self.extract_features(
-            grad, hue, curvature_bank, aspect_bank, orient_bank, ts
-        )
-        self.last_feats = feats
-
-        mode, center, r = self.saccade.step()
-
-        if mode == 'end':
+        # Get saccade decision
+        mode_sacc, center, r = self.saccade.step()
+        if mode_sacc == 'end':
             return 'end', [], None
 
         if center is None or r is None:
-            return mode, [], None
+            # nothing to do now, remain in wander
+            return 'wander', [], None
 
-        window_feats = [
-            f for f in feats
-            if abs(f['pos'][0] - center[0]) <= r and
-            abs(f['pos'][1] - center[1]) <= r
-        ]
-        print(len(window_feats))
+        # Incremental extraction limited to window
+        window_feats = self.extract_features(grad, hue, curvature_bank, aspect_bank, orient_bank, center=center, r=r, ts=ts)
 
+        # Retrieve & score
         activated_nodes, proto_matches, S = self.retrieve_candidates(window_feats, ts)
+        print(len(window_feats), S)
 
-        if S >= self.cfg.strengthen_threshold:
+        # Decide branch: only strengthen OR learn (not both)
+        if S >= self.cfg.strengthen_threshold and len(activated_nodes) > 0:
+            self.saccade.mode = 'wander'
             self.apply_strengthen(activated_nodes, proto_matches, ts)
             return 'strengthen', list(activated_nodes), center
         else:
-            feats_for_learning = self._limit_feats_per_modality(
-                window_feats, self.cfg.max_writes_per_modality
-            )
-            print(len(feats_for_learning))
+            self.saccade.mode = 'learn'
+            # Prepare feats for learning limited per modality
+            feats_for_learning = self._limit_feats_per_modality(window_feats, self.cfg.max_writes_per_modality)
             self.learn(feats_for_learning, set(), [], ts)
             return 'learn', [], center
 
     # --------------------------
+    # extract_features: incremental within a window
+    # --------------------------
+    def extract_features(self,
+                         grad: torch.Tensor,
+                         hue: torch.Tensor,
+                         curvature_bank: Optional[torch.Tensor] = None,
+                         aspect_bank: Optional[torch.Tensor] = None,
+                         orient_bank: Optional[torch.Tensor] = None,
+                         center: Optional[Tuple[int,int]] = None,
+                         r: Optional[int] = None,
+                         ts: int = 0) -> List[Dict[str,Any]]:
+        """
+        Incremental extraction:
+        - If center and r are provided: extract only inside window (2r x 2r) the pixels that are not yet visited.
+          Merge them with previously cached features inside the window and return the combined list.
+        - If center is None: (optional) perform full-image extraction (fallback).
+        """
+        device = self.device
+        H = int(hue.shape[-2]); W = int(hue.shape[-1])
+
+        # If full-image extraction requested (center is None), fallback to previous global behavior.
+        if center is None or r is None:
+            # full extraction - fall back to global behavior (expensive)
+            feats = self._extract_global_features(grad, hue, curvature_bank, aspect_bank, orient_bank, ts)
+            # cache & mark visited whole image
+            self.cached_feats = feats
+            if self.saccade.visited is not None:
+                self.saccade.visited[:, :] = 1
+            return feats
+
+        # compute window bounding box
+        cx, cy = int(center[0]), int(center[1])
+        x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
+        y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
+
+        # collect previously cached feats in this window
+        prev_feats = []
+        for f in self.cached_feats:
+            fx, fy = int(f['pos'][0]), int(f['pos'][1])
+            if x0 <= fx <= x1 and y0 <= fy <= y1:
+                prev_feats.append(f)
+
+        # Determine unvisited mask patch
+        if self.saccade.visited is None:
+            unvisited_patch = torch.ones((y1 - y0 + 1, x1 - x0 + 1), dtype=torch.bool, device=device)
+        else:
+            visited_patch = self.saccade.visited[y0:y1+1, x0:x1+1]
+            unvisited_patch = (visited_patch == 0)
+
+        new_feats: List[Dict[str,Any]] = []
+
+        # --- modality: edges (grad) ---
+        # compute gradient magnitude & orientation in window, then pick topk among unvisited
+        g = grad.squeeze(0)
+        if g.ndim == 4 and g.shape[-1] == 2:
+            g = g.squeeze(0)
+        if g.ndim == 3 and g.shape[-1] == 2:
+            gx = g[..., 0].to(device); gy = g[..., 1].to(device)
+        else:
+            gx = torch.zeros((H, W), device=device); gy = torch.zeros_like(gx)
+        mag = torch.sqrt(gx*gx + gy*gy)
+        # take window patch
+        mag_patch = mag[y0:y1+1, x0:x1+1].clone()
+        # mask visited pixels (ensure they are not selected again)
+        mag_patch_masked = mag_patch.clone()
+        mag_patch_masked[unvisited_patch] = float('-inf')
+        flat = mag_patch_masked.flatten()
+        topk = min(self.cfg.topk_per_modality, int((mag_patch_masked != float('-inf')).sum().item()))
+        if topk > 0:
+            vals, idxs = torch.topk(flat, topk)
+            Wpatch = x1 - x0 + 1
+            for v, idx in zip(vals.cpu().numpy().tolist(), idxs.cpu().numpy().tolist()):
+                if not np.isfinite(v):
+                    continue
+                ry = idx // Wpatch; rx = idx % Wpatch
+                absx = x0 + rx; absy = y0 + ry
+                angle = math.atan2(float(gy[absy, absx].item()), float(gx[absy, absx].item()))
+                binidx = int(((angle + math.pi) / (2*math.pi)) * 16) & 0xff
+                sig = int((0 << 24) | binidx)
+                # embedding: prefer using your real embedder; here we put a placeholder vector
+                emb = self._embed_stub(0, sig)
+                fdict = {'modality': 0, 'signature': sig, 'pos': (absx, absy), 'value': float(v), 'embedding': emb}
+                new_feats.append(fdict)
+                # update descriptor maps
+                self._accumulate_descriptor(emb, absx, absy)
+
+        # --- modality: hue ---
+        hmap = hue.squeeze(0).squeeze(0).to(device)
+        hue_patch = hmap[y0:y1+1, x0:x1+1]
+        # local contrast (global method but we compute per pixel patch using same formula)
+        k = 7; pad = k // 2
+        kernel = torch.ones((1,1,k,k), device=device) / (k*k)
+        hue_mean = F.conv2d(hmap[None,None], kernel, padding=pad)[0,0]
+        hue_patch_mean = hue_mean[y0:y1+1, x0:x1+1]
+        sal_patch = torch.abs(hue_patch - hue_patch_mean)
+        sal_patch_masked = sal_patch.clone(); sal_patch_masked[~unvisited_patch] = float('-inf')
+        flat = sal_patch_masked.flatten()
+        topk = min(self.cfg.topk_per_modality, int((sal_patch_masked != float('-inf')).sum().item()))
+        if topk > 0:
+            vals, idxs = torch.topk(flat, topk)
+            Wpatch = x1 - x0 + 1
+            for v, idx in zip(vals.cpu().numpy().tolist(), idxs.cpu().numpy().tolist()):
+                if not np.isfinite(v):
+                    continue
+                ry = idx // Wpatch; rx = idx % Wpatch
+                absx = x0 + rx; absy = y0 + ry
+                binidx = int((hmap[absy, absx].item()) * 32) & 0xff
+                sig = int((1 << 24) | binidx)
+                emb = self._embed_stub(1, sig)
+                fdict = {'modality': 1, 'signature': sig, 'pos': (absx, absy), 'value': float(v), 'embedding': emb}
+                new_feats.append(fdict)
+                self._accumulate_descriptor(emb, absx, absy)
+
+        # --- banks: curvature/aspect/orient (modalities 2,3,4) ---
+        banks = [curvature_bank, aspect_bank, orient_bank]
+        for mi, bank in enumerate(banks, start=2):
+            if bank is None:
+                continue
+            b = bank.squeeze(0).to(device)  # [C, H, W]
+            Cb, Hfull, Wfull = b.shape
+            patch = b[:, y0:y1+1, x0:x1+1]  # [C, Hpatch, Wpatch]
+            sal = torch.norm(patch, dim=0)
+            sal_masked = sal.clone(); sal_masked[~unvisited_patch] = float('-inf')
+            flat = sal_masked.flatten()
+            topk = min(self.cfg.topk_per_modality, int((sal_masked != float('-inf')).sum().item()))
+            if topk > 0:
+                vals, idxs = torch.topk(flat, topk)
+                Wpatch = x1 - x0 + 1
+                for v, idx in zip(vals.cpu().numpy().tolist(), idxs.cpu().numpy().tolist()):
+                    if not np.isfinite(v):
+                        continue
+                    ry = idx // Wpatch; rx = idx % Wpatch
+                    absx = x0 + rx; absy = y0 + ry
+                    # channel signature
+                    ch = int(torch.argmax(patch[:, ry, rx]).item())
+                    sig = int((mi << 24) | (ch & 0xffff))
+                    emb = self._embed_stub(mi, sig)
+                    fdict = {'modality': mi, 'signature': sig, 'pos': (absx, absy), 'value': float(v), 'embedding': emb}
+                    new_feats.append(fdict)
+                    self._accumulate_descriptor(emb, absx, absy)
+
+        # Combine: add new_feats into cache; mark visited entire window (per requirement)
+        # Avoid duplicating existing cached feat entries at same pos/signature
+        # We'll append new feats straightforwardly because visited ensured we didn't re-extract same pixels
+        self.cached_feats.extend(new_feats)
+        # Mark visited for the whole window region (so future calls won't recompute)
+        self.saccade.mark_visited(center, r)
+
+        # Return combined feats within the window (previously cached + newly added)
+        combined_feats = prev_feats + new_feats
+        return combined_feats
+
+    # --------------------------
     # Feature extraction (full image)
     # --------------------------
-    def extract_features(self, grad, hue, curvature_bank, aspect_bank, orient_bank, ts:int=0) -> List[Dict[str,Any]]:
+    def _extract_global_features(self, grad, hue, curvature_bank, aspect_bank, orient_bank, ts:int=0) -> List[Dict[str,Any]]:
         """
         Extract candidate features across modalities (edge, hue, curvature, aspect, orient).
         Append embeddings and update descriptor maps & counts.
@@ -518,6 +740,29 @@ class FoveatedMemory:
             Hc = self.desc_maps[s].shape[1]; Wc = self.desc_maps[s].shape[2]
             cx = min(Wc-1, max(0, int(x // s)))
             cy = min(Hc-1, max(0, int(y // s)))
+            self.desc_maps[s][:, cy, cx] += emb
+            self.desc_counts[s][0, cy, cx] += 1.0
+
+    # --------------------------
+    # helper: embedding stub & descriptor update
+    # --------------------------
+    def _embed_stub(self, modality:int, signature:int):
+        # placeholder embedding: you should use the real SignatureEmbedder
+        # return a CPU tensor of shape (C,)
+        C = self.cfg.descriptor_C
+        # deterministic pseudo-embedding for consistency: hash -> vector
+        h = hash((modality, signature)) & 0xffffffff
+        rnd = np.random.RandomState(h)
+        vec = torch.tensor(rnd.randn(C).astype(np.float32), device=self.device)
+        return vec
+
+    def _accumulate_descriptor(self, emb: torch.Tensor, x:int, y:int):
+        """Add embedding to every scale cell corresponding to (x,y)."""
+        emb = emb.to(self.device)
+        for s in self.cfg.scales:
+            Hc = self.desc_maps[s].shape[1]; Wc = self.desc_maps[s].shape[2]
+            cx = min(Wc - 1, max(0, int(x // s)))
+            cy = min(Hc - 1, max(0, int(y // s)))
             self.desc_maps[s][:, cy, cx] += emb
             self.desc_counts[s][0, cy, cx] += 1.0
 
@@ -750,6 +995,10 @@ class FoveatedMemory:
     def load(path:str) -> 'FoveatedMemory':
         with open(path, 'rb') as f:
             return pickle.load(f)
+        
+        
+
+
 '''
 # =============================
 # Quick smoke test
@@ -782,5 +1031,7 @@ if __name__ == '__main__':
     learn时的眼跳机制需要修改 现在是根据interest-path
         应该改成不同尺度下的interest-path相互竞争 
         将匹配时的下采样结果复用
-    extract_features针对全图,改为window内或缓存或增量式
+    (done)extract_features针对全图,改为window内或缓存或增量式
+    graph1或更高图更新原理需要优化
+        改为单向边同时优化saccade 针对边缘/闭合曲线
 '''
