@@ -1,6 +1,8 @@
 # foveated_memory_with_saccades.py
 import math
+import time
 import pickle
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -305,6 +307,25 @@ class Graph1Proto:
         self.strength = 1.0
         self.last_updated = 0
 
+# =============================
+# Embedding
+# =============================
+class SignatureEmbedder(nn.Module):
+    def __init__(self, C:int, sig_vocab:int=4096, n_modalities:int=16):
+        super().__init__()
+        self.C = C
+        self.sig_emb = nn.Embedding(sig_vocab, C)
+        self.mod_emb = nn.Embedding(n_modalities, C)
+        self.mlp = nn.Sequential(nn.Linear(C*2, C), nn.ReLU(), nn.Linear(C, C))
+
+    def forward(self, modality:int, signature_hash:int) -> torch.Tensor:
+        sidx = int(signature_hash % self.sig_emb.num_embeddings)
+        midx = int(modality % self.mod_emb.num_embeddings)
+        s = self.sig_emb(torch.tensor(sidx, dtype=torch.long, device=self.mlp[0].weight.device))
+        m = self.mod_emb(torch.tensor(midx, dtype=torch.long, device=self.mlp[0].weight.device))
+        out = self.mlp(torch.cat([s, m], dim=-1))
+        return out.detach()
+
 class GraphCollection:
     def __init__(self, bucket_size:int, cfg:Config):
         self.bucket_size = bucket_size
@@ -391,24 +412,204 @@ class GraphCollection:
                     if len(p.members) == 0:
                         del self.protos[pid]
 
-# =============================
-# Embedding
-# =============================
-class SignatureEmbedder(nn.Module):
-    def __init__(self, C:int, sig_vocab:int=4096, n_modalities:int=16):
-        super().__init__()
-        self.C = C
-        self.sig_emb = nn.Embedding(sig_vocab, C)
-        self.mod_emb = nn.Embedding(n_modalities, C)
-        self.mlp = nn.Sequential(nn.Linear(C*2, C), nn.ReLU(), nn.Linear(C, C))
 
-    def forward(self, modality:int, signature_hash:int) -> torch.Tensor:
-        sidx = int(signature_hash % self.sig_emb.num_embeddings)
-        midx = int(modality % self.mod_emb.num_embeddings)
-        s = self.sig_emb(torch.tensor(sidx, dtype=torch.long, device=self.mlp[0].weight.device))
-        m = self.mod_emb(torch.tensor(midx, dtype=torch.long, device=self.mlp[0].weight.device))
-        out = self.mlp(torch.cat([s, m], dim=-1))
-        return out.detach()
+# =============================================================================
+# Graph II: Cross‑modal fusion (Graph2) + Saccade‑conditioned transitions (Graph3)
+# This code is designed to plug into the existing FoveatedMemory framework
+# without modifying Graph I logic.
+# =============================================================================
+
+# -------------------------------------------------
+# Graph2 Node: cross‑modal local object/part concept
+# -------------------------------------------------
+class Graph2Node:
+    def __init__(self, node_id: int, members, embedding, bitset, positions, ts):
+        self.id = node_id
+        self.members = list(members)  # [(collection_id, proto_id)]
+        self.modalities = {cid for cid, _ in members}
+
+        self.embedding = embedding.clone()
+        self.bitset = bitset
+
+        # relative position statistics (mean + covariance)
+        self.pos_mean = positions.mean(dim=0)
+        diffs = positions - self.pos_mean
+        self.pos_cov = diffs.t().mm(diffs) / max(1, positions.shape[0])
+
+        self.count = 1
+        self.strength = 1.0
+        self.last_seen = ts
+
+    # -----------------------------
+    def update(self, event_embedding, event_bitset, event_positions, ts, cfg):
+        self.count += 1
+        self.last_seen = ts
+        self.strength = (1 - cfg.graph2_strength_beta) * self.strength + cfg.graph2_strength_beta
+
+        # embedding EMA
+        self.embedding = F.normalize(
+            (1 - cfg.graph2_embed_beta) * self.embedding + cfg.graph2_embed_beta * event_embedding,
+            dim=0
+        )
+
+        # bitset union
+        self.bitset |= event_bitset
+
+        # position statistics update (EMA mean, covariance)
+        mean_new = event_positions.mean(dim=0)
+        self.pos_mean = (1 - cfg.graph2_pos_beta) * self.pos_mean + cfg.graph2_pos_beta * mean_new
+
+
+# -------------------------------------------------
+# Graph3 Edge: directed saccade transition
+# -------------------------------------------------
+class Graph3Edge:
+    def __init__(self, src, dst, vec, ts):
+        self.src = src
+        self.dst = dst
+        self.count = 1
+        self.weight = 1.0
+        self.vec_mean = vec.clone()
+        self.vec_cov = torch.zeros((2, 2), device=vec.device)
+        self.last_seen = ts
+
+    def update(self, vec, ts, cfg):
+        self.count += 1
+        self.last_seen = ts
+        self.weight += cfg.graph3_edge_inc
+
+        delta = vec - self.vec_mean
+        self.vec_mean = self.vec_mean + cfg.graph3_vec_beta * delta
+        self.vec_cov = (1 - cfg.graph3_vec_beta) * self.vec_cov + cfg.graph3_vec_beta * torch.outer(delta, delta)
+
+
+# -------------------------------------------------
+# Graph II Manager: owns Graph2 + Graph3
+# -------------------------------------------------
+class GraphII:
+    def __init__(self, cfg, device):
+        self.cfg = cfg
+        self.device = device
+
+        self.graph2_nodes: Dict[int, Graph2Node] = {}
+        self.graph3_edges: Dict[Tuple[int, int], Graph3Edge] = {}
+
+        self.next_graph2_id = 0
+        self.prev_graph2_active: Optional[int] = None
+
+        # cache for proto co‑occurrence (for forming new graph2)
+        self.cooccur_cache = []
+
+    # -------------------------------------------------
+    # Main entry per fixation/window
+    # -------------------------------------------------
+    def observe(self, activated_protos, proto_embeddings, proto_bitsets, proto_positions, ts):
+        """
+        activated_protos: [(collection_id, proto_id)]
+        proto_embeddings: Tensor [N, C]
+        proto_bitsets: list[int]
+        proto_positions: Tensor [N, 2]
+        """
+        if len(activated_protos) == 0:
+            self.prev_graph2_active = None
+            return None
+
+        # aggregate event representation
+        event_embedding = F.normalize(proto_embeddings.mean(dim=0), dim=0)
+        event_bitset = 0
+        for b in proto_bitsets:
+            event_bitset |= b
+
+        # ---------- match existing graph2 ----------
+        best_id, best_score = None, 0.0
+        for gid, g2 in self.graph2_nodes.items():
+            score = self._match_score(g2, activated_protos, event_embedding, event_bitset, proto_positions)
+            if score > best_score:
+                best_score, best_id = score, gid
+
+        if best_score >= self.cfg.graph2_match_threshold:
+            g2 = self.graph2_nodes[best_id]
+            g2.update(event_embedding, event_bitset, proto_positions, ts, self.cfg)
+            active_id = best_id
+        else:
+            # cache candidate
+            self.cooccur_cache.append((activated_protos, event_embedding, event_bitset, proto_positions, ts))
+            active_id = None
+            self._try_form_graph2(ts)
+
+        # ---------- update graph3 transition ----------
+        if self.prev_graph2_active is not None and active_id is not None:
+            vec = proto_positions.mean(dim=0) - self.prev_center
+            self._update_graph3(self.prev_graph2_active, active_id, vec, ts)
+
+        self.prev_graph2_active = active_id
+        self.prev_center = proto_positions.mean(dim=0)
+        return active_id
+
+    # -------------------------------------------------
+    def _match_score(self, g2: Graph2Node, activated_protos, event_embedding, event_bitset, positions):
+        # modality overlap
+        mods = {cid for cid, _ in activated_protos}
+        mod_overlap = len(mods & g2.modalities) / max(1, len(g2.modalities))
+
+        # bitset jaccard
+        inter = (g2.bitset & event_bitset).bit_count()
+        union = (g2.bitset | event_bitset).bit_count()
+        bit_score = inter / max(1, union)
+
+        # embedding cosine
+        emb_score = F.cosine_similarity(g2.embedding, event_embedding, dim=0).item()
+
+        return (
+            self.cfg.w_g2_mod * mod_overlap +
+            self.cfg.w_g2_bit * bit_score +
+            self.cfg.w_g2_emb * emb_score
+        )
+
+    # -------------------------------------------------
+    def _try_form_graph2(self, ts):
+        # count identical proto sets
+        if len(self.cooccur_cache) < self.cfg.graph2_form_count:
+            return
+
+        recent = self.cooccur_cache[-self.cfg.graph2_form_count:]
+        proto_sets = [tuple(sorted(x[0])) for x in recent]
+
+        if len(set(proto_sets)) == 1:
+            activated_protos, emb, bitset, pos, _ = recent[-1]
+            gid = self.next_graph2_id
+            self.next_graph2_id += 1
+
+            self.graph2_nodes[gid] = Graph2Node(
+                gid, activated_protos, emb, bitset, pos, ts
+            )
+            self.cooccur_cache.clear()
+
+    # -------------------------------------------------
+    def _update_graph3(self, src, dst, vec, ts):
+        key = (src, dst)
+        if key not in self.graph3_edges:
+            self.graph3_edges[key] = Graph3Edge(src, dst, vec, ts)
+        else:
+            self.graph3_edges[key].update(vec, ts, self.cfg)
+
+    # -------------------------------------------------
+    def decay(self):
+        # decay graph2
+        for gid in list(self.graph2_nodes.keys()):
+            g2 = self.graph2_nodes[gid]
+            g2.strength *= self.cfg.graph2_decay
+            if g2.strength < self.cfg.graph2_min_strength:
+                del self.graph2_nodes[gid]
+
+        # decay graph3 edges
+        for key in list(self.graph3_edges.keys()):
+            e = self.graph3_edges[key]
+            e.weight *= self.cfg.graph3_edge_decay
+            if e.weight < self.cfg.graph3_edge_min:
+                del self.graph3_edges[key]
+
+
 
 # =============================
 # Main class with saccades
@@ -1004,6 +1205,9 @@ if __name__ == '__main__':
 
 '''
 改进:
+    整体设计:
+        每层graph内都应该有融合机制.节点的相似性应该可以被量化,比如允许多次重复存储,同时也知道它们是类似的
+
     graph0:
         learn时的眼跳机制(center和r的选择)需要修改 现在是根据interest-path
             应该改成不同尺度下的interest-path相互竞争 
