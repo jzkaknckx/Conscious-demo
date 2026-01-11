@@ -3,7 +3,7 @@
 import math
 import time
 import pickle
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -53,25 +53,80 @@ class Config:
     device = torch.device('cpu')
 
     # GraphII params (defaults used by GraphII)
-    graph2_strength_beta = 0.1
-    graph2_embed_beta = 0.05
-    graph2_pos_beta = 0.05
+    # formation & consolidation
+    graph2_form_count = 3           # promote candidate->node when count >= this
+    T_coalesce = 200                # time window (in ts units) for promotion
+    event_merge_thresh = 0.55       # merge threshold between events within same bucket
+    bucket_key_n = 3                # number of proto tokens used in bucket key generation
+
+    # matching & scoring weights
+    w_g2_bit = 0.45
+    w_g2_emb = 0.35
+    w_g2_mod = 0.20
     graph2_match_threshold = 0.5
-    graph2_form_count = 3
-    graph2_decay = 0.995
-    graph2_min_strength = 0.01
-    
+
+    # node update rates
+    graph2_strength_beta = 0.05
+    graph2_embed_beta = 0.06
+    graph2_pos_beta = 0.06
+
+    # edge params
     graph2_edge_init_weight = 1.0
     graph2_edge_inc = 1.0
-    graph2_vec_beta = 0.05
-    graph2_edge_decay = 0.995
-    graph2_edge_min = 0.01
+    graph2_vec_beta = 0.06
+    graph2_edge_decay = 0.999
+    graph2_edge_min = 0.1
 
-    # weights for GraphII matching
-    w_g2_mod = 0.3
-    w_g2_bit = 0.3
-    w_g2_emb = 0.4
+    # node decay/prune
+    graph2_decay = 0.999
+    graph2_min_strength = 0.05
+    graph2_min_count = 1
 
+    # consolidation merging nodes
+    graph2_merge_thresh = 0.78
+
+    # embedding dimensionality (pseudo-embedding if needed)
+    descriptor_C = 32
+
+    device = torch.device('cpu')
+    
+class GraphIIConfig:
+    # formation & consolidation
+    graph2_form_count = 3           # promote candidate->node when count >= this
+    T_coalesce = 200                # time window (in ts units) for promotion
+    event_merge_thresh = 0.55       # merge threshold between events within same bucket
+    bucket_key_n = 3                # number of proto tokens used in bucket key generation
+
+    # matching & scoring weights
+    w_g2_bit = 0.45
+    w_g2_emb = 0.35
+    w_g2_mod = 0.20
+    graph2_match_threshold = 0.5
+
+    # node update rates
+    graph2_strength_beta = 0.05
+    graph2_embed_beta = 0.06
+    graph2_pos_beta = 0.06
+
+    # edge params
+    graph2_edge_init_weight = 1.0
+    graph2_edge_inc = 1.0
+    graph2_vec_beta = 0.06
+    graph2_edge_decay = 0.999
+    graph2_edge_min = 0.1
+
+    # node decay/prune
+    graph2_decay = 0.999
+    graph2_min_strength = 0.05
+    graph2_min_count = 1
+
+    # consolidation merging nodes
+    graph2_merge_thresh = 0.78
+
+    # embedding dimensionality (pseudo-embedding if needed)
+    descriptor_C = 32
+
+    device = torch.device('cpu')
 
 # =============================
 # Saccade
@@ -927,262 +982,470 @@ class GraphI:
 # =============================================================================
 # Graph II (unchanged, copied over)
 # =============================================================================
-
 class Graph2Node:
-    def __init__(self, node_id: int, members: List[Tuple[int,int]],
-                 embedding: torch.Tensor, bitset: int, positions: torch.Tensor, ts: int, cfg):
-        """
-        members: list of (collection_idx, proto_id)
-        embedding: 1D tensor (C,)
-        bitset: int (bitset union of members)
-        positions: Tensor shape [N_members, 2] of absolute positions (float)
-        """
-        self.id = node_id
-        self.members = list(members)
-        self.modalities = {cid for cid, _ in members}
-
-        self.embedding = embedding.detach().clone()
+    def __init__(self,
+                 node_id: int,
+                 members: List[Tuple[int, int]],
+                 embedding: torch.Tensor,
+                 bitset: int,
+                 positions: Optional[torch.Tensor],
+                 ts: int,
+                 cfg: GraphIIConfig):
+        self.id = int(node_id)
+        self.members = list(members)            # list of (collection_idx, proto_id)
+        self.modalities = {c for c, _ in members}
+        self.embedding = embedding.detach().clone().float()
         self.bitset = int(bitset)
 
-        # position stats
-        if positions is not None and positions.numel() > 0:
-            self.pos_mean = positions.mean(dim=0).clone()
+        if (positions is not None) and (positions.numel() > 0):
+            self.pos_mean = positions.mean(dim=0).clone().float()
             diffs = positions - self.pos_mean.unsqueeze(0)
-            self.pos_cov = (diffs.t() @ diffs) / max(1.0, positions.shape[0])
+            self.pos_cov = (diffs.t() @ diffs) / max(1.0, float(positions.shape[0]))
         else:
-            self.pos_mean = torch.zeros(2, device=self.embedding.device)
-            self.pos_cov = torch.eye(2, device=self.embedding.device) * 1.0
+            # default small covariance
+            self.pos_mean = torch.zeros(2, device=self.embedding.device, dtype=torch.float32)
+            self.pos_cov = torch.eye(2, device=self.embedding.device, dtype=torch.float32) * 1.0
 
         self.count = 1
         self.strength = 1.0
         self.last_seen = ts
+        self.examples = deque(maxlen=8)  # store small set of example events (for debugging)
 
-    def update(self, event_embedding: torch.Tensor, event_bitset: int, event_positions: torch.Tensor, ts:int, cfg):
+    def update(self, event_embedding: torch.Tensor, event_bitset: int,
+               event_positions: Optional[torch.Tensor], ts: int, cfg: GraphIIConfig):
+        # increment count / time / strength
         self.count += 1
         self.last_seen = ts
-        # strength EMA
         self.strength = (1 - cfg.graph2_strength_beta) * self.strength + cfg.graph2_strength_beta * 1.0
-        # embedding EMA + normalize
+
+        # embedding EMA (normalized)
         self.embedding = F.normalize((1 - cfg.graph2_embed_beta) * self.embedding + cfg.graph2_embed_beta * event_embedding, dim=0)
+
         # bitset union
         self.bitset |= int(event_bitset)
-        # update pos mean via EMA
-        if event_positions is not None and event_positions.numel() > 0:
+
+        # positions EMA mean/cov
+        if (event_positions is not None) and (event_positions.numel() > 0):
             ev_mean = event_positions.mean(dim=0)
             self.pos_mean = (1 - cfg.graph2_pos_beta) * self.pos_mean + cfg.graph2_pos_beta * ev_mean
-            # update covariance crudely (not exact EMA but stable)
             diffs = event_positions - ev_mean.unsqueeze(0)
-            ev_cov = (diffs.t() @ diffs) / max(1.0, event_positions.shape[0])
+            ev_cov = (diffs.t() @ diffs) / max(1.0, float(event_positions.shape[0]))
             self.pos_cov = (1 - cfg.graph2_pos_beta) * self.pos_cov + cfg.graph2_pos_beta * ev_cov
+
+    def merge_into(self, other:'Graph2Node', cfg: GraphIIConfig):
+        """
+        Merge 'other' node into self (self absorbs other).
+        Update members, embedding (weighted), bitset, counts, pos stats.
+        """
+        # combine members (keep unique)
+        existing_set = set(self.members)
+        for m in other.members:
+            if m not in existing_set:
+                self.members.append(m)
+                existing_set.add(m)
+                self.modalities.add(m[0])
+        # weighted embedding mean by counts
+        total_count = float(self.count + other.count)
+        self.embedding = F.normalize((self.embedding * self.count + other.embedding * other.count) / total_count, dim=0)
+        # union bitset
+        self.bitset |= other.bitset
+        # combine pos stats approximately by weighted mean
+        self.pos_mean = (self.pos_mean * self.count + other.pos_mean * other.count) / total_count
+        # simple cov combine (approx)
+        self.pos_cov = (self.pos_cov * self.count + other.pos_cov * other.count) / total_count
+        # counts and strength
+        self.count += other.count
+        self.strength = max(self.strength, other.strength) + cfg.graph2_strength_beta
+        # last seen is latest
+        self.last_seen = max(self.last_seen, other.last_seen)
+        # examples: extend
+        for ex in other.examples:
+            self.examples.append(ex)
 
 
 class Graph2Edge:
-    def __init__(self, src:int, dst:int, vec:torch.Tensor, ts:int, cfg):
-        # directed edge src -> dst
-        self.src = src
-        self.dst = dst
+    def __init__(self, src: int, dst: int, vec: torch.Tensor, ts: int, cfg: GraphIIConfig):
+        self.src = int(src)
+        self.dst = int(dst)
         self.count = 1
         self.weight = float(cfg.graph2_edge_init_weight)
-        self.vec_mean = vec.detach().float().clone()  # vector 2D
-        self.vec_cov = torch.zeros((2,2), device=vec.device, dtype=torch.float32)
+        self.vec_mean = vec.detach().clone().float()
+        self.vec_cov = torch.zeros((2, 2), device=vec.device, dtype=torch.float32)
         self.last_seen = ts
 
-    def update(self, vec:torch.Tensor, ts:int, cfg):
+    def update(self, vec: torch.Tensor, ts: int, cfg: GraphIIConfig):
         vec = vec.detach().float()
         self.count += 1
         self.last_seen = ts
-        # weight update (additive)
         self.weight += cfg.graph2_edge_inc
-        # online mean + covariance update (small learning rate)
         delta = vec - self.vec_mean
         self.vec_mean = self.vec_mean + cfg.graph2_vec_beta * delta
-        # update approximate cov
         self.vec_cov = (1 - cfg.graph2_vec_beta) * self.vec_cov + cfg.graph2_vec_beta * torch.ger(delta, delta)
 
 
+# ---------- GraphII manager ----------
 class GraphII:
     """
-    Single-layer GraphII: graph2 nodes (cross-modal proto fusion) and directed graph2_edges
+    GraphII implements candidate-cache + consolidation for cross-modal graph2.
     """
+    def __init__(self, cfg: Optional[GraphIIConfig] = None, device: Optional[torch.device] = None):
+        self.cfg = cfg if cfg is not None else GraphIIConfig()
+        if device is not None:
+            self.cfg.device = device
+        self.device = self.cfg.device
 
-    def __init__(self, cfg, device:torch.device):
-        self.cfg = cfg
-        self.device = device
+        # core containers
         self.graph2_nodes: Dict[int, Graph2Node] = {}
-        self.graph2_edges: Dict[Tuple[int,int], Graph2Edge] = {}
+        self.graph2_edges: Dict[Tuple[int, int], Graph2Edge] = {}
         self.next_graph2_id = 0
 
-        # previous active graph2 node used to record transitions
-        self.prev_active = None
-        self.prev_center = None
+        # inverted index: (collection_idx, proto_id) -> set(graph2_id)
+        self.inverted_index_proto2graph2: Dict[Tuple[int, int], set] = defaultdict(set)
 
-        # cache of recent co-occurrence events for forming nodes
-        self.cooccur_cache = []  # list of (members, embedding, bitset, positions, ts)
+        # candidate cache: bucket_key -> list of records
+        # record: dict with keys: members(tuple), bitset(int), emb(tensor), positions(tensor or None), first_ts, last_ts, count
+        self.cooccur_cache: Dict[Any, List[Dict[str, Any]]] = defaultdict(list)
 
-    # helper to synthesize embedding from bitset if proto.embedding missing
-    def _bitset_to_embedding(self, bitset:int, dim:int):
-        # deterministic pseudo-embedding: map set bits to vector dims via simple hash
+        # previous active node for transition updates
+        self.prev_active: Optional[int] = None
+        self.prev_center: Optional[torch.Tensor] = None
+
+    # ---------- utility: create bucket key from members ----------
+    def _make_bucket_key(self, members: List[Tuple[int, int]]) -> Tuple:
+        """
+        Simple stable bucket key:
+          - compute tokens like 'c:p' for each member
+          - sort tokens and take prefix of length bucket_key_n
+        This groups events that share several same top tokens.
+        """
+        tokens = [f"{c}:{pid}" for (c, pid) in members]
+        tokens.sort()
+        prefix = tuple(tokens[:self.cfg.bucket_key_n])
+        return prefix
+
+    # ---------- utility: synthesize embedding from bitset if needed ----------
+    def _bitset_to_embedding(self, bitset: int, dim: int) -> torch.Tensor:
         vec = torch.zeros(dim, device=self.device, dtype=torch.float32)
         b = int(bitset)
         i = 0
-        while b and i < 1024:
-            lowest = (b & -b).bit_length() - 1  # index of lowest set bit
+        # iterate up to at most 64 bits for speed
+        while b and i < 64:
+            lowest = (b & -b).bit_length() - 1
             idx = (lowest * 2654435761) % dim
             vec[idx] += 1.0
             b = b & (b - 1)
             i += 1
         if vec.sum() == 0:
-            vec += 1e-3
+            vec += 1e-6
         return F.normalize(vec, dim=0)
 
-    # main observe function: collections: list[GraphCollection]
-    def observe(self, activated_protos: List[Tuple[int,int]], collections: List, ts:int):
+    # ---------- similarity between two candidate records ----------
+    def _record_similarity(self, recA: Dict, recB: Dict) -> float:
+        # bitset Jaccard
+        a = int(recA['bitset']); b = int(recB['bitset'])
+        inter = (a & b).bit_count()
+        union = (a | b).bit_count()
+        bit_j = inter / float(max(1, union))
+
+        # embedding cosine (guard)
+        embA = recA['emb']; embB = recB['emb']
+        if (embA is None) or (embB is None):
+            emb_cos = 0.0
+        else:
+            emb_cos = float(F.cosine_similarity(embA, embB, dim=0).item())
+
+        # modality overlap ratio
+        modsA = {c for (c, _) in recA['members']}
+        modsB = {c for (c, _) in recB['members']}
+        mod_overlap = len(modsA & modsB) / float(max(1, len(modsA | modsB)))
+
+        # weighted sum
+        score = (self.cfg.w_g2_bit * bit_j) + (self.cfg.w_g2_emb * emb_cos) + (self.cfg.w_g2_mod * mod_overlap)
+        return float(score)
+
+    # ---------- insert/merge event into bucket ----------
+    def _insert_event_into_bucket(self, bucket_key: Any, event: Dict, ts: int) -> Dict:
         """
-        activated_protos: list of (collection_idx, proto_id) that were active in this window
-        collections: list of GraphCollection instances (to fetch proto details)
+        Try to merge event into an existing record in bucket (if similarity >= threshold),
+        otherwise append as new record.
+        Returns the merged/created record.
         """
-        if len(activated_protos) == 0:
-            # reset previous active (no protos observed)
+        bucket = self.cooccur_cache[bucket_key]
+        for rec in bucket:
+            # If rec is old beyond T_coalesce, skip merge (it will eventually be evicted)
+            if ts - rec['first_ts'] > self.cfg.T_coalesce:
+                continue
+            sim = self._record_similarity(rec, event)
+            if sim >= self.cfg.event_merge_thresh:
+                # merge event into rec (EMA-like)
+                rec['count'] += 1
+                rec['last_ts'] = ts
+                # emb EMA
+                if rec['emb'] is None:
+                    rec['emb'] = event['emb']
+                elif event['emb'] is None:
+                    pass
+                else:
+                    rec['emb'] = F.normalize((1 - 0.1) * rec['emb'] + 0.1 * event['emb'], dim=0)
+                # bitset union
+                rec['bitset'] |= int(event['bitset'])
+                # append positions if present
+                if (rec['positions'] is None) and (event['positions'] is not None):
+                    rec['positions'] = event['positions'].clone()
+                elif (rec['positions'] is not None) and (event['positions'] is not None):
+                    rec['positions'] = torch.cat([rec['positions'], event['positions']], dim=0)
+                # extend members list by union (keep canonical order)
+                existing = set(rec['members'])
+                for m in event['members']:
+                    if m not in existing:
+                        rec['members'].append(m)
+                        existing.add(m)
+                return rec
+        # no merge -> append new record
+        newrec = {
+            'members': list(event['members']),     # list of tuples
+            'bitset': int(event['bitset']),
+            'emb': None if event['emb'] is None else event['emb'].detach().clone(),
+            'positions': None if event['positions'] is None else (event['positions'].detach().clone()),
+            'first_ts': ts,
+            'last_ts': ts,
+            'count': 1
+        }
+        bucket.append(newrec)
+        return newrec
+
+    # ---------- promotion: try promote records in bucket_key to node ----------
+    def _try_promote_bucket_record(self, bucket_key: Any, rec: Dict, ts: int):
+        """
+        Promote rec -> Graph2Node if rec['count'] >= form_count and age within T_coalesce.
+        """
+        if rec['count'] < self.cfg.graph2_form_count:
+            return None
+        age = ts - rec['first_ts']
+        if age > self.cfg.T_coalesce:
+            # outdated; do not promote
+            return None
+        # Create node
+        gid = self.next_graph2_id
+        self.next_graph2_id += 1
+        dim = self.cfg.descriptor_C
+        emb = rec['emb'] if rec['emb'] is not None else self._bitset_to_embedding(rec['bitset'], dim)
+        positions = rec['positions'] if rec['positions'] is not None else None
+        node = Graph2Node(gid, rec['members'], emb, rec['bitset'], positions, ts, self.cfg)
+        self.graph2_nodes[gid] = node
+        # update inverted index
+        for (c, pid) in rec['members']:
+            self.inverted_index_proto2graph2[(c, pid)].add(gid)
+        # clear record (remove from bucket)
+        bucket = self.cooccur_cache[bucket_key]
+        try:
+            bucket.remove(rec)
+        except ValueError:
+            pass
+        return node
+
+    # ---------- public observe API ----------
+    def observe(self, activated_protos: List[Tuple[int, int]], collections: List[Any], ts: int) -> Optional[int]:
+        """
+        Main call per fixation:
+          - activated_protos: list[(collection_idx, proto_id)]
+          - collections: list of GraphCollection to read proto bitset/embedding/positions
+          - ts: integer timestamp (monotonic)
+        Returns: active graph2 node id (if matched or created), else None
+        """
+        if not activated_protos:
+            # no protos -> reset prev context
             self.prev_active = None
             self.prev_center = None
             return None
 
-        # build arrays: proto_embeddings, proto_bitsets, proto_positions
+        # prepare event: gather proto embeddings, bitsets, and proto member positions
         emb_list = []
-        bitsets = []
+        bitset_union = 0
         pos_list = []
         members = []
-
         for (cidx, pid) in activated_protos:
+            if cidx < 0 or cidx >= len(collections):
+                continue
             coll = collections[cidx]
             p = coll.protos.get(pid, None)
             if p is None:
-                # skip if not found
                 continue
-            # embedding: prefer p.embedding else synthesize
+            # get embedding or synthesize
             if getattr(p, 'embedding', None) is not None:
-                emb = p.embedding.to(self.device)
+                emb = p.embedding.detach().to(self.device).float()
             else:
-                emb = self._bitset_to_embedding(p.bitset, self.cfg.descriptor_C).to(self.device)
+                # use bitset if available
+                b = int(getattr(p, 'bitset', 0))
+                emb = self._bitset_to_embedding(b, self.cfg.descriptor_C)
             emb_list.append(emb)
-            bitsets.append(int(p.bitset))
-            # positions: compute centroid of proto members from Graph0 nodes
-            pos_accum = []
-            for nid in p.members:
+            bitset_union |= int(getattr(p, 'bitset', 0))
+            # gather member node positions from coll.nodes
+            pos_acc = []
+            for nid in getattr(p, 'members', []):
                 n = coll.nodes.get(nid, None)
                 if n is not None:
-                    pos_accum.append([float(n.pos[0]), float(n.pos[1])])
-            if len(pos_accum) > 0:
-                pos_tensor = torch.tensor(pos_accum, device=self.device, dtype=torch.float32)
-                centroid = pos_tensor.mean(dim=0)
-                pos_list.append(pos_tensor)  # store member positions (N,2)
-            else:
-                # fallback: use zeros
-                pos_list.append(torch.zeros((1,2), device=self.device))
+                    pos_acc.append([float(n.pos[0]), float(n.pos[1])])
+            if pos_acc:
+                pos_list.append(torch.tensor(pos_acc, device=self.device, dtype=torch.float32))
             members.append((cidx, pid))
 
-        if len(emb_list) == 0:
+        if not members:
             # nothing meaningful
             return None
 
-        # aggregate event representation
-        proto_embeddings = torch.stack(emb_list, dim=0)
-        event_embedding = F.normalize(proto_embeddings.mean(dim=0), dim=0)
-        event_bitset = 0
-        for b in bitsets:
-            event_bitset |= int(b)
+        # event embedding
+        proto_embeddings = torch.stack(emb_list, dim=0) if emb_list else None
+        event_emb = F.normalize(proto_embeddings.mean(dim=0), dim=0) if proto_embeddings is not None else None
+        event_positions = torch.cat(pos_list, dim=0) if pos_list else None
 
-        # merge positions into a single positions tensor by concatenation
-        positions = torch.cat(pos_list, dim=0) if len(pos_list) > 0 else None
-
-        # 1) match existing graph2 nodes
+        print("len(members): ", len(members))
+        # 1) attempt to match existing graph2 nodes via inverted index -> small candidate set
+        candidate_ids = set()
+        for (c, pid) in members:
+            candidate_ids.update(self.inverted_index_proto2graph2.get((c, pid), set()))
+        # if empty candidate set, fall back to scanning small subset (or none)
         best_id = None; best_score = 0.0
-        for gid, g2 in self.graph2_nodes.items():
-            score = self._match_score(g2, members, event_embedding, event_bitset)
-            if score > best_score:
-                best_id, best_score = gid, score
+        if candidate_ids:
+            for gid in candidate_ids:
+                g2 = self.graph2_nodes.get(gid, None)
+                if g2 is None:
+                    continue
+                score = self._match_score(g2, members, event_emb, bitset_union)
+                if score > best_score:
+                    best_score, best_id = score, gid
 
+        # decide match vs candidate creation
         active_node_id = None
-        if best_score >= self.cfg.graph2_match_threshold:
-            # update matched graph2
-            g2 = self.graph2_nodes[best_id]
-            g2.update(event_embedding, event_bitset, positions, ts, self.cfg)
+        if best_score >= self.cfg.graph2_match_threshold and best_id is not None:
+            node = self.graph2_nodes[best_id]
+            node.update(event_emb if event_emb is not None else self._bitset_to_embedding(bitset_union, self.cfg.descriptor_C),
+                        bitset_union, event_positions, ts, self.cfg)
             active_node_id = best_id
         else:
-            # cache event for possible formation
-            self.cooccur_cache.append((tuple(members), event_embedding, event_bitset, positions, ts))
-            # attempt form
-            self._try_form(ts)
-            active_node_id = None
+            # no strong existing match -> insert event into cooccur cache bucket and possibly promote
+            bucket_key = self._make_bucket_key(members)
+            event = {'members': list(members), 'bitset': int(bitset_union), 'emb': event_emb, 'positions': event_positions}
+            merged_rec = self._insert_event_into_bucket(bucket_key, event, ts)
+            promoted = self._try_promote_bucket_record(bucket_key, merged_rec, ts)
+            if promoted is not None:
+                active_node_id = promoted.id
 
-        # 2) update directed edges (transition) using prev_active -> active_node_id
-        if self.prev_active is not None and active_node_id is not None:
-            # vector: current centroid - previous centroid
-            if positions is not None:
-                cur_centroid = positions.mean(dim=0)
+        # 2) update directed transition edges using prev_active -> active_node_id
+        if (self.prev_active is not None) and (active_node_id is not None) and (self.prev_active != active_node_id):
+            # compute displacement vector: current centroid - prev_center
+            if event_positions is not None:
+                cur_centroid = event_positions.mean(dim=0)
             else:
                 cur_centroid = torch.zeros(2, device=self.device)
             prev_centroid = self.prev_center if self.prev_center is not None else cur_centroid
             vec = cur_centroid - prev_centroid
             self._update_edge(self.prev_active, active_node_id, vec, ts)
 
-        # update prev_active and prev_center if we have an active node
+        # update prev_active / prev_center if we have active node
         if active_node_id is not None:
-            if positions is not None:
-                self.prev_center = positions.mean(dim=0).clone()
+            if event_positions is not None:
+                self.prev_center = event_positions.mean(dim=0).detach().clone()
             else:
                 self.prev_center = torch.zeros(2, device=self.device)
             self.prev_active = active_node_id
-        else:
-            # do not change prev_active — allow transient misses
-            pass
-
+        # return currently active graph2 id (or None)
         return active_node_id
 
-    def _match_score(self, g2: Graph2Node, members: List[Tuple[int,int]], event_embedding: torch.Tensor, event_bitset: int):
+    # ---------- match scoring ----------
+    def _match_score(self, g2: Graph2Node, members: List[Tuple[int, int]], event_emb: Optional[torch.Tensor], event_bitset: int) -> float:
         # modality overlap
-        event_mods = {cid for cid, _ in members}
+        event_mods = {c for (c, _) in members}
         mod_overlap = len(event_mods & g2.modalities) / float(max(1, len(g2.modalities)))
         # bitset jaccard
-        inter = (g2.bitset & event_bitset).bit_count()
-        union = (g2.bitset | event_bitset).bit_count()
+        inter = (g2.bitset & int(event_bitset)).bit_count()
+        union = (g2.bitset | int(event_bitset)).bit_count()
         bit_score = inter / float(max(1, union))
         # embedding cosine
-        emb_score = float(F.cosine_similarity(g2.embedding, event_embedding, dim=0).item())
-        # weighted sum
-        score = self.cfg.w_g2_mod * mod_overlap + self.cfg.w_g2_bit * bit_score + self.cfg.w_g2_emb * emb_score
+        if event_emb is None:
+            emb_score = 0.0
+        else:
+            emb_score = float(F.cosine_similarity(g2.embedding, event_emb, dim=0).item())
+        score = (self.cfg.w_g2_mod * mod_overlap + self.cfg.w_g2_bit * bit_score + self.cfg.w_g2_emb * emb_score)
         return float(score)
 
-    def _try_form(self, ts:int):
-        # require repeating same member set graph2_form_count times (conservative)
-        if len(self.cooccur_cache) < self.cfg.graph2_form_count:
-            return
-        recent = self.cooccur_cache[-self.cfg.graph2_form_count:]
-        sets = [r[0] for r in recent]
-        if len(set(sets)) == 1:
-            # identical member set repeated -> create node
-            members, emb, bitset, positions, _ = recent[-1]
-            gid = self.next_graph2_id
-            self.next_graph2_id += 1
-            node = Graph2Node(gid, list(members), emb, bitset, positions if positions is not None else torch.zeros((1,2), device=self.device), ts, self.cfg)
-            self.graph2_nodes[gid] = node
-            # clear cache
-            self.cooccur_cache.clear()
-
-    def _update_edge(self, src:int, dst:int, vec:torch.Tensor, ts:int):
-        key = (src, dst)
+    # ---------- update/create edge ----------
+    def _update_edge(self, src: int, dst: int, vec: torch.Tensor, ts: int):
+        key = (int(src), int(dst))
         if key not in self.graph2_edges:
             self.graph2_edges[key] = Graph2Edge(src, dst, vec, ts, self.cfg)
         else:
             self.graph2_edges[key].update(vec, ts, self.cfg)
 
+    # ---------- periodic consolidation: merge similar nodes ----------
+    def consolidate(self):
+        """
+        Merge very similar graph2 nodes to reduce fragmentation.
+        Strategy:
+          - For each node, find neighbors via inverted_index union of their member protos
+          - Compute pairwise similarity and merge pairs with similarity >= merge_thresh
+        This is a conservative single-pass merge (merging smaller into larger).
+        """
+        merge_thresh = self.cfg.graph2_merge_thresh
+        visited = set()
+        # build candidate neighbors via inverted index
+        for gid, g in list(self.graph2_nodes.items()):
+            if gid in visited:
+                continue
+            # gather neighbor candidates via member protos
+            candidates = set()
+            for (c, pid) in g.members:
+                candidates.update(self.inverted_index_proto2graph2.get((c, pid), set()))
+            candidates.discard(gid)
+            # compute similarities
+            for other_id in list(candidates):
+                if other_id == gid or other_id not in self.graph2_nodes:
+                    continue
+                other = self.graph2_nodes[other_id]
+                # compute simple similarity via bitset Jaccard + embedding cosine
+                inter = (g.bitset & other.bitset).bit_count()
+                union = (g.bitset | other.bitset).bit_count()
+                bit_j = inter / float(max(1, union))
+                emb_cos = float(F.cosine_similarity(g.embedding, other.embedding, dim=0).item())
+                sim = 0.5 * bit_j + 0.5 * emb_cos
+                if sim >= merge_thresh:
+                    # merge smaller into larger
+                    if g.count >= other.count:
+                        g.merge_into(other, self.cfg)
+                        # remove other from storage & inverted index
+                        self._remove_node(other_id)
+                    else:
+                        other.merge_into(g, self.cfg)
+                        self._remove_node(gid)
+                        visited.add(other_id)
+                        break
+            visited.add(gid)
+
+    # ---------- remove node helper ----------
+    def _remove_node(self, gid: int):
+        node = self.graph2_nodes.pop(gid, None)
+        if node is None:
+            return
+        # remove from inverted index
+        for (c, pid) in node.members:
+            s = self.inverted_index_proto2graph2.get((c, pid), None)
+            if s:
+                s.discard(gid)
+                if not s:
+                    del self.inverted_index_proto2graph2[(c, pid)]
+        # remove edges touching gid
+        for key in list(self.graph2_edges.keys()):
+            if key[0] == gid or key[1] == gid:
+                del self.graph2_edges[key]
+
+    # ---------- decay / pruning ----------
     def decay(self):
         # decay nodes
         for gid in list(self.graph2_nodes.keys()):
-            g2 = self.graph2_nodes[gid]
-            g2.strength *= self.cfg.graph2_decay
-            if g2.strength < self.cfg.graph2_min_strength and g2.count < self.cfg.graph2_min_count:
-                del self.graph2_nodes[gid]
+            g = self.graph2_nodes[gid]
+            g.strength *= self.cfg.graph2_decay
+            if g.strength < self.cfg.graph2_min_strength and g.count < self.cfg.graph2_min_count:
+                self._remove_node(gid)
         # decay edges
         for key in list(self.graph2_edges.keys()):
             e = self.graph2_edges[key]
@@ -1190,6 +1453,25 @@ class GraphII:
             if e.weight < self.cfg.graph2_edge_min:
                 del self.graph2_edges[key]
 
+    # ---------- debug / inspection helpers ----------
+    def get_node_summary(self, gid: int):
+        g = self.graph2_nodes.get(gid, None)
+        if g is None:
+            return None
+        return {
+            'id': g.id,
+            'count': g.count,
+            'strength': g.strength,
+            'members': list(g.members),
+            'modalities': list(g.modalities),
+            'pos_mean': g.pos_mean.cpu().tolist() if isinstance(g.pos_mean, torch.Tensor) else None
+        }
+
+    def list_nodes(self):
+        return list(self.graph2_nodes.keys())
+
+    def list_edges(self):
+        return [(k, {'weight': v.weight, 'count': v.count, 'vec_mean': v.vec_mean.cpu().tolist()}) for k, v in self.graph2_edges.items()]
 
 # =============================
 # FoveatedMemory (orchestrator): only initialization + run_one_step + small helpers
