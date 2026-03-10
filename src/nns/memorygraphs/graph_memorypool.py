@@ -60,8 +60,8 @@ class Config:
     bucket_key_n = 3                # number of proto tokens used in bucket key generation
 
     # matching & scoring weights
-    w_g2_bit = 0.45
-    w_g2_emb = 0.35
+    w_g2_bit = 0.80
+    w_g2_emb = 0.00
     w_g2_mod = 0.20
     graph2_match_threshold = 0.5
 
@@ -449,6 +449,7 @@ class GraphCollection:
         for pid, p in self.protos.items():
             common = (qbit & p.bitset)
             score = common.bit_count()
+            # score = bin(qbit & p.bitset).count('1')
             if score > 0:
                 scored.append((pid, float(score)))
         scored.sort(key=lambda x: x[1], reverse=True)
@@ -1238,10 +1239,10 @@ class GraphII:
             self.inverted_index_proto2graph2[(c, pid)].add(gid)
         # clear record (remove from bucket)
         bucket = self.cooccur_cache[bucket_key]
-        try:
-            bucket.remove(rec)
-        except ValueError:
-            pass
+        for i, r in enumerate(bucket):
+            if r is rec:
+                del bucket[i]
+                break
         return node
 
     # ---------- public observe API ----------
@@ -1299,7 +1300,6 @@ class GraphII:
         event_emb = F.normalize(proto_embeddings.mean(dim=0), dim=0) if proto_embeddings is not None else None
         event_positions = torch.cat(pos_list, dim=0) if pos_list else None
 
-        print("len(members): ", len(members))
         # 1) attempt to match existing graph2 nodes via inverted index -> small candidate set
         candidate_ids = set()
         for (c, pid) in members:
@@ -1361,12 +1361,16 @@ class GraphII:
         inter = (g2.bitset & int(event_bitset)).bit_count()
         union = (g2.bitset | int(event_bitset)).bit_count()
         bit_score = inter / float(max(1, union))
+        '''
+        emb_score is invalid for match, it is a discontinuous function
         # embedding cosine
         if event_emb is None:
             emb_score = 0.0
         else:
             emb_score = float(F.cosine_similarity(g2.embedding, event_emb, dim=0).item())
         score = (self.cfg.w_g2_mod * mod_overlap + self.cfg.w_g2_bit * bit_score + self.cfg.w_g2_emb * emb_score)
+        '''
+        score = (self.cfg.w_g2_mod * mod_overlap + self.cfg.w_g2_bit * bit_score)
         return float(score)
 
     # ---------- update/create edge ----------
