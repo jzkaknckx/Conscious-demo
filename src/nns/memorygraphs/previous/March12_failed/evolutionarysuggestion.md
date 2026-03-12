@@ -1,0 +1,5 @@
+这是一个用于聚合特征的创新图网络，不同于传统图神经网络，它目前由三层graph构成，低层网络接收卷积提取的视觉特征，将表现较为突出的特征（很直或较圆）且共现频率高的特征放入下一层图graph1的节点中，即这个节点存储上层节点的集合，逐渐形成更高级的图。
+当前需要对这个网络进行修改：
+1.当前结构是graphI(graph0node->graph1proto)->graph2(graph2node)，需要改为：只有graph0中的edge模态和hue模态的节点形成proto，curvature_bank，aspect_bank，orient_bank不需要聚合直接映射为graph1proto，后续结构保持不变，两种proto和三种bank作为同一个层级向graph2映射
+2.现在不需要embedding，在graph2中的检索操作完全通过signature和bitset进行，检索的具体过程在bitset_position_retrieval_spec.md文档，模态与位段分配需要留出接口在config中定义
+3.为graph1的bucket操作留出重置的接口，即清空已有的所有bucket
