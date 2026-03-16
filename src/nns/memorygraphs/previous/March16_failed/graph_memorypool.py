@@ -57,10 +57,6 @@ class Config:
     w_hue = 0.3
     w_cont = 0.2
 
-    max_fixations_per_episode = 20
-    edge_search_radius = 40
-    texture_window_radius = 32
-
     device = torch.device('cpu')
     
 class GraphIIConfig:
@@ -116,59 +112,7 @@ class GraphIIConfig:
     # consolidation merging nodes
     graph2_merge_thresh = 0.78
 
-    promote_high = 0.7
-    promote_low = 0.4
-
     device = torch.device('cpu')
-
-# =============================
-# Episode Manager
-# =============================
-class EpisodeManager:
-    def __init__(self):
-        self.episodes = {}
-        self.next_episode_id = 1
-
-    def create_episode(self, layer_level: int) -> int:
-        eid = self.next_episode_id
-        self.next_episode_id += 1
-        self.episodes[eid] = {
-            'layer_level': layer_level,
-            'fixations': [],
-            'active_protos': set(), # 收集该 episode 激活的所有 graph1 proto
-            'start_time': None
-        }
-        return eid
-
-    def append_observation(self, episode_id: int, fixation_point: Tuple[int, int], 
-                           features: List[Dict], texture_resp: float, edge_resp: List, 
-                           time_now: int, active_protos: List[Tuple[int, int]]):
-        ep = self.episodes.get(episode_id)
-        if not ep: return
-        
-        if ep['start_time'] is None:
-            ep['start_time'] = time_now
-            
-        ep['fixations'].append({
-            'point': fixation_point,
-            'time': time_now
-        })
-        ep['active_protos'].update(active_protos)
-
-    def finalize_episode(self, episode_id: int) -> List[Dict[str, Any]]:
-        ep = self.episodes.pop(episode_id, None)
-        if not ep: return []
-        
-        # 完成判定：直接将收集到的所有 protos 打包为一个 hypothesis
-        if not ep['active_protos']:
-            return []
-            
-        completed_hypothesis = {
-            'members': list(ep['active_protos']), # List of (collection_idx, proto_id)
-            'layer_level': ep['layer_level'],
-            'fixation_count': len(ep['fixations'])
-        }
-        return [completed_hypothesis]
 
 # =============================
 # Saccade
@@ -176,28 +120,16 @@ class EpisodeManager:
 class Saccade:
     """
     Encapsulates all saccade / fixation / path / interest logic.
-    已融合最新的 Episode-based (分层/扫视驱动) 增量学习逻辑，同时向下兼容 GraphI 的张量掩码。
     """
-    def __init__(self, cfg: 'Config', device=None):
+    def __init__(self, cfg: Config, device=None):
         self.cfg = cfg
         self.device = device or cfg.device
-
         self.interest: Optional[torch.Tensor] = None 
         self.path: Optional[torch.Tensor] = None      
         self.visited: Optional[torch.Tensor] = None   
         self.mode: str = 'wander'
         self.current_center: Optional[Tuple[int,int]] = None
         self.learn_saccades_left: int = 0
-
-        self.episode_manager = EpisodeManager()
-        self.policy = SelectorPolicy(cfg)
-        
-        self.state = 'idle' # 'idle', 'learn', 'end'
-        self.current_fixation: Optional[Tuple[int, int]] = None
-        self.fixation_history = deque(maxlen=getattr(cfg, 'max_fixations_per_episode', 20))
-        self.episode_id: Optional[int] = None
-        self.saccade_matrix: Dict[Tuple[int, int], bool] = {}
-        self.layer_level = 0
 
     def reset(self, grad: torch.Tensor, hue: torch.Tensor):
         H = int(hue.shape[-2]); W = int(hue.shape[-1])
@@ -208,7 +140,6 @@ class Saccade:
         self.mode = 'wander'
         self.current_center = None
         self.learn_saccades_left = 0
-        self.saccade_matrix.clear()
 
     def _compute_interest(self, grad: torch.Tensor, hue: torch.Tensor) -> torch.Tensor:
         g = grad.squeeze(0)
@@ -262,10 +193,7 @@ class Saccade:
         H, W = self.visited.shape
         x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
         y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
-        # 1. 更新 GraphI 需要的张量
         self.visited[y0:y1+1, x0:x1+1] = 1
-        # 2. 同步更新新策略需要的字典矩阵
-        self.saccade_matrix[(cx, cy)] = True
 
     def prob_map(self) -> torch.Tensor:
         return F.relu(self.interest - self.path)
@@ -329,121 +257,10 @@ class Saccade:
             self.mark_visited(center, r)
             self.learn_saccades_left -= 1
             return 'learn', center, r
+        
         else:
             return 'end', None, None
 
-    def start_episode(self, initial_point: Tuple[int, int], layer_level: int = 0) -> int:
-        self.layer_level = layer_level
-        self.episode_id = self.episode_manager.create_episode(layer_level)
-        self.current_fixation = initial_point
-        self.fixation_history.clear()
-        self.saccade_matrix.clear()
-        self.state = 'learn'
-        return self.episode_id
-
-    def perform_fixation(self, image_dict: Any, graphI: 'GraphI', time_now: int):
-        if self.state != 'learn' or self.current_fixation is None:
-            return
-            
-        # 兼容 GraphI 的 extract_features
-        features = graphI.extract_features(
-            grad=image_dict.get('grad'), hue=image_dict.get('hue'), 
-            curvature_bank=image_dict.get('curvature'), aspect_bank=image_dict.get('aspect'), orient_bank=image_dict.get('orient'),
-            center=self.current_fixation, r=getattr(self.cfg, 'texture_window_radius', 32), ts=time_now
-        )
-        
-        texture_resp = TextureChannel.compute(self.current_fixation, image_dict)
-        edge_resp = EdgeContourTracker.sample_local(self.current_fixation, image_dict)
-        
-        # 仅执行 GraphI 的 fast_update
-        active_protos = graphI.fast_update(features, self.current_fixation, time_now)
-        
-        self.episode_manager.append_observation(
-            self.episode_id, self.current_fixation, features, 
-            texture_resp, edge_resp, time_now, active_protos
-        )
-        
-        self.fixation_history.append((self.current_fixation, time_now))
-        # 同步更新 visited 张量和 saccade_matrix
-        self.mark_visited(self.current_fixation, getattr(self.cfg, 'texture_window_radius', 32))
-
-    def decide_next_fixation(self, image_dict: Any) -> str:
-        max_fix = getattr(self.cfg, 'max_fixations_per_episode', 20)
-        if len(self.fixation_history) >= max_fix:
-            self.state = 'end'
-            return 'end_episode'
-            
-        next_pt = self.policy.next_point(self.current_fixation, self.saccade_matrix, image_dict)
-        if next_pt is None:
-            self.state = 'end'
-            return 'end_episode'
-            
-        self.current_fixation = next_pt
-        return 'continue'
-
-    def end_episode(self, graphII: 'GraphII', collections: List[Any], time_now: int):
-        completed_hypotheses = self.episode_manager.finalize_episode(self.episode_id)
-        for hyp in completed_hypotheses:
-            graphII.batch_update_from_hypothesis(hyp, collections, time_now)
-        self.state = 'idle'
-
-    def global_search_for_initial_fixation(self, image_dict: Any) -> Tuple[int, int]:
-        return self.policy.global_initial_point(image_dict)
-
-# =============================
-# texterture channel
-# =============================
-class TextureChannel:
-    @staticmethod
-    def compute(point: Tuple[int, int], image: Any) -> float:
-        # 提取局部纹理响应（此处为占位，实际可接入 Gabor/卷积响应）
-        return 0.5 
-
-    @staticmethod
-    def next_point_along_texture(current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
-        # 简化的纹理连通域漫游逻辑：在附近随机找一个未访问过的点
-        cx, cy = current_point
-        for dx, dy in [(0, 16), (16, 0), (0, -16), (-16, 0), (16, 16), (-16, -16)]:
-            nx, ny = cx + dx, cy + dy
-            if (nx, ny) not in saccade_matrix:
-                return (nx, ny)
-        return None
-
-class EdgeContourTracker:
-    @staticmethod
-    def sample_local(point: Tuple[int, int], image: Any) -> List[Any]:
-        # 返回局部边缘片段
-        return []
-
-    @staticmethod
-    def query(point: Tuple[int, int], radius: int) -> List[Any]:
-        # 查询半径内的边缘（此处简化为无边缘，强制走纹理策略）
-        return []
-
-    @staticmethod
-    def next_point_along_edge(current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
-        # 沿边缘追踪逻辑
-        return None
-
-class SelectorPolicy:
-    def __init__(self, cfg: Config):
-        self.cfg = cfg
-
-    def next_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool], image: Any) -> Optional[Tuple[int, int]]:
-        local_edges = EdgeContourTracker.query(current_point, self.cfg.edge_search_radius)
-        if not local_edges:
-            # 如果附近没有边缘，沿着纹理连通域滑动
-            return TextureChannel.next_point_along_texture(current_point, saccade_matrix)
-        else:
-            # 如果在边缘附近，沿边缘跟踪
-            return EdgeContourTracker.next_point_along_edge(current_point, saccade_matrix)
-
-    def global_initial_point(self, image: Any) -> Tuple[int, int]:
-        # 全局搜索初始注视点（权宜之计：返回图像中心或显著性最高点）
-        # 假设 image 是 tensor，取 H, W
-        if hasattr(image, 'shape') and len(image.shape) >= 2:
-            return (image.shape[-1] // 2, image.shape[-2] // 2)
-        return (128, 128)
 
 # =============================
 # Graph I related
@@ -932,29 +749,6 @@ class GraphI:
             out.extend(fl_sorted[:per_mod_limit])
         return out
 
-    def fast_update(self, features: List[Dict[str, Any]], location: Tuple[int, int], ts: int = 0) -> List[Tuple[int, int]]:
-        """
-        仅在 fixation 时调用：快速插入/增强 local proto counts，不执行 expensive merges
-        """
-        activated_nodes, proto_matches, S = self.retrieve_candidates(features, ts)
-
-        if S >= self.cfg.strengthen_threshold and len(activated_nodes) > 0:
-            activated_protos = self.apply_strengthen(activated_nodes, proto_matches, ts)
-            new_protos = []
-        else:
-            feats_for_learning = self._limit_feats_per_modality(features, self.cfg.max_writes_per_modality)
-            new_protos = self.learn(feats_for_learning, set(), [], ts)
-            activated_protos = proto_matches and [(cidx, pid) for (cidx, pid, _) in proto_matches] or []
-        
-        # 合并去重
-        active_protos = list(dict.fromkeys(activated_protos + new_protos))
-        
-        # 清理不活跃节点
-        for coll in self.graphI:
-            coll.prune_inactive_nodes()
-            
-        return active_protos
-
     def save(self, path:str):
         with open(path, 'wb') as f:
             pickle.dump(self, f)
@@ -1370,113 +1164,77 @@ class GraphII:
             if e.weight < self.cfg.graph2_edge_min:
                 del self.graph2_edges[key]
 
-    # 在 class GraphII 中追加：
-    def batch_update_from_hypothesis(self, hyp_summary: Dict[str, Any], collections: List[Any], ts: int):
-        """
-        接收 EpisodeManager 输出的 hypothesis summary，执行 slow consolidation.
-        """
-        members = hyp_summary.get('members', [])
-        if not members:
-            return None
-            
-        # 计算空间 bitset 和 centroids
-        event_bitset, event_centroids = self._compute_spatial_bitset_and_centroids(members, collections)
-        if event_bitset == 0 and not event_centroids:
-            return None
-            
-        candidate_summary = {
-            'members': members,
-            'bitset': event_bitset,
-            'centroids': event_centroids
-        }
-        
-        return self.soft_merge(candidate_summary, ts)
 
-    def soft_merge(self, candidate: Dict[str, Any], ts: int) -> int:
-        """
-        如果匹配度极高 -> enhance
-        如果匹配度中等 -> create new C-node with references (soft merge)
-        如果匹配度低 -> create new node
-        """
-        candidate_ids = set()
-        for (c, pid) in candidate['members']:
-            candidate_ids.update(self.inverted_index_proto2graph2.get((c, pid), set()))
-            
-        best_id = None
-        best_score = 0.0
-        
-        if candidate_ids:
-            for gid in candidate_ids:
-                g2 = self.graph2_nodes.get(gid)
-                if not g2: continue
-                score = self._match_score(g2, candidate['bitset'], candidate['centroids'])
-                if score > best_score:
-                    best_score = score
-                    best_id = gid
-
-        # 执行 Soft-merge 逻辑
-        if best_score >= self.cfg.promote_high and best_id is not None:
-            # High match: Enhance existing node
-            node = self.graph2_nodes[best_id]
-            node.update(candidate['bitset'], candidate['centroids'], ts, self.cfg)
-            return node.id
-            
-        elif best_score >= self.cfg.promote_low and best_id is not None:
-            # Mid match: Soft merge (Create new, but link to existing)
-            new_id = self._create_node_from_candidate(candidate, ts)
-            # 建立 soft link (使用 Graph2Edge 记录关联)
-            self._update_edge(best_id, new_id, (0.0, 0.0), ts)
-            return new_id
-            
-        else:
-            # Low match: Create entirely new node
-            return self._create_node_from_candidate(candidate, ts)
-
-    def _create_node_from_candidate(self, candidate: Dict[str, Any], ts: int) -> int:
-        gid = self.next_graph2_id
-        self.next_graph2_id += 1
-        node = Graph2Node(gid, candidate['members'], candidate['bitset'], candidate['centroids'], ts, self.cfg)
-        self.graph2_nodes[gid] = node
-        
-        for (c, pid) in candidate['members']:
-            self.inverted_index_proto2graph2[(c, pid)].add(gid)
-            
-        return gid
-
-class MultilevelCoordinator:
-    def __init__(self, cfg: Config, g2cfg: GraphIIConfig):
+# =============================
+# FoveatedMemory (orchestrator)
+# =============================
+class FoveatedMemory:
+    def __init__(self, cfg:Config = Config(), g2cfg:Config = GraphIIConfig()):
         self.cfg = cfg
         self.device = cfg.device
         self.graphI = GraphI(cfg, device=self.device)
         self.graphII = GraphII(g2cfg, device=self.device)
-        self.episode_manager = EpisodeManager()
-        self.saccade = Saccade(cfg, device=self.device)
-        
-        self.levels = [2, 1, 0] # Example: 2=object, 1=part, 0=patch
         self.timestep = 0
 
-    def handle_new_view(self, image_dict: Dict[str, Any]):
-        """
-        image_dict 包含 grad, hue, curvature, aspect, orient 等 tensor
-        """
+    def run_one_step(self,
+                     grad: torch.Tensor,
+                     hue: torch.Tensor,
+                     curvature_bank: Optional[torch.Tensor] = None,
+                     aspect_bank: Optional[torch.Tensor] = None,
+                     orient_bank: Optional[torch.Tensor] = None,
+                     reset_image: bool = False,
+                     ts: Optional[int] = None):
+        if ts is None:
+            ts = self.timestep
         self.timestep += 1
+
+        if reset_image:
+            self.graphI.reset_image(grad, hue, curvature_bank, aspect_bank, orient_bank)
+
+        mode_sacc, center, r = self.graphI.propose_window()
+        if mode_sacc == 'end':
+            return 'end',None, None, None
+
+        if center is None or r is None:
+            return 'wander', None, None, None
+
+        window_feats = self.graphI.extract_features(grad, hue, curvature_bank, aspect_bank, orient_bank, center=center, r=r, ts=ts)
+        activated_nodes, proto_matches, S = self.graphI.retrieve_candidates(window_feats, ts)
+
+        if S >= self.cfg.strengthen_threshold and len(activated_nodes) > 0:
+            self.graphI.saccade.mode = 'wander'
+            activated_protos = self.graphI.apply_strengthen(activated_nodes, proto_matches, ts)
+            new_protos = []
+        else:
+            self.graphI.saccade.mode = 'learn'
+            feats_for_learning = self.graphI._limit_feats_per_modality(window_feats, self.cfg.max_writes_per_modality)
+            new_protos = self.graphI.learn(feats_for_learning, set(), [], ts)
+            activated_protos = proto_matches and [(cidx,pid) for (cidx,pid,_) in proto_matches] or []
         
-        # 1. 全局搜索初始注视点
-        initial_point = self.saccade.global_search_for_initial_fixation(image_dict)
+        active_protos = []
+        if activated_protos:
+            active_protos.extend(activated_protos)
+        if new_protos:
+            active_protos.extend(new_protos)
+            
+        active_protos = list(dict.fromkeys(active_protos))
+        self.graphII.observe(active_protos, self.graphI.graphI, ts)
         
-        # 2. 多层级检索与学习 (Top-down)
-        for level in self.levels:
-            # 开启一个 Episode
-            self.saccade.start_episode(initial_point, layer_level=level)
-            
-            # 在该 Episode 内连续执行 Fixation
-            while self.saccade.state == 'learn':
-                self.saccade.perform_fixation(image_dict, self.graphI, self.timestep)
-                
-                action = self.saccade.decide_next_fixation(image_dict)
-                if action == 'end_episode':
-                    # Episode 结束，批量更新 GraphII
-                    self.saccade.end_episode(self.graphII, self.graphI.graphI, self.timestep)
-                    break
-            
-            # 简化逻辑：如果底层学习完成，直接返回上层（此处循环会继续，可根据实际检索命中率做 break 优化）
+        for coll in self.graphI.graphI:
+            coll.prune_inactive_nodes()
+
+        if self.graphI.saccade.mode == 'strengthen':
+            return self.graphI.saccade.mode, len(activated_nodes), len(active_protos), center
+        elif self.graphI.saccade.mode == 'learn':
+            return self.graphI.saccade.mode, len(feats_for_learning), len(new_protos), center
+        else:
+            return self.graphI.saccade.mode, None, None, center
+    
+    def save(self, path:str):
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(path:str) -> 'FoveatedMemory':
+        with open(path, 'rb') as f:
+            return pickle.load(f)
