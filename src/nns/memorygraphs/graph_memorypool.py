@@ -1,4 +1,3 @@
-
 import math
 import time
 import pickle
@@ -11,13 +10,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # =============================
-# Config
+# Unified Config
 # =============================
-class Config:
+class MemoryConfig:
     H = 256
     W = 256
 
-    # 模态与位段分配（对外留出接口）
+    # Modality bit allocations
     bitset_mod_bits = {
         0: 8,  # edge_proto
         1: 6,  # hue_proto
@@ -26,100 +25,62 @@ class Config:
         4: 4   # orient_bank
     }
     
+    # Graph I
     scales = [8, 4, 2, 1]
     base_bucket_size = 8
-
     graphs_per_layer = {'graphI': 5}
     bitset_bits = 64
-
     topk_per_scale = {8: 128, 4: 64, 2: 32, 1: 16}
     topk_per_modality = 20000
     proto_form_thresh = 3
     proto_merge_thresh = 0.7
-    strengthen_threshold = 0.5 # 无 embedding 后分数阈值调整
+    strengthen_threshold = 0.5
     proto_match_thresh = 0.08
-
     max_nodes_per_collection = 50000
     max_edges_per_node = 12
-
     max_candidates_per_step = 512
     max_activated_per_collection = 128
-
-    # Saccade params
-    saccade_radii = [32, 64] # to enhance
-    learn_saccades_N = 0
     max_writes_per_modality = 32
-    interest_end_thresh = 0.02
-    path_sigma = 3.0
 
-    # interest weights
+    # Saccade & Episode
+    max_fixations_per_episode = 20
+    edge_search_radius = 40
+    texture_window_radius = 32
     w_grad = 0.5
     w_hue = 0.3
     w_cont = 0.2
 
-    max_fixations_per_episode = 20
-    edge_search_radius = 40
-    texture_window_radius = 32
-
-    device = torch.device('cpu')
+    # Graph II
+    P_global = 128
+    P_local = 64
+    M_centroid = 6
+    K_fast = 200
+    K_final = 10
     
-class GraphIIConfig:
-    H = 256
-    W = 256
-    
-    # 模态与位段分配（同 GraphI，用于统一维护结构）
-    bitset_mod_bits = {
-        0: 8,
-        1: 6,
-        2: 4,
-        3: 4,
-        4: 4
-    }
-    
-    P_global = 128            # 全局 proto 词表大小
-    P_local = 64              # 每 node 激活 proto 上限
-    scales = [1, 2, 4]        # multi-scale grids (S_total = 1+4+16 = 21)
-    M_centroid = 6            # 精排使用 proto 数量上限
-    K_fast = 200              # 粗筛候选数
-    K_final = 10              # 返回 top
-    
-    # formation & consolidation
-    graph2_form_count = 3           
-    T_coalesce = 200                
-    event_merge_thresh = 0.55       
-    bucket_key_n = 3                
-
-    # matching & scoring weights (基于检索规格文档)
+    # Matching & Scoring
     w_jaccard = 0.55
     w_pos = 0.30
     w_pair = 0.10
     w_strength = 0.05
-    
     graph2_match_threshold = 0.5
+    promote_high = 0.7
+    promote_low = 0.4
 
-    # node update rates
+    # Node/Edge Update Rates
     graph2_strength_beta = 0.05
     graph2_pos_beta = 0.06
-
-    # edge params
     graph2_edge_init_weight = 1.0
     graph2_edge_inc = 1.0
     graph2_vec_beta = 0.06
     graph2_edge_decay = 0.999
     graph2_edge_min = 0.1
-
-    # node decay/prune
     graph2_decay = 0.999
     graph2_min_strength = 0.05
     graph2_min_count = 1
-
-    # consolidation merging nodes
     graph2_merge_thresh = 0.78
 
-    promote_high = 0.7
-    promote_low = 0.4
-
     device = torch.device('cpu')
+
 
 # =============================
 # Episode Manager
@@ -135,7 +96,7 @@ class EpisodeManager:
         self.episodes[eid] = {
             'layer_level': layer_level,
             'fixations': [],
-            'active_protos': set(), # 收集该 episode 激活的所有 graph1 proto
+            'active_protos': set(),
             'start_time': None
         }
         return eid
@@ -157,104 +118,81 @@ class EpisodeManager:
 
     def finalize_episode(self, episode_id: int) -> List[Dict[str, Any]]:
         ep = self.episodes.pop(episode_id, None)
-        if not ep: return []
-        
-        # 完成判定：直接将收集到的所有 protos 打包为一个 hypothesis
-        if not ep['active_protos']:
+        if not ep or not ep['active_protos']: 
             return []
             
         completed_hypothesis = {
-            'members': list(ep['active_protos']), # List of (collection_idx, proto_id)
+            'members': list(ep['active_protos']),
             'layer_level': ep['layer_level'],
             'fixation_count': len(ep['fixations'])
         }
         return [completed_hypothesis]
+
+
+# =============================
+# Attention Policy (Merged Texture/Edge/Selector)
+# =============================
+class AttentionPolicy:
+    def __init__(self, cfg: MemoryConfig):
+        self.cfg = cfg
+
+    def _compute_texture_resp(self, point: Tuple[int, int], image: Any) -> float:
+        return 0.5 
+
+    def _next_texture_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
+        cx, cy = current_point
+        for dx, dy in [(0, 16), (16, 0), (0, -16), (-16, 0), (16, 16), (-16, -16)]:
+            nx, ny = cx + dx, cy + dy
+            if (nx, ny) not in saccade_matrix:
+                return (nx, ny)
+        return None
+
+    def _query_edges(self, point: Tuple[int, int], radius: int) -> List[Any]:
+        return []
+
+    def _next_edge_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
+        return None
+
+    def next_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool], image: Any) -> Optional[Tuple[int, int]]:
+        local_edges = self._query_edges(current_point, self.cfg.edge_search_radius)
+        if not local_edges:
+            return self._next_texture_point(current_point, saccade_matrix)
+        else:
+            return self._next_edge_point(current_point, saccade_matrix)
+
+    def global_initial_point(self, image: Any) -> Tuple[int, int]:
+        if hasattr(image, 'shape') and len(image.shape) >= 2:
+            return (image.shape[-1] // 2, image.shape[-2] // 2)
+        return (128, 128)
+
+    def extract_responses(self, point: Tuple[int, int], image: Any) -> Tuple[float, List[Any]]:
+        return self._compute_texture_resp(point, image), self._query_edges(point, 0)
+
 
 # =============================
 # Saccade
 # =============================
 class Saccade:
     """
-    Encapsulates all saccade / fixation / path / interest logic.
-    已融合最新的 Episode-based (分层/扫视驱动) 增量学习逻辑，同时向下兼容 GraphI 的张量掩码。
+    Encapsulates episode-based saccade logic.
     """
-    def __init__(self, cfg: 'Config', device=None):
+    def __init__(self, cfg: MemoryConfig, device=None):
         self.cfg = cfg
         self.device = device or cfg.device
-
-        self.interest: Optional[torch.Tensor] = None 
-        self.path: Optional[torch.Tensor] = None      
         self.visited: Optional[torch.Tensor] = None   
-        self.mode: str = 'wander'
-        self.current_center: Optional[Tuple[int,int]] = None
-        self.learn_saccades_left: int = 0
-
         self.episode_manager = EpisodeManager()
-        self.policy = SelectorPolicy(cfg)
+        self.policy = AttentionPolicy(cfg)
         
-        self.state = 'idle' # 'idle', 'learn', 'end'
+        self.state = 'idle'
         self.current_fixation: Optional[Tuple[int, int]] = None
-        self.fixation_history = deque(maxlen=getattr(cfg, 'max_fixations_per_episode', 20))
+        self.fixation_history = deque(maxlen=cfg.max_fixations_per_episode)
         self.episode_id: Optional[int] = None
         self.saccade_matrix: Dict[Tuple[int, int], bool] = {}
         self.layer_level = 0
 
-    def reset(self, grad: torch.Tensor, hue: torch.Tensor):
-        H = int(hue.shape[-2]); W = int(hue.shape[-1])
-        self.path = torch.zeros((H, W), device=self.device, dtype=torch.float32)
+    def reset_visited(self, H: int, W: int):
         self.visited = torch.zeros((H, W), device=self.device, dtype=torch.uint8)
-        self.interest = self._compute_interest(grad, hue)
-        self.interest = torch.clamp(self.interest, 0.0, 1.0)
-        self.mode = 'wander'
-        self.current_center = None
-        self.learn_saccades_left = 0
         self.saccade_matrix.clear()
-
-    def _compute_interest(self, grad: torch.Tensor, hue: torch.Tensor) -> torch.Tensor:
-        g = grad.squeeze(0)
-        if g.ndim == 4 and g.shape[-1] == 2:
-            g = g.squeeze(0)
-        if g.ndim == 3 and g.shape[-1] == 2:
-            gx = g[..., 0].to(self.device); gy = g[..., 1].to(self.device)
-        else:
-            gx = torch.zeros((self.cfg.H, self.cfg.W), device=self.device)
-            gy = torch.zeros_like(gx)
-        grad_mag = torch.sqrt(gx*gx + gy*gy)
-
-        h = hue.squeeze(0).squeeze(0).to(self.device)
-        k = 7; pad = k // 2
-        kernel = torch.ones((1,1,k,k), device=self.device) / (k*k)
-        hue_mean = F.conv2d(h[None,None], kernel, padding=pad)[0,0]
-        hue_contrast = torch.abs(h - hue_mean)
-
-        def norm_map(t):
-            tmin = float(t.min().item()); tmax = float(t.max().item())
-            if tmax - tmin < 1e-9:
-                return torch.zeros_like(t)
-            return (t - tmin) / (tmax - tmin + 1e-12)
-
-        gm = norm_map(grad_mag)
-        hc = norm_map(hue_contrast)
-        interest = self.cfg.w_grad * gm + self.cfg.w_hue * hc
-        return interest.clamp(0.0, 1.0)
-
-    def add_path_bump(self, center: Tuple[int,int], window_radius: int):
-        if self.path is None:
-            return
-        cx, cy = int(center[0]), int(center[1])
-        H, W = self.path.shape
-        sigma = max(1.0, float(window_radius) * 0.5)
-        radius = int(math.ceil(3.0 * sigma))
-        x0 = max(0, cx - radius); x1 = min(W - 1, cx + radius)
-        y0 = max(0, cy - radius); y1 = min(H - 1, cy + radius)
-        if x1 < x0 or y1 < y0: return
-        xs = torch.arange(x0, x1+1, device=self.device, dtype=torch.float32)
-        ys = torch.arange(y0, y1+1, device=self.device, dtype=torch.float32)
-        dx2 = (xs - float(cx)) ** 2
-        dy2 = (ys - float(cy)) ** 2
-        denom = 2.0 * (sigma * sigma + 1e-12)
-        g = torch.exp(-(dy2.unsqueeze(1) + dx2.unsqueeze(0)) / denom)
-        self.path[y0:y1+1, x0:x1+1] = torch.clamp(self.path[y0:y1+1, x0:x1+1] + g, 0.0, 1.0)
 
     def mark_visited(self, center: Tuple[int,int], r: int):
         if self.visited is None: return
@@ -262,75 +200,8 @@ class Saccade:
         H, W = self.visited.shape
         x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
         y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
-        # 1. 更新 GraphI 需要的张量
         self.visited[y0:y1+1, x0:x1+1] = 1
-        # 2. 同步更新新策略需要的字典矩阵
         self.saccade_matrix[(cx, cy)] = True
-
-    def prob_map(self) -> torch.Tensor:
-        return F.relu(self.interest - self.path)
-
-    def choose_fixation(self) -> Optional[Tuple[int,int]]:
-        pm = self.prob_map()
-        if float(pm.max().item()) <= 0.0:
-            return None
-        idx = int(torch.argmax(pm.flatten()).item())
-        W = pm.shape[1]
-        return (idx % W, idx // W)
-
-    def choose_radius(self, center: Tuple[int,int]) -> Optional[int]:
-        cx, cy = int(center[0]), int(center[1])
-        best_r = None; best_score = -1.0
-        H, W = self.interest.shape
-        for r in self.cfg.saccade_radii:
-            x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
-            y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
-            region = self.interest[y0:y1+1, x0:x1+1]
-            if region.numel() == 0: continue
-            score = float(region.sum().item()) / float(region.numel())
-            if score > best_score:
-                best_score = score; best_r = r
-        if best_score <= 0: return None
-        return best_r
-
-    def step(self) -> Tuple[str, Optional[Tuple[int,int]], Optional[int]]:
-        if self.mode == 'wander':
-            center = self.choose_fixation()
-            if center is None:
-                self.mode = 'end'
-                return 'end', None, None
-            r = self.choose_radius(center)
-            if r is None:
-                return 'wander', center, None
-            self.current_center = center
-            self.learn_saccades_left = self.cfg.learn_saccades_N
-            self.add_path_bump(center, r)
-            self.mark_visited(center, r)
-            return 'wander', center, r
-
-        elif self.mode == 'learn':
-            if self.learn_saccades_left <= 0:
-                self.mode = 'wander'
-                self.current_center = None
-                return 'wander', None, None
-            center = self.current_center
-            if center is None:
-                center = self.choose_fixation()
-                if center is None:
-                    self.mode = 'end'
-                    return 'end', None, None
-                self.current_center = center
-            r = self.choose_radius(center)
-            if r is None:
-                self.mode = 'wander'
-                self.current_center = None
-                return 'wander', None, None
-            self.add_path_bump(center, r)
-            self.mark_visited(center, r)
-            self.learn_saccades_left -= 1
-            return 'learn', center, r
-        else:
-            return 'end', None, None
 
     def start_episode(self, initial_point: Tuple[int, int], layer_level: int = 0) -> int:
         self.layer_level = layer_level
@@ -338,6 +209,8 @@ class Saccade:
         self.current_fixation = initial_point
         self.fixation_history.clear()
         self.saccade_matrix.clear()
+        if self.visited is not None:
+            self.visited.zero_()
         self.state = 'learn'
         return self.episode_id
 
@@ -345,17 +218,18 @@ class Saccade:
         if self.state != 'learn' or self.current_fixation is None:
             return
             
-        # 兼容 GraphI 的 extract_features
+        if self.visited is None:
+            # Initialize visited tensor based on first image dict if needed
+            h_shape = image_dict.get('hue').shape if image_dict.get('hue') is not None else (self.cfg.H, self.cfg.W)
+            self.reset_visited(h_shape[-2], h_shape[-1])
+
         features = graphI.extract_features(
             grad=image_dict.get('grad'), hue=image_dict.get('hue'), 
             curvature_bank=image_dict.get('curvature'), aspect_bank=image_dict.get('aspect'), orient_bank=image_dict.get('orient'),
-            center=self.current_fixation, r=getattr(self.cfg, 'texture_window_radius', 32), ts=time_now
+            center=self.current_fixation, r=self.cfg.texture_window_radius, ts=time_now, visited_mask_tensor=self.visited
         )
-        
-        texture_resp = TextureChannel.compute(self.current_fixation, image_dict)
-        edge_resp = EdgeContourTracker.sample_local(self.current_fixation, image_dict)
-        
-        # 仅执行 GraphI 的 fast_update
+
+        texture_resp, edge_resp = self.policy.extract_responses(self.current_fixation, image_dict)
         active_protos = graphI.fast_update(features, self.current_fixation, time_now)
         
         self.episode_manager.append_observation(
@@ -364,12 +238,10 @@ class Saccade:
         )
         
         self.fixation_history.append((self.current_fixation, time_now))
-        # 同步更新 visited 张量和 saccade_matrix
-        self.mark_visited(self.current_fixation, getattr(self.cfg, 'texture_window_radius', 32))
+        self.mark_visited(self.current_fixation, self.cfg.texture_window_radius)
 
     def decide_next_fixation(self, image_dict: Any) -> str:
-        max_fix = getattr(self.cfg, 'max_fixations_per_episode', 20)
-        if len(self.fixation_history) >= max_fix:
+        if len(self.fixation_history) >= self.cfg.max_fixations_per_episode:
             self.state = 'end'
             return 'end_episode'
             
@@ -390,60 +262,6 @@ class Saccade:
     def global_search_for_initial_fixation(self, image_dict: Any) -> Tuple[int, int]:
         return self.policy.global_initial_point(image_dict)
 
-# =============================
-# texterture channel
-# =============================
-class TextureChannel:
-    @staticmethod
-    def compute(point: Tuple[int, int], image: Any) -> float:
-        # 提取局部纹理响应（此处为占位，实际可接入 Gabor/卷积响应）
-        return 0.5 
-
-    @staticmethod
-    def next_point_along_texture(current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
-        # 简化的纹理连通域漫游逻辑：在附近随机找一个未访问过的点
-        cx, cy = current_point
-        for dx, dy in [(0, 16), (16, 0), (0, -16), (-16, 0), (16, 16), (-16, -16)]:
-            nx, ny = cx + dx, cy + dy
-            if (nx, ny) not in saccade_matrix:
-                return (nx, ny)
-        return None
-
-class EdgeContourTracker:
-    @staticmethod
-    def sample_local(point: Tuple[int, int], image: Any) -> List[Any]:
-        # 返回局部边缘片段
-        return []
-
-    @staticmethod
-    def query(point: Tuple[int, int], radius: int) -> List[Any]:
-        # 查询半径内的边缘（此处简化为无边缘，强制走纹理策略）
-        return []
-
-    @staticmethod
-    def next_point_along_edge(current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
-        # 沿边缘追踪逻辑
-        return None
-
-class SelectorPolicy:
-    def __init__(self, cfg: Config):
-        self.cfg = cfg
-
-    def next_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool], image: Any) -> Optional[Tuple[int, int]]:
-        local_edges = EdgeContourTracker.query(current_point, self.cfg.edge_search_radius)
-        if not local_edges:
-            # 如果附近没有边缘，沿着纹理连通域滑动
-            return TextureChannel.next_point_along_texture(current_point, saccade_matrix)
-        else:
-            # 如果在边缘附近，沿边缘跟踪
-            return EdgeContourTracker.next_point_along_edge(current_point, saccade_matrix)
-
-    def global_initial_point(self, image: Any) -> Tuple[int, int]:
-        # 全局搜索初始注视点（权宜之计：返回图像中心或显著性最高点）
-        # 假设 image 是 tensor，取 H, W
-        if hasattr(image, 'shape') and len(image.shape) >= 2:
-            return (image.shape[-1] // 2, image.shape[-2] // 2)
-        return (128, 128)
 
 # =============================
 # Graph I related
@@ -472,9 +290,8 @@ class Graph1Proto:
         self.strength = 1.0
         self.last_updated = 0
 
-
 class GraphCollection:
-    def __init__(self, bucket_size:int, cfg:Config):
+    def __init__(self, bucket_size:int, cfg:MemoryConfig):
         self.bucket_size = bucket_size
         self.cfg = cfg
         self.nodes: Dict[int, Graph0Node] = {}
@@ -488,7 +305,6 @@ class GraphCollection:
         return (int(x // self.bucket_size), int(y // self.bucket_size))
 
     def reset_buckets(self):
-        """ 清空当前已有的所有 bucket """
         self.buckets.clear()
 
     def add_or_merge_node(self, signature:int, modality:int, pos:Tuple[int,int], value:float, ts:int=0) -> int:
@@ -508,7 +324,6 @@ class GraphCollection:
         return nid
 
     def add_node_no_merge(self, signature:int, modality:int, pos:Tuple[int,int], value:float, ts:int=0) -> int:
-        """ 用于 Bank 模态直接作为特征插入，而不进行 buckets 中的相似聚合 """
         nid = self._next_node_id; self._next_node_id += 1
         node = Graph0Node(nid, signature, modality, pos, value, ts)
         self.nodes[nid] = node
@@ -574,27 +389,16 @@ class GraphCollection:
 
 
 class GraphI:
-    def __init__(self, cfg:Config, device=None):
+    def __init__(self, cfg:MemoryConfig, device=None):
         self.cfg = cfg
         self.device = device or cfg.device
-
         n_col = cfg.graphs_per_layer.get('graphI', 5)
         self.graphI: List[GraphCollection] = [GraphCollection(cfg.base_bucket_size, cfg) for _ in range(n_col)]
-
-        self.saccade = Saccade(cfg = self.cfg, device=self.device)
         self.cached_feats: List[Dict[str,Any]] = []
 
-    def reset_image(self, grad, hue, curvature_bank=None, aspect_bank=None, orient_bank=None):
-        self.cached_feats = []
-        self.saccade.reset(grad, hue)
-
     def reset_all_buckets(self):
-        """ 清空所有 GraphI 中 GraphCollection 的 buckets 聚合缓存 """
         for coll in self.graphI:
             coll.reset_buckets()
-
-    def propose_window(self) -> Tuple[str, Optional[Tuple[int,int]], Optional[int]]:
-        return self.saccade.step()
 
     def extract_features(self,
                          grad: torch.Tensor,
@@ -604,16 +408,13 @@ class GraphI:
                          orient_bank: Optional[torch.Tensor] = None,
                          center: Optional[Tuple[int,int]] = None,
                          r: Optional[int] = None,
-                         ts: int = 0) -> List[Dict[str,Any]]:
+                         ts: int = 0,
+                         visited_mask_tensor: Optional[torch.Tensor] = None) -> List[Dict[str,Any]]:
         device = self.device
         H = int(hue.shape[-2]); W = int(hue.shape[-1])
 
         if center is None or r is None:
-            feats = self._extract_global_features(grad, hue, curvature_bank, aspect_bank, orient_bank, ts)
-            self.cached_feats = feats
-            if self.saccade.visited is not None:
-                self.saccade.visited[:, :] = 1
-            return feats
+            return self._extract_global_features(grad, hue, curvature_bank, aspect_bank, orient_bank, ts)
 
         cx, cy = int(center[0]), int(center[1])
         x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
@@ -625,16 +426,15 @@ class GraphI:
             if x0 <= fx <= x1 and y0 <= fy <= y1:
                 prev_feats.append(f)
 
-        if self.saccade.visited is None:
-            unvisited_patch = torch.ones((y1 - y0 + 1, x1 - x0 + 1), dtype=torch.bool, device=device)
+        if visited_mask_tensor is None:
+            visited_mask = torch.zeros((y1 - y0 + 1, x1 - x0 + 1), dtype=torch.bool, device=device)
         else:
-            visited_patch = self.saccade.visited[y0:y1+1, x0:x1+1]
-            unvisited_patch = (visited_patch == 0)
+            visited_patch = visited_mask_tensor[y0:y1+1, x0:x1+1]
+            visited_mask = (visited_patch > 0)
         
-        # visited_mask = ~unvisited_patch
-        visited_mask = unvisited_patch
         new_feats: List[Dict[str,Any]] = []
 
+        # Grad
         g = grad.squeeze(0)
         if g.ndim == 4 and g.shape[-1] == 2:
             g = g.squeeze(0)
@@ -644,10 +444,9 @@ class GraphI:
             gx = torch.zeros((H, W), device=device); gy = torch.zeros_like(gx)
         mag = torch.sqrt(gx*gx + gy*gy)
         mag_patch = mag[y0:y1+1, x0:x1+1].clone()
-        mag_patch_masked = mag_patch.clone()
-        mag_patch_masked[visited_mask] = float('-inf')
-        flat = mag_patch_masked.flatten()
-        topk = min(self.cfg.topk_per_modality, int((mag_patch_masked != float('-inf')).sum().item()))
+        mag_patch[visited_mask] = float('-inf')
+        flat = mag_patch.flatten()
+        topk = min(self.cfg.topk_per_modality, int((mag_patch != float('-inf')).sum().item()))
         if topk > 0:
             vals, idxs = torch.topk(flat, topk)
             Wpatch = x1 - x0 + 1
@@ -658,9 +457,9 @@ class GraphI:
                 angle = math.atan2(float(gy[absy, absx].item()), float(gx[absy, absx].item()))
                 binidx = int(((angle + math.pi) / (2*math.pi)) * 16) & 0xff
                 sig = int((0 << 24) | binidx)
-                fdict = {'modality': 0, 'signature': sig, 'pos': (absx, absy), 'value': float(v)}
-                new_feats.append(fdict)
+                new_feats.append({'modality': 0, 'signature': sig, 'pos': (absx, absy), 'value': float(v)})
 
+        # Hue
         hmap = hue.squeeze(0).squeeze(0).to(device)
         hue_patch = hmap[y0:y1+1, x0:x1+1]
         k = 7; pad = k // 2
@@ -668,10 +467,9 @@ class GraphI:
         hue_mean = F.conv2d(hmap[None,None], kernel, padding=pad)[0,0]
         hue_patch_mean = hue_mean[y0:y1+1, x0:x1+1]
         sal_patch = torch.abs(hue_patch - hue_patch_mean)
-        sal_patch_masked = sal_patch.clone()
-        sal_patch_masked[visited_mask] = float('-inf')
-        flat = sal_patch_masked.flatten()
-        topk = min(self.cfg.topk_per_modality, int((sal_patch_masked != float('-inf')).sum().item()))
+        sal_patch[visited_mask] = float('-inf')
+        flat = sal_patch.flatten()
+        topk = min(self.cfg.topk_per_modality, int((sal_patch != float('-inf')).sum().item()))
         if topk > 0:
             vals, idxs = torch.topk(flat, topk)
             Wpatch = x1 - x0 + 1
@@ -681,19 +479,18 @@ class GraphI:
                 absx = x0 + rx; absy = y0 + ry
                 binidx = int((hmap[absy, absx].item()) * 32) & 0xff
                 sig = int((1 << 24) | binidx)
-                fdict = {'modality': 1, 'signature': sig, 'pos': (absx, absy), 'value': float(v)}
-                new_feats.append(fdict)
+                new_feats.append({'modality': 1, 'signature': sig, 'pos': (absx, absy), 'value': float(v)})
 
+        # Banks
         banks = [curvature_bank, aspect_bank, orient_bank]
         for mi, bank in enumerate(banks, start=2):
             if bank is None: continue
             b = bank.squeeze(0).to(device)  
             patch = b[:, y0:y1+1, x0:x1+1]  
             sal = torch.norm(patch, dim=0)
-            sal_masked = sal.clone()
-            sal_masked[visited_mask] = float('-inf')
-            flat = sal_masked.flatten()
-            topk = min(self.cfg.topk_per_modality, int((sal_masked != float('-inf')).sum().item()))
+            sal[visited_mask] = float('-inf')
+            flat = sal.flatten()
+            topk = min(self.cfg.topk_per_modality, int((sal != float('-inf')).sum().item()))
             if topk > 0:
                 vals, idxs = torch.topk(flat, topk)
                 Wpatch = x1 - x0 + 1
@@ -703,11 +500,9 @@ class GraphI:
                     absx = x0 + rx; absy = y0 + ry
                     ch = int(torch.argmax(patch[:, ry, rx]).item())
                     sig = int((mi << 24) | (ch & 0xffff))
-                    fdict = {'modality': mi, 'signature': sig, 'pos': (absx, absy), 'value': float(v)}
-                    new_feats.append(fdict)
+                    new_feats.append({'modality': mi, 'signature': sig, 'pos': (absx, absy), 'value': float(v)})
 
         self.cached_feats.extend(new_feats)
-        self.saccade.mark_visited(center, r)
         return prev_feats + new_feats
 
     def _extract_global_features(self, grad, hue, curvature_bank, aspect_bank, orient_bank, ts:int=0) -> List[Dict[str,Any]]:
@@ -767,7 +562,6 @@ class GraphI:
         if len(feats) == 0:
             return set(), [], 0.0
 
-        # 取消了 embedding，通过空间网格查询相同 signature 的节点做粗筛
         candidate_nodes_by_collection = [set() for _ in range(len(self.graphI))]
         for f in feats:
             mod = int(f['modality'])
@@ -776,7 +570,6 @@ class GraphI:
             sig = int(f['signature'])
             x, y = int(f['pos'][0]), int(f['pos'][1])
 
-            # 基于位置的快速搜索
             for dx in (-1, 0, 1):
                 for dy in (-1, 0, 1):
                     nx = x + dx * coll.bucket_size
@@ -862,7 +655,6 @@ class GraphI:
         new_nodes_by_collection = [ [] for _ in range(ncols) ]
         created = []
         
-        # 1. Edge & Hue 走聚合，Banks 绕过直接创建 proto
         for f in feats:
             mod = int(f['modality']); idx = mod % ncols
             coll = self.graphI[idx]
@@ -870,7 +662,6 @@ class GraphI:
             x,y = int(f['pos'][0]), int(f['pos'][1])
             
             if mod in (0, 1):
-                # 聚合逻辑
                 b = coll._bucket_coord(x,y)
                 found = False
                 for nid in coll.buckets.get(b, []):
@@ -881,14 +672,12 @@ class GraphI:
                     nid = coll.add_or_merge_node(sig, mod, (x,y), f['value'], ts)
                     new_nodes_by_collection[idx].append(nid)
             else:
-                # Bank 数据不需要聚合直接映射为 graph1proto
                 nid = coll.add_node_no_merge(sig, mod, (x,y), f['value'], ts)
                 pid = coll.add_proto([nid])
                 p = coll.protos[pid]
                 p.count = 1; p.strength = 1.0; p.last_updated = ts
                 created.append((idx, pid))
                 
-        # 2. 只有模态为 0/1 时生成的 nodes 在这里才会走 bucket aggregation 形成 proto
         for idx, coll in enumerate(self.graphI):
             groups: Dict[Tuple[int,int], List[int]] = {}
             for nid in new_nodes_by_collection[idx]:
@@ -903,7 +692,6 @@ class GraphI:
                     created.append((idx, pid))
                     p = coll.protos.get(pid)
                     p.count = 1; p.strength = 1.0; p.last_updated = ts
-                    # merge if similar
                     for other_pid, other_p in list(coll.protos.items()):
                         if other_pid == pid: continue
                         inter = (p.bitset & other_p.bitset).bit_count()
@@ -933,9 +721,6 @@ class GraphI:
         return out
 
     def fast_update(self, features: List[Dict[str, Any]], location: Tuple[int, int], ts: int = 0) -> List[Tuple[int, int]]:
-        """
-        仅在 fixation 时调用：快速插入/增强 local proto counts，不执行 expensive merges
-        """
         activated_nodes, proto_matches, S = self.retrieve_candidates(features, ts)
 
         if S >= self.cfg.strengthen_threshold and len(activated_nodes) > 0:
@@ -946,10 +731,7 @@ class GraphI:
             new_protos = self.learn(feats_for_learning, set(), [], ts)
             activated_protos = proto_matches and [(cidx, pid) for (cidx, pid, _) in proto_matches] or []
         
-        # 合并去重
         active_protos = list(dict.fromkeys(activated_protos + new_protos))
-        
-        # 清理不活跃节点
         for coll in self.graphI:
             coll.prune_inactive_nodes()
             
@@ -966,7 +748,7 @@ class GraphI:
 
 
 # =============================================================================
-# Graph II (基于文档：Bitset 粗筛 + 位置精排进行检索匹配)
+# Graph II
 # =============================================================================
 class Graph2Node:
     def __init__(self,
@@ -975,7 +757,7 @@ class Graph2Node:
                  bitset: int,
                  centroids: List[Tuple[float, float]],
                  ts: int,
-                 cfg: GraphIIConfig):
+                 cfg: MemoryConfig):
         self.id = int(node_id)
         self.members = list(members)            
         self.modalities = {c for c, _ in members}
@@ -987,7 +769,7 @@ class Graph2Node:
         self.last_seen = ts
         self.examples = deque(maxlen=8) 
 
-    def update(self, event_bitset: int, event_centroids: List[Tuple[float, float]], ts: int, cfg: GraphIIConfig):
+    def update(self, event_bitset: int, event_centroids: List[Tuple[float, float]], ts: int, cfg: MemoryConfig):
         self.count += 1
         self.last_seen = ts
         self.strength = (1 - cfg.graph2_strength_beta) * self.strength + cfg.graph2_strength_beta * 1.0
@@ -999,7 +781,7 @@ class Graph2Node:
         else:
             self.centroids = all_c
 
-    def merge_into(self, other:'Graph2Node', cfg: GraphIIConfig):
+    def merge_into(self, other:'Graph2Node', cfg: MemoryConfig):
         existing_set = set(self.members)
         for m in other.members:
             if m not in existing_set:
@@ -1020,7 +802,7 @@ class Graph2Node:
 
 
 class Graph2Edge:
-    def __init__(self, src: int, dst: int, vec: Tuple[float, float], ts: int, cfg: GraphIIConfig):
+    def __init__(self, src: int, dst: int, vec: Tuple[float, float], ts: int, cfg: MemoryConfig):
         self.src = int(src)
         self.dst = int(dst)
         self.count = 1
@@ -1028,7 +810,7 @@ class Graph2Edge:
         self.vec_mean = list(vec)
         self.last_seen = ts
 
-    def update(self, vec: Tuple[float, float], ts: int, cfg: GraphIIConfig):
+    def update(self, vec: Tuple[float, float], ts: int, cfg: MemoryConfig):
         self.count += 1
         self.last_seen = ts
         self.weight += cfg.graph2_edge_inc
@@ -1039,11 +821,8 @@ class Graph2Edge:
 
 
 class GraphII:
-    """
-    GraphII implements candidate-cache + consolidation for cross-modal graph2.
-    """
-    def __init__(self, cfg: Optional[GraphIIConfig] = None, device: Optional[torch.device] = None):
-        self.cfg = cfg if cfg is not None else GraphIIConfig()
+    def __init__(self, cfg: Optional[MemoryConfig] = None, device: Optional[torch.device] = None):
+        self.cfg = cfg if cfg is not None else MemoryConfig()
         if device is not None:
             self.cfg.device = device
         self.device = self.cfg.device
@@ -1053,19 +832,8 @@ class GraphII:
         self.next_graph2_id = 0
 
         self.inverted_index_proto2graph2: Dict[Tuple[int, int], set] = defaultdict(set)
-        self.cooccur_cache: Dict[Any, List[Dict[str, Any]]] = defaultdict(list)
-
-        self.prev_active: Optional[int] = None
-        self.prev_center: Optional[Tuple[float, float]] = None
-
-    def _make_bucket_key(self, members: List[Tuple[int, int]]) -> Tuple:
-        tokens = [f"{c}:{pid}" for (c, pid) in members]
-        tokens.sort()
-        prefix = tuple(tokens[:self.cfg.bucket_key_n])
-        return prefix
 
     def _compute_spatial_bitset_and_centroids(self, activated_protos, collections):
-        """ 遵循检索文档规范：按多尺度空间计算位特征及生成 centroid 核信息用于后续二阶精排 """
         bitset = 0
         proto_pos_list = []
         
@@ -1096,7 +864,6 @@ class GraphII:
             nx = min(max(nx, 0.0), 0.9999)
             ny = min(max(ny, 0.0), 0.9999)
             
-            # S_total = 21 (1x1: 1, 2x2: 4, 4x4: 16)
             bitset |= (1 << (p_type * 21 + 0))
             
             r2 = int(ny * 2)
@@ -1110,168 +877,11 @@ class GraphII:
         centroids = proto_pos_list[:self.cfg.M_centroid]
         return bitset, centroids
 
-    def _record_similarity(self, recA: Dict, recB: Dict) -> float:
-        a = int(recA['bitset']); b = int(recB['bitset'])
-        inter = (a & b).bit_count()
-        union = (a | b).bit_count()
-        bit_j = inter / float(max(1, union))
-
-        cA = recA.get('centroids', [])
-        cB = recB.get('centroids', [])
-        pos_score = 0.0
-        if cA and cB:
-            total_rbf = 0.0
-            sigma2 = 0.1
-            for qx, qy in cA:
-                best_rbf = 0.0
-                for nx, ny in cB:
-                    dx = qx - nx
-                    dy = qy - ny
-                    rbf = math.exp(-(dx*dx + dy*dy) / sigma2)
-                    if rbf > best_rbf: best_rbf = rbf
-                total_rbf += best_rbf
-            pos_score = total_rbf / len(cA)
-
-        modsA = {c for (c, _) in recA['members']}
-        modsB = {c for (c, _) in recB['members']}
-        mod_overlap = len(modsA & modsB) / float(max(1, len(modsA | modsB)))
-
-        score = (self.cfg.w_jaccard * bit_j) + (self.cfg.w_pos * pos_score) + (self.cfg.w_pair * mod_overlap)
-        return float(score)
-
-    def _insert_event_into_bucket(self, bucket_key: Any, event: Dict, ts: int) -> Dict:
-        bucket = self.cooccur_cache[bucket_key]
-        for rec in bucket:
-            if ts - rec['first_ts'] > self.cfg.T_coalesce:
-                continue
-            sim = self._record_similarity(rec, event)
-            if sim >= self.cfg.event_merge_thresh:
-                rec['count'] += 1
-                rec['last_ts'] = ts
-                rec['bitset'] |= int(event['bitset'])
-                
-                all_c = rec.get('centroids', []) + event.get('centroids', [])
-                rec['centroids'] = all_c[:self.cfg.M_centroid]
-                
-                existing = set(rec['members'])
-                for m in event['members']:
-                    if m not in existing:
-                        rec['members'].append(m)
-                        existing.add(m)
-                return rec
-
-        newrec = {
-            'members': list(event['members']),
-            'bitset': int(event['bitset']),
-            'centroids': list(event.get('centroids', [])),
-            'first_ts': ts,
-            'last_ts': ts,
-            'count': 1
-        }
-        bucket.append(newrec)
-        return newrec
-
-    def _try_promote_bucket_record(self, bucket_key: Any, rec: Dict, ts: int):
-        if rec['count'] < self.cfg.graph2_form_count:
-            return None
-        age = ts - rec['first_ts']
-        if age > self.cfg.T_coalesce:
-            return None
-            
-        gid = self.next_graph2_id
-        self.next_graph2_id += 1
-        node = Graph2Node(gid, rec['members'], rec['bitset'], rec['centroids'], ts, self.cfg)
-        self.graph2_nodes[gid] = node
-        
-        for (c, pid) in rec['members']:
-            self.inverted_index_proto2graph2[(c, pid)].add(gid)
-            
-        bucket = self.cooccur_cache[bucket_key]
-        for i, r in enumerate(bucket):
-            if r is rec:
-                del bucket[i]
-                break
-        return node
-
-    def observe(self, activated_protos: List[Tuple[int, int]], collections: List[Any], ts: int) -> Optional[int]:
-        if not activated_protos:
-            self.prev_active = None
-            self.prev_center = None
-            return None
-
-        event_bitset, event_centroids = self._compute_spatial_bitset_and_centroids(activated_protos, collections)
-        if event_bitset == 0 and not event_centroids:
-            return None
-
-        members = []
-        for (cidx, pid) in activated_protos:
-            if 0 <= cidx < len(collections):
-                members.append((cidx, pid))
-
-        if not members:
-            return None
-
-        # 1) attempt to match existing graph2 nodes via inverted index -> small candidate set
-        candidate_ids = set()
-        for (c, pid) in members:
-            candidate_ids.update(self.inverted_index_proto2graph2.get((c, pid), set()))
-            
-        best_id = None; best_score = 0.0
-        if candidate_ids:
-            for gid in candidate_ids:
-                g2 = self.graph2_nodes.get(gid, None)
-                if g2 is None: continue
-                score = self._match_score(g2, event_bitset, event_centroids)
-                if score > best_score:
-                    best_score, best_id = score, gid
-
-        # decide match vs candidate creation
-        active_node_id = None
-        if best_score >= self.cfg.graph2_match_threshold and best_id is not None:
-            node = self.graph2_nodes[best_id]
-            node.update(event_bitset, event_centroids, ts, self.cfg)
-            active_node_id = best_id
-        else:
-            # no strong existing match -> insert event into cooccur cache bucket and possibly promote
-            bucket_key = self._make_bucket_key(members)
-            event = {'members': list(members), 'bitset': event_bitset, 'centroids': event_centroids}
-            merged_rec = self._insert_event_into_bucket(bucket_key, event, ts)
-            promoted = self._try_promote_bucket_record(bucket_key, merged_rec, ts)
-            if promoted is not None:
-                active_node_id = promoted.id
-
-        # 2) update directed transition edges using prev_active -> active_node_id
-        if (self.prev_active is not None) and (active_node_id is not None) and (self.prev_active != active_node_id):
-            if event_centroids:
-                cx = sum(c[0] for c in event_centroids) / len(event_centroids)
-                cy = sum(c[1] for c in event_centroids) / len(event_centroids)
-                cur_centroid = (cx, cy)
-            else:
-                cur_centroid = (0.0, 0.0)
-                
-            prev_centroid = self.prev_center if self.prev_center is not None else cur_centroid
-            vec = (cur_centroid[0] - prev_centroid[0], cur_centroid[1] - prev_centroid[1])
-            self._update_edge(self.prev_active, active_node_id, vec, ts)
-
-        # update prev_active / prev_center if we have active node
-        if active_node_id is not None:
-            if event_centroids:
-                cx = sum(c[0] for c in event_centroids) / len(event_centroids)
-                cy = sum(c[1] for c in event_centroids) / len(event_centroids)
-                self.prev_center = (cx, cy)
-            else:
-                self.prev_center = (0.0, 0.0)
-            self.prev_active = active_node_id
-            
-        return active_node_id
-
     def _match_score(self, g2: Graph2Node, event_bitset: int, event_centroids: List[Tuple[float, float]]) -> float:
-        # 1. 粗筛：按位计算 Jaccard similarity
         inter = (g2.bitset & event_bitset).bit_count()
         union = (g2.bitset | event_bitset).bit_count()
         bit_score = inter / float(max(1, union))
         
-        # 2. 精排：基于 Centroid Mahalanobis 核 (RBF 近似) 的分布一致性打分
         pos_score = 0.0
         if event_centroids and g2.centroids:
             total_rbf = 0.0
@@ -1296,6 +906,64 @@ class GraphII:
             self.graph2_edges[key] = Graph2Edge(src, dst, vec, ts, self.cfg)
         else:
             self.graph2_edges[key].update(vec, ts, self.cfg)
+
+    def batch_update_from_hypothesis(self, hyp_summary: Dict[str, Any], collections: List[Any], ts: int):
+        members = hyp_summary.get('members', [])
+        if not members:
+            return None
+            
+        event_bitset, event_centroids = self._compute_spatial_bitset_and_centroids(members, collections)
+        if event_bitset == 0 and not event_centroids:
+            return None
+            
+        candidate_summary = {
+            'members': members,
+            'bitset': event_bitset,
+            'centroids': event_centroids
+        }
+        
+        return self.soft_merge(candidate_summary, ts)
+
+    def soft_merge(self, candidate: Dict[str, Any], ts: int) -> int:
+        candidate_ids = set()
+        for (c, pid) in candidate['members']:
+            candidate_ids.update(self.inverted_index_proto2graph2.get((c, pid), set()))
+            
+        best_id = None
+        best_score = 0.0
+        
+        if candidate_ids:
+            for gid in candidate_ids:
+                g2 = self.graph2_nodes.get(gid)
+                if not g2: continue
+                score = self._match_score(g2, candidate['bitset'], candidate['centroids'])
+                if score > best_score:
+                    best_score = score
+                    best_id = gid
+
+        if best_score >= self.cfg.promote_high and best_id is not None:
+            node = self.graph2_nodes[best_id]
+            node.update(candidate['bitset'], candidate['centroids'], ts, self.cfg)
+            return node.id
+            
+        elif best_score >= self.cfg.promote_low and best_id is not None:
+            new_id = self._create_node_from_candidate(candidate, ts)
+            self._update_edge(best_id, new_id, (0.0, 0.0), ts)
+            return new_id
+            
+        else:
+            return self._create_node_from_candidate(candidate, ts)
+
+    def _create_node_from_candidate(self, candidate: Dict[str, Any], ts: int) -> int:
+        gid = self.next_graph2_id
+        self.next_graph2_id += 1
+        node = Graph2Node(gid, candidate['members'], candidate['bitset'], candidate['centroids'], ts, self.cfg)
+        self.graph2_nodes[gid] = node
+        
+        for (c, pid) in candidate['members']:
+            self.inverted_index_proto2graph2[(c, pid)].add(gid)
+            
+        return gid
 
     def consolidate(self):
         merge_thresh = self.cfg.graph2_merge_thresh
@@ -1370,113 +1038,37 @@ class GraphII:
             if e.weight < self.cfg.graph2_edge_min:
                 del self.graph2_edges[key]
 
-    # 在 class GraphII 中追加：
-    def batch_update_from_hypothesis(self, hyp_summary: Dict[str, Any], collections: List[Any], ts: int):
-        """
-        接收 EpisodeManager 输出的 hypothesis summary，执行 slow consolidation.
-        """
-        members = hyp_summary.get('members', [])
-        if not members:
-            return None
-            
-        # 计算空间 bitset 和 centroids
-        event_bitset, event_centroids = self._compute_spatial_bitset_and_centroids(members, collections)
-        if event_bitset == 0 and not event_centroids:
-            return None
-            
-        candidate_summary = {
-            'members': members,
-            'bitset': event_bitset,
-            'centroids': event_centroids
-        }
-        
-        return self.soft_merge(candidate_summary, ts)
 
-    def soft_merge(self, candidate: Dict[str, Any], ts: int) -> int:
-        """
-        如果匹配度极高 -> enhance
-        如果匹配度中等 -> create new C-node with references (soft merge)
-        如果匹配度低 -> create new node
-        """
-        candidate_ids = set()
-        for (c, pid) in candidate['members']:
-            candidate_ids.update(self.inverted_index_proto2graph2.get((c, pid), set()))
-            
-        best_id = None
-        best_score = 0.0
-        
-        if candidate_ids:
-            for gid in candidate_ids:
-                g2 = self.graph2_nodes.get(gid)
-                if not g2: continue
-                score = self._match_score(g2, candidate['bitset'], candidate['centroids'])
-                if score > best_score:
-                    best_score = score
-                    best_id = gid
-
-        # 执行 Soft-merge 逻辑
-        if best_score >= self.cfg.promote_high and best_id is not None:
-            # High match: Enhance existing node
-            node = self.graph2_nodes[best_id]
-            node.update(candidate['bitset'], candidate['centroids'], ts, self.cfg)
-            return node.id
-            
-        elif best_score >= self.cfg.promote_low and best_id is not None:
-            # Mid match: Soft merge (Create new, but link to existing)
-            new_id = self._create_node_from_candidate(candidate, ts)
-            # 建立 soft link (使用 Graph2Edge 记录关联)
-            self._update_edge(best_id, new_id, (0.0, 0.0), ts)
-            return new_id
-            
-        else:
-            # Low match: Create entirely new node
-            return self._create_node_from_candidate(candidate, ts)
-
-    def _create_node_from_candidate(self, candidate: Dict[str, Any], ts: int) -> int:
-        gid = self.next_graph2_id
-        self.next_graph2_id += 1
-        node = Graph2Node(gid, candidate['members'], candidate['bitset'], candidate['centroids'], ts, self.cfg)
-        self.graph2_nodes[gid] = node
-        
-        for (c, pid) in candidate['members']:
-            self.inverted_index_proto2graph2[(c, pid)].add(gid)
-            
-        return gid
-
+# =============================
+# Multilevel Coordinator
+# =============================
 class MultilevelCoordinator:
-    def __init__(self, cfg: Config, g2cfg: GraphIIConfig):
+    def __init__(self, cfg: MemoryConfig):
         self.cfg = cfg
         self.device = cfg.device
         self.graphI = GraphI(cfg, device=self.device)
-        self.graphII = GraphII(g2cfg, device=self.device)
-        self.episode_manager = EpisodeManager()
+        self.graphII = GraphII(cfg, device=self.device)
         self.saccade = Saccade(cfg, device=self.device)
         
-        self.levels = [2, 1, 0] # Example: 2=object, 1=part, 0=patch
+        # self.levels = [2, 1, 0] # Example: 2=object, 1=part, 0=patch
+        self.levels = [2]
         self.timestep = 0
 
+        self.current_view = None
+
     def handle_new_view(self, image_dict: Dict[str, Any]):
-        """
-        image_dict 包含 grad, hue, curvature, aspect, orient 等 tensor
-        """
         self.timestep += 1
         
-        # 1. 全局搜索初始注视点
         initial_point = self.saccade.global_search_for_initial_fixation(image_dict)
-        
-        # 2. 多层级检索与学习 (Top-down)
+
         for level in self.levels:
-            # 开启一个 Episode
             self.saccade.start_episode(initial_point, layer_level=level)
             
-            # 在该 Episode 内连续执行 Fixation
             while self.saccade.state == 'learn':
                 self.saccade.perform_fixation(image_dict, self.graphI, self.timestep)
                 
                 action = self.saccade.decide_next_fixation(image_dict)
+                self.current_view = self.saccade.current_fixation
                 if action == 'end_episode':
-                    # Episode 结束，批量更新 GraphII
                     self.saccade.end_episode(self.graphII, self.graphI.graphI, self.timestep)
                     break
-            
-            # 简化逻辑：如果底层学习完成，直接返回上层（此处循环会继续，可根据实际检索命中率做 break 优化）
