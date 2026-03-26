@@ -42,13 +42,17 @@ class MemoryConfig:
     max_activated_per_collection = 128
     max_writes_per_modality = 32
 
-    # Saccade & Episode
-    max_fixations_per_episode = 20
+    # Saccade & Episode & Interest Map
+    max_fixations_per_episode = 100
     edge_search_radius = 40
     texture_window_radius = 32
-    w_grad = 0.5
-    w_hue = 0.3
-    w_cont = 0.2
+    
+    sigma_r = 0.08 * 362  # 环形核半径 (0.08 * 对角线)
+    tau_rec = 15.0        # 轨迹恢复时间常数
+    lambda_trace = 0.7    # 轨迹抑制强度
+    lambda_comp = 1.0     # 完成区域抑制强度
+    C_thresh = 0.85       # 完成度阈值
+    G_thresh = 0.01       # 增益阈值
 
     # Graph II
     P_global = 128
@@ -130,40 +134,151 @@ class EpisodeManager:
 
 
 # =============================
-# Attention Policy (Merged Texture/Edge/Selector)
+# Attention Policy (Refactored)
 # =============================
 class AttentionPolicy:
+    """
+    基于全局兴趣图与局部连续性的扫视策略。
+    集成了 TextureAnalyzer, EdgeAnalyzer 与 EpisodeMemory 的职责。
+    """
     def __init__(self, cfg: MemoryConfig):
         self.cfg = cfg
+        self.device = cfg.device
+        
+        # 静态缓存 (Static Cache)
+        self.texture_base_map: Optional[torch.Tensor] = None
+        self.edge_base_map: Optional[torch.Tensor] = None
+        self.base_interest: Optional[torch.Tensor] = None
+        
+        # 动态状态 (Dynamic Episode State)
+        self.interest_map: Optional[torch.Tensor] = None
+        self.completed_map: Optional[torch.Tensor] = None
+        self.last_visit_time_map: Optional[torch.Tensor] = None
+        self.visited_mask: Optional[torch.Tensor] = None
 
-    def _compute_texture_resp(self, point: Tuple[int, int], image: Any) -> float:
-        return 0.5 
+    def reset_image(self, image_dict: Dict[str, torch.Tensor], H_o: Optional[int] = None, W_o: Optional[int] = None):
+        """新图像输入，重建静态缓存"""
+        grad = image_dict.get('grad').to(self.device)
+        hue = image_dict.get('hue').to(self.device)
+        cur = image_dict.get('curvature').to(self.device)
+        
+        # 1. 计算边缘基础图: E = grad_mag * (1 + cur_max)
+        # grad shape: [1, 1, H, W, 2] -> 取模得到 [1, 1, H, W]
+        grad_mag = torch.sqrt((grad**2).sum(dim=-1)) 
+        # cur shape: [1, 3, H, W] -> 取通道最大值得到 [1, 1, H, W]
+        cur_max = torch.max(cur, dim=1, keepdim=True)[0]
+        self.edge_base_map = grad_mag * (1.0 + cur_max)
+        
+        # 2. 计算纹理基础图: 基于局部方差的逆
+        # hue shape: [1, 1, H, W]
+        hue_mean = F.avg_pool2d(hue, kernel_size=5, stride=1, padding=2)
+        hue_var = F.avg_pool2d(hue**2, kernel_size=5, stride=1, padding=2) - hue_mean**2
+        self.texture_base_map = torch.exp(-hue_var / 0.01)
+        
+        # 3. 基础兴趣项 B(x) = w_t * T(x) + w_e * E(x)
+        self.base_interest = 0.4 * self.texture_base_map + 0.6 * self.edge_base_map
+        
+        # 更新配置中的 H, W 以匹配实际图像尺寸
+        H, W = hue.shape[-2], hue.shape[-1]
+        self.cfg.H, self.cfg.W = H, W
 
-    def _next_texture_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
-        cx, cy = current_point
-        for dx, dy in [(0, 16), (16, 0), (0, -16), (-16, 0), (16, 16), (-16, -16)]:
-            nx, ny = cx + dx, cy + dy
-            if (nx, ny) not in saccade_matrix:
-                return (nx, ny)
-        return None
+        # 4. 处理黑边抑制 (Padding Suppression)
+        if H_o is not None and W_o is not None:
+            h_valid = min(H, H_o)
+            w_valid = min(W, W_o)
+            y_start = (H - h_valid) // 2
+            x_start = (W - w_valid) // 2
+            
+            valid_mask = torch.zeros((1, 1, H, W), device=self.device)
+            # 留出 5 像素边距以压低黑边附近
+            m = 5
+            y0, y1 = max(0, y_start + m), min(H, y_start + h_valid - m)
+            x0, x1 = max(0, x_start + m), min(W, x_start + w_valid - m)
+            if y1 > y0 and x1 > x0:
+                valid_mask[:, :, y0:y1, x0:x1] = 1.0
+            
+            self.base_interest *= valid_mask
+
+        # 动态调整环形核半径
+        diag = math.sqrt(H**2 + W**2)
+        self.cfg.sigma_r = 0.08 * diag
+        
+        self.reset_episode()
+
+    def reset_episode(self):
+        """重置 Episode 动态状态"""
+        H, W = self.cfg.H, self.cfg.W
+        self.interest_map = self.base_interest.clone() if self.base_interest is not None else None
+        self.completed_map = torch.zeros((1, 1, H, W), device=self.device)
+        self.last_visit_time_map = torch.full((1, 1, H, W), -1e6, device=self.device)
+        self.visited_mask = torch.zeros((1, 1, H, W), device=self.device)
+
+    def update_interest_map(self, current_fixation: Tuple[int, int], time_now: float):
+        """
+        计算最终兴趣图: I_t(x) = Norm(B(x) * R(d) * M_trace * M_comp)
+        """
+        if self.base_interest is None: return
+        
+        H, W = self.cfg.H, self.cfg.W
+        cx, cy = current_fixation
+        
+        # 1. 环形注视抑制项 R(d)
+        y = torch.arange(H, device=self.device).view(H, 1)
+        x = torch.arange(W, device=self.device).view(1, W)
+        dist_sq = (x - cx)**2 + (y - cy)**2
+        dist = torch.sqrt(dist_sq + 1e-6)
+        sigma = self.cfg.sigma_r
+        ring_kernel = (dist / sigma) * torch.exp(-dist_sq / (2 * sigma**2))
+        ring_kernel = ring_kernel.view(1, 1, H, W)
+        
+        # 2. 轨迹抑制与恢复项 M_trace
+        dt = time_now - self.last_visit_time_map
+        trace_recovery = torch.exp(-dt / self.cfg.tau_rec)
+        m_trace = 1.0 - self.cfg.lambda_trace * trace_recovery
+        
+        # 3. 已完成区域抑制项 M_comp
+        m_comp = 1.0 - self.cfg.lambda_comp * self.completed_map
+        
+        # 4. 综合
+        raw_interest = self.base_interest * ring_kernel * m_trace * m_comp
+        
+        # 归一化
+        i_min, i_max = raw_interest.min(), raw_interest.max()
+        self.interest_map = (raw_interest - i_min) / (i_max - i_min + 1e-8)
+
+    def next_point(self, current_fixation: Tuple[int, int], image_dict: Any) -> Optional[Tuple[int, int]]:
+        """从兴趣图中寻找局部峰值作为下一点"""
+        if self.interest_map is None: return None
+        
+        # 局部非极大值抑制 (简易版: MaxPool 寻找局部最大)
+        pooled = F.max_pool2d(self.interest_map, kernel_size=7, stride=1, padding=3)
+        peaks = (self.interest_map == pooled) * (self.interest_map > 0.1)
+        
+        peak_indices = torch.nonzero(peaks.squeeze())
+        if peak_indices.numel() == 0:
+            return None
+            
+        # 简单策略：选择兴趣值最高的峰值
+        # 也可以加入距离惩罚 D(c, f_t)
+        peak_values = self.interest_map[0, 0, peak_indices[:, 0], peak_indices[:, 1]]
+        best_idx = torch.argmax(peak_values)
+        next_pt = (int(peak_indices[best_idx, 1].item()), int(peak_indices[best_idx, 0].item()))
+        
+        return next_pt
+
+    def _compute_texture_resp(self, point: Tuple[int, int], image_dict: Any) -> float:
+        """计算当前位置的纹理连续性 (局部方差的逆)"""
+        cx, cy = point
+        if self.texture_base_map is None: return 0.5
+        return float(self.texture_base_map[0, 0, cy, cx].item())
 
     def _query_edges(self, point: Tuple[int, int], radius: int) -> List[Any]:
-        return []
-
-    def _next_edge_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool]) -> Optional[Tuple[int, int]]:
-        return None
-
-    def next_point(self, current_point: Tuple[int, int], saccade_matrix: Dict[Tuple[int,int], bool], image: Any) -> Optional[Tuple[int, int]]:
-        local_edges = self._query_edges(current_point, self.cfg.edge_search_radius)
-        if not local_edges:
-            return self._next_texture_point(current_point, saccade_matrix)
-        else:
-            return self._next_edge_point(current_point, saccade_matrix)
-
-    def global_initial_point(self, image: Any) -> Tuple[int, int]:
-        if hasattr(image, 'shape') and len(image.shape) >= 2:
-            return (image.shape[-1] // 2, image.shape[-2] // 2)
-        return (128, 128)
+        """查询局部边缘连续性"""
+        # 暂存为简单标量响应，后续可扩展为 Fragment 列表
+        if self.edge_base_map is None: return []
+        cx, cy = point
+        val = float(self.edge_base_map[0, 0, cy, cx].item())
+        return [val] if val > 0.3 else []
 
     def extract_responses(self, point: Tuple[int, int], image: Any) -> Tuple[float, List[Any]]:
         return self._compute_texture_resp(point, image), self._query_edges(point, 0)
@@ -187,65 +302,58 @@ class Saccade:
         self.current_fixation: Optional[Tuple[int, int]] = None
         self.fixation_history = deque(maxlen=cfg.max_fixations_per_episode)
         self.episode_id: Optional[int] = None
-        self.saccade_matrix: Dict[Tuple[int, int], bool] = {}
         self.layer_level = 0
-
-    def reset_visited(self, H: int, W: int):
-        self.visited = torch.zeros((H, W), device=self.device, dtype=torch.uint8)
-        self.saccade_matrix.clear()
-
-    def mark_visited(self, center: Tuple[int,int], r: int):
-        if self.visited is None: return
-        cx, cy = int(center[0]), int(center[1])
-        H, W = self.visited.shape
-        x0 = max(0, cx - r); x1 = min(W - 1, cx + r)
-        y0 = max(0, cy - r); y1 = min(H - 1, cy + r)
-        self.visited[y0:y1+1, x0:x1+1] = 1
-        self.saccade_matrix[(cx, cy)] = True
+        self.timestep = 0.0
 
     def start_episode(self, initial_point: Tuple[int, int], layer_level: int = 0) -> int:
         self.layer_level = layer_level
         self.episode_id = self.episode_manager.create_episode(layer_level)
         self.current_fixation = initial_point
         self.fixation_history.clear()
-        self.saccade_matrix.clear()
-        if self.visited is not None:
-            self.visited.zero_()
+        self.policy.reset_episode()
         self.state = 'learn'
+        self.timestep = 0.0
         return self.episode_id
 
     def perform_fixation(self, image_dict: Any, graphI: 'GraphI', time_now: int):
         if self.state != 'learn' or self.current_fixation is None:
             return
             
-        if self.visited is None:
-            # Initialize visited tensor based on first image dict if needed
-            h_shape = image_dict.get('hue').shape if image_dict.get('hue') is not None else (self.cfg.H, self.cfg.W)
-            self.reset_visited(h_shape[-2], h_shape[-1])
-
+        self.timestep += 1.0
+        
+        # 1. 提取特征
         features = graphI.extract_features(
             grad=image_dict.get('grad'), hue=image_dict.get('hue'), 
             curvature_bank=image_dict.get('curvature'), aspect_bank=image_dict.get('aspect'), orient_bank=image_dict.get('orient'),
-            center=self.current_fixation, r=self.cfg.texture_window_radius, ts=time_now, visited_mask_tensor=self.visited
+            center=self.current_fixation, r=self.cfg.texture_window_radius, ts=time_now, visited_mask_tensor=self.policy.visited_mask
         )
-
+        
+        # 2. 获取局部响应
         texture_resp, edge_resp = self.policy.extract_responses(self.current_fixation, image_dict)
         active_protos = graphI.fast_update(features, self.current_fixation, time_now)
         
+        # 3. 更新 Episode 动态状态
+        cx, cy = self.current_fixation
+        self.policy.last_visit_time_map[0, 0, cy, cx] = self.timestep
+        self.policy.visited_mask[0, 0, cy, cx] = 1.0
+        
+        # 4. 记录到 STM
         self.episode_manager.append_observation(
             self.episode_id, self.current_fixation, features, 
             texture_resp, edge_resp, time_now, active_protos
         )
         
         self.fixation_history.append((self.current_fixation, time_now))
-        self.mark_visited(self.current_fixation, self.cfg.texture_window_radius)
+        
+        # 5. 更新兴趣图
+        self.policy.update_interest_map(self.current_fixation, self.timestep)
 
     def decide_next_fixation(self, image_dict: Any) -> str:
         if len(self.fixation_history) >= self.cfg.max_fixations_per_episode:
             self.state = 'end'
             return 'end_episode'
             
-        next_pt = self.policy.next_point(self.current_fixation, self.saccade_matrix, image_dict)
+        next_pt = self.policy.next_point(self.current_fixation, image_dict)
         if next_pt is None:
             self.state = 'end'
             return 'end_episode'
@@ -260,7 +368,12 @@ class Saccade:
         self.state = 'idle'
 
     def global_search_for_initial_fixation(self, image_dict: Any) -> Tuple[int, int]:
-        return self.policy.global_initial_point(image_dict)
+        # 初始点：兴趣图最高点
+        if self.policy.interest_map is not None:
+            idx = torch.argmax(self.policy.interest_map).item()
+            W = self.cfg.W
+            return (int(idx % W), int(idx // W))
+        return (128, 128)
 
 
 # =============================
@@ -429,7 +542,8 @@ class GraphI:
         if visited_mask_tensor is None:
             visited_mask = torch.zeros((y1 - y0 + 1, x1 - x0 + 1), dtype=torch.bool, device=device)
         else:
-            visited_patch = visited_mask_tensor[y0:y1+1, x0:x1+1]
+            # visited_mask_tensor is (1, 1, H, W)
+            visited_patch = visited_mask_tensor[0, 0, y0:y1+1, x0:x1+1]
             visited_mask = (visited_patch > 0)
         
         new_feats: List[Dict[str,Any]] = []
@@ -1055,20 +1169,32 @@ class MultilevelCoordinator:
         self.timestep = 0
 
         self.current_view = None
+        self.viewroute = []
 
-    def handle_new_view(self, image_dict: Dict[str, Any]):
+    def handle_new_view(self, image_dict: Dict[str, Any], H_o: Optional[int] = None, W_o: Optional[int] = None):
         self.timestep += 1
+        step = 0
         
+        # 1. 重置图像静态缓存
+        self.saccade.policy.reset_image(image_dict, H_o, W_o)
+        
+        # 2. 初始注视点
         initial_point = self.saccade.global_search_for_initial_fixation(image_dict)
+        viewroute = [initial_point[0], initial_point[1]]
 
         for level in self.levels:
             self.saccade.start_episode(initial_point, layer_level=level)
             
             while self.saccade.state == 'learn':
+                step += 1
                 self.saccade.perform_fixation(image_dict, self.graphI, self.timestep)
                 
                 action = self.saccade.decide_next_fixation(image_dict)
                 self.current_view = self.saccade.current_fixation
+                viewroute.append(self.current_view[0])
+                viewroute.append(self.current_view[1])
                 if action == 'end_episode':
                     self.saccade.end_episode(self.graphII, self.graphI.graphI, self.timestep)
                     break
+        
+        self.viewroute = viewroute
