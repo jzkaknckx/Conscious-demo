@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .swt_module import SWTModule
+
 # =============================
 # Unified Config
 # =============================
@@ -60,6 +62,12 @@ class MemoryConfig:
     M_centroid = 6
     K_fast = 200
     K_final = 10
+    
+    # SWT & Texture Segmentation
+    swt_J = 4
+    swt_NScale = 3
+    swt_wavelet = 'haar'
+    swt_sigma = 1.0
     
     # Matching & Scoring
     w_jaccard = 0.55
@@ -145,10 +153,17 @@ class AttentionPolicy:
         self.cfg = cfg
         self.device = cfg.device
         
+        # SWT Module
+        self.swt_module = SWTModule(J=cfg.swt_J, wavelet=cfg.swt_wavelet, device=self.device)
+        
+        # 预计算 alpha(j, b)
+        self.alpha = self._generate_alpha(cfg.swt_J, cfg.swt_NScale, cfg.swt_sigma)
+        
         # 静态缓存 (Static Cache)
         self.texture_base_map: Optional[torch.Tensor] = None
         self.edge_base_map: Optional[torch.Tensor] = None
         self.base_interest: Optional[torch.Tensor] = None
+        self.texture_label_map: Optional[torch.Tensor] = None # [B, NScale, H, W]
         
         # 动态状态 (Dynamic Episode State)
         self.interest_map: Optional[torch.Tensor] = None
@@ -176,11 +191,18 @@ class AttentionPolicy:
         self.texture_base_map = torch.exp(-hue_var / 0.01)
         
         # 3. 基础兴趣项 B(x) = w_t * T(x) + w_e * E(x)
-        self.base_interest = 0.4 * self.texture_base_map + 0.6 * self.edge_base_map
+        self.base_interest = 0.8 * self.texture_base_map + 0.2 * self.edge_base_map
         
         # 更新配置中的 H, W 以匹配实际图像尺寸
         H, W = hue.shape[-2], hue.shape[-1]
         self.cfg.H, self.cfg.W = H, W
+
+        # 5. SWT 分解与纹理分割
+        # 输入原始图像 (假设 image_dict['image'] 存在，否则用 hue/grad 拼凑)
+        # 这里假设输入已经包含 'image' [1, 3, H, W]
+        raw_img = image_dict.get('image', torch.cat([hue]*3, dim=1)).to(self.device)
+        swt_output = self.swt_module(raw_img)
+        self.texture_label_map = self._compute_texture_resp(swt_output)
 
         # 4. 处理黑边抑制 (Padding Suppression)
         if H_o is not None and W_o is not None:
@@ -266,10 +288,151 @@ class AttentionPolicy:
         
         return next_pt
 
-    def _compute_texture_resp(self, point: Tuple[int, int], image_dict: Any) -> float:
+    def _generate_alpha(self, J: int, NScale: int, sigma: float) -> torch.Tensor:
+        """生成 alpha(j, b) 权重"""
+        mu = torch.linspace(1, J, NScale, device=self.device)
+        j_coords = torch.arange(1, J + 1, device=self.device).view(1, J)
+        mu = mu.view(NScale, 1)
+        
+        # Gaussian window
+        w = torch.exp(-(j_coords - mu)**2 / (2 * sigma**2))
+        w = w / (w.sum(dim=1, keepdim=True) + 1e-8)
+        
+        # beta = 1/3 for H, V, D
+        alpha = w.unsqueeze(-1).repeat(1, 1, 3) * (1.0 / 3.0)
+        return alpha # [NScale, J, 3]
+
+    def _compute_texture_resp(self, swt_output: torch.Tensor) -> torch.Tensor:
+        """
+        基于 SWT 输出构造 E(p) 并执行 Watershed 分割。
+        返回 [B, NScale, H, W] 的标签图。
+        """
+        B, C, H, W = swt_output.shape
+        J = self.cfg.swt_J
+        NScale = self.cfg.swt_NScale
+        
+        # swt_output: [A_J, D_1^H, D_1^V, D_1^D, ..., D_J^H, D_J^V, D_J^D]
+        # 提取细节项
+        details = swt_output[:, 1:, :, :] # [B, 3J, H, W]
+        details = details.view(B, J, 3, H, W)
+        abs_details = torch.abs(details)
+        
+        label_maps = []
+        
+        for s in range(NScale):
+            # 1. 构造边界能量图 E_s(p)
+            # alpha_s shape: [J, 3]
+            alpha_s = self.alpha[s].view(1, J, 3, 1, 1)
+            E_s = torch.sum(alpha_s * abs_details, dim=(1, 2)) # [B, H, W]
+            
+            # 2. 预处理: 平滑
+            E_s_smooth = F.avg_pool2d(E_s.unsqueeze(1), kernel_size=5, stride=1, padding=2).squeeze(1)
+            
+            # 3. 执行 Watershed (Steepest Descent 模拟)
+            # 这里实现一个简化的 GPU 友好版本：
+            # 每个像素向 8 邻域中能量最低的像素移动，直到到达局部极小值。
+            labels = self._torch_watershed(E_s_smooth)
+            label_maps.append(labels)
+            
+        return torch.stack(label_maps, dim=1) # [B, NScale, H, W]
+
+    def _torch_watershed(self, energy: torch.Tensor) -> torch.Tensor:
+        """
+        简化的 GPU  Watershed 实现 (Steepest Descent)。
+        Input: [B, H, W]
+        Output: [B, H, W] labels
+        """
+        B, H, W = energy.shape
+        device = energy.device
+        
+        # 1. 寻找局部极小值作为种子
+        # 使用 3x3 窗口
+        min_pool = -F.max_pool2d(-energy.unsqueeze(1), kernel_size=3, stride=1, padding=1).squeeze(1)
+        is_min = (energy == min_pool)
+        
+        # 分配初始标签给极小值
+        # 这里的标签分配需要跨 batch 独立
+        seeds = torch.zeros((B, H, W), dtype=torch.long, device=device)
+        for b in range(B):
+            min_indices = torch.nonzero(is_min[b])
+            if min_indices.numel() > 0:
+                seeds[b, min_indices[:, 0], min_indices[:, 1]] = torch.arange(1, min_indices.shape[0] + 1, device=device)
+        
+        # 2. 迭代传播标签 (Steepest Descent)
+        # 每个像素指向其能量最低的邻域像素
+        # 我们预先计算每个像素的“下游”位置
+        
+        # 构造偏移量
+        offsets = torch.tensor([
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1],           [0, 1],
+            [1, -1],  [1, 0],  [1, 1]
+        ], device=device)
+        
+        # 填充能量图以处理边界
+        padded_energy = F.pad(energy, (1, 1, 1, 1), mode='replicate')
+        
+        # 寻找每个像素的最低能量邻居的索引
+        neighbor_energies = []
+        for off in offsets:
+            # 移动能量图
+            # e.g. off=[-1, 0] means neighbor is above, so we shift energy down
+            shifted = padded_energy[:, 1+off[0]:1+off[0]+H, 1+off[1]:1+off[1]+W]
+            neighbor_energies.append(shifted)
+        
+        neighbor_energies = torch.stack(neighbor_energies, dim=1) # [B, 8, H, W]
+        min_neighbor_idx = torch.argmin(neighbor_energies, dim=1) # [B, H, W]
+        min_neighbor_val = torch.min(neighbor_energies, dim=1)[0]
+        
+        # 只有当邻居能量低于自己时才移动
+        has_lower = min_neighbor_val < energy
+        
+        # 路径追踪
+        # 这是一个并查集或者简单的路径压缩过程
+        # 在 GPU 上，我们可以迭代地让每个像素跳转到其邻居的邻居
+        current_pos = torch.arange(H * W, device=device).view(1, H, W).repeat(B, 1, 1)
+        
+        # 计算邻居的扁平索引
+        y_coords = torch.arange(H, device=device).view(1, H, 1).repeat(B, 1, W)
+        x_coords = torch.arange(W, device=device).view(1, 1, W).repeat(B, H, 1)
+        
+        target_y = y_coords + offsets[min_neighbor_idx, 0]
+        target_x = x_coords + offsets[min_neighbor_idx, 1]
+        
+        # 裁剪边界
+        target_y = torch.clamp(target_y, 0, H - 1)
+        target_x = torch.clamp(target_x, 0, W - 1)
+        
+        target_pos = target_y * W + target_x
+        # 只有有更低能量邻居的才跳转，否则原地不动
+        target_pos = torch.where(has_lower, target_pos, current_pos)
+        
+        # 迭代路径压缩 (Jump Pointer)
+        # 2^k 步跳转，通常 10 次迭代 (1024步) 足够覆盖 512x512
+        for _ in range(int(math.log2(max(H, W))) + 1):
+            # target_pos[b, y, x] 是当前指向的扁平索引
+            # 我们需要获取 target_pos[b, target_pos[b, y, x]]
+            # 使用 gather
+            b_idx = torch.arange(B, device=device).view(B, 1, 1).expand(B, H, W)
+            target_pos = torch.gather(target_pos.view(B, -1), 1, target_pos.view(B, -1)).view(B, H, W)
+            
+        # 最终 target_pos 指向了局部极小值点
+        # 获取极小值点的种子标签
+        final_labels = torch.gather(seeds.view(B, -1), 1, target_pos.view(B, -1)).view(B, H, W)
+        return final_labels
+
+    def get_texture_label(self, point: Tuple[int, int]) -> torch.Tensor:
+        """获取指定点的多尺度纹理标签"""
+        cx, cy = point
+        if self.texture_label_map is None:
+            return torch.zeros(self.cfg.swt_NScale, dtype=torch.long, device=self.device)
+        return self.texture_label_map[0, :, cy, cx]
+
+    def _compute_texture_resp_legacy(self, point: Tuple[int, int], image_dict: Any) -> float:
         """计算当前位置的纹理连续性 (局部方差的逆)"""
         cx, cy = point
-        if self.texture_base_map is None: return 0.5
+        if self.texture_base_map is None: 
+            return 0.5
         return float(self.texture_base_map[0, 0, cy, cx].item())
 
     def _query_edges(self, point: Tuple[int, int], radius: int) -> List[Any]:
@@ -280,8 +443,8 @@ class AttentionPolicy:
         val = float(self.edge_base_map[0, 0, cy, cx].item())
         return [val] if val > 0.3 else []
 
-    def extract_responses(self, point: Tuple[int, int], image: Any) -> Tuple[float, List[Any]]:
-        return self._compute_texture_resp(point, image), self._query_edges(point, 0)
+    def extract_responses(self, point: Tuple[int, int], image: Any) -> Tuple[float, List[Any], torch.Tensor]:
+        return self._compute_texture_resp_legacy(point, image), self._query_edges(point, 0), self.get_texture_label(point)
 
 
 # =============================
@@ -329,7 +492,7 @@ class Saccade:
         )
         
         # 2. 获取局部响应
-        texture_resp, edge_resp = self.policy.extract_responses(self.current_fixation, image_dict)
+        texture_resp, edge_resp, texture_labels = self.policy.extract_responses(self.current_fixation, image_dict)
         active_protos = graphI.fast_update(features, self.current_fixation, time_now)
         
         # 3. 更新 Episode 动态状态
@@ -1193,6 +1356,7 @@ class MultilevelCoordinator:
                 self.current_view = self.saccade.current_fixation
                 viewroute.append(self.current_view[0])
                 viewroute.append(self.current_view[1])
+                
                 if action == 'end_episode':
                     self.saccade.end_episode(self.graphII, self.graphI.graphI, self.timestep)
                     break
