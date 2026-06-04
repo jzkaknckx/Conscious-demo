@@ -360,6 +360,11 @@ class Controller:
         self.m_comp: Optional[torch.Tensor] = None
         
         self.fixation_point = (cfg.W // 2, cfg.H // 2)
+        
+        # 记录当前正在操作的语义锚点，用于在不同状态间传递上下文
+        self.active_semantic_id: Optional[int] = None 
+        # 记录局部探查时的参考基准点
+        self.anchor_position: Optional[Tuple[int, int]] = None
 
     def initialize_interest_map(self, X_subspaces: Dict[int, torch.Tensor]):
         """生成基础层兴趣图"""
@@ -381,15 +386,76 @@ class Controller:
         if self.base_interest is not None:
              self.interest_map = self.base_interest * self.m_trace * self.m_comp
 
+    def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
+                                          gmem_i: GmemoryI, x: int, y: int, 
+                                          similarity_threshold: float = 0.85) -> List[ModalityNode]:
+        """自下而上：提取当前注视点的特征，并在 Gmemory I 中匹配或创建新节点"""
+        active_nodes = []
+        for mod_id, X_m in X_subspaces.items():
+            # 提取局部特征向量 (假设 X_m shape: [B, C, H, W])
+            local_vec = X_m[0, :, y, x].unsqueeze(0) # [1, C]
+            local_norm = F.normalize(local_vec, p=2, dim=1)
+            
+            matched_node = None
+            best_sim = -1.0
+            
+            # 在同一模态下寻找最相似的孤立节点
+            for node in gmem_i.nodes.values():
+                if node.modality_id == mod_id:
+                    node_norm = F.normalize(node.prototype.unsqueeze(0), p=2, dim=1)
+                    sim = torch.sum(local_norm * node_norm).item()
+                    if sim > best_sim:
+                        best_sim = sim
+                        matched_node = node
+            
+            if matched_node and best_sim >= similarity_threshold:
+                # 特征已存在，增加活跃度/更新时间戳
+                matched_node.count += 1
+                matched_node.last_seen = time.time()
+                active_nodes.append(matched_node)
+            else:
+                # 发现全新视觉特征，立即存入 Gmemory I
+                new_node = gmem_i.add_node(mod_id, local_vec.squeeze(0).detach().clone())
+                active_nodes.append(new_node)
+                
+        return active_nodes
+
     def run_step(self, X_subspaces: Dict[int, torch.Tensor], 
                  gmem_i: GmemoryI, gmem_ii: GmemoryII, gpos: Gposition):
-        """执行一个周期：Top-Down 匹配与 Bottom-Up 眼跳"""
-        # --- Top-Down: 跨塔结构注入与匹配 ---
-        required_nodes = list(gmem_i.nodes.values())
-        if not required_nodes:
-            self._execute_saccade_explore()
+        """执行一个周期：Top-Down 匹配与 Bottom-Up 学习及眼跳"""
+        
+        # ==========================================
+        # 1. 底部向上 (Bottom-Up) 特征获取与 Gmem I 维护
+        # ==========================================
+        cx, cy = self.fixation_point
+        # 保证坐标在合法范围内
+        _, _, H, W = list(X_subspaces.values())[0].shape
+        cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
+        
+        active_gmem1_nodes = self._extract_and_match_local_features(X_subspaces, gmem_i, cx, cy)
+        
+        # ==========================================
+        # 2. 模型冷启动 (Cold Start)
+        # ==========================================
+        if not gmem_ii.semantic_nodes:
+            if active_gmem1_nodes:
+                # 选取最显著的一个模态特征作为初代 Anchor
+                anchor_node = active_gmem1_nodes[0] 
+                new_sem_node = gmem_ii.add_semantic_node(anchor_node.node_id)
+                
+                self.active_semantic_id = new_sem_node.node_id
+                self.anchor_position = (cx, cy)
+                self.state = SaccadeState.INSPECT # 立刻进入局部审查寻找外围特征
+                
+                # 注入抑制反馈，迫使下一次眼跳离开当前原点
+                self._inject_gaussian_peak(cx, cy, gain=-2.0) 
+                self._execute_saccade_short_range(cx, cy)
             return
-            
+
+        # ==========================================
+        # 3. 顶部向下 (Top-Down) 全局拓扑检索
+        # ==========================================
+        required_nodes = list(gmem_i.nodes.values())
         S_maps = gpos.l1_modality_routing_projection(X_subspaces, required_nodes)
         
         matched_targets = []
@@ -397,35 +463,103 @@ class Controller:
             res = gpos.l2_structure_synthesis(S_maps, sem_node)
             if res is not None:
                 matched_targets.append((sem_node, res))
-                
-        # --- 控制器根据返回结果切换状态与物理闭环 ---
+
+        # ==========================================
+        # 4. 控制器状态机与 Gmem II 拓扑演化
+        # ==========================================
         if self.state == SaccadeState.EXPLORE:
-            if matched_targets:
+            # 在长程探索中，判断是否认出了已知拓扑
+            if matched_targets and max(matched_targets, key=lambda x: x[1]['score'])[1]['score'] > 1.5: 
                 best_match = max(matched_targets, key=lambda x: x[1]['score'])
                 self.global_scaler = best_match[1]['s_star']
                 
+                # 认出已知物体，锁定 Anchor 进行审查
+                self.active_semantic_id = best_match[0].node_id
                 self.state = SaccadeState.INSPECT
                 self.fixation_point = (best_match[1]['x'], best_match[1]['y'])
+                self.anchor_position = self.fixation_point
                 
-                # Bottom-Up 兴趣反馈: 在匹配原点抬高兴趣值
+                # 在匹配点抬高兴趣值，准备在周围建构或校验
                 self._inject_gaussian_peak(self.fixation_point[0], self.fixation_point[1], gain=3.0)
             else:
-                self._execute_saccade_explore()
+                # 没认出已知物体，说明当前注视点可能是一个新事物
+                if active_gmem1_nodes:
+                    new_anchor = active_gmem1_nodes[0]
+                    new_sem_node = gmem_ii.add_semantic_node(new_anchor.node_id)
+                    self.active_semantic_id = new_sem_node.node_id
+                    self.anchor_position = (cx, cy)
+                    self.state = SaccadeState.INSPECT
                 
+                # 无论如何，眼跳继续去全局探索
+                self._execute_saccade_explore()
+
         elif self.state == SaccadeState.INSPECT:
-            # TODO: 局部寻找新的外围节点，建立或维护 Peripheral
+            # 局部审查状态：眼跳刚离开 Anchor 到达了一个周边点，尝试建立拓扑连接
+            active_sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
+            
+            if active_sem_node and active_gmem1_nodes and self.anchor_position:
+                ax, ay = self.anchor_position
+                
+                # 计算新外围节点在对数极坐标系下的相对位置
+                dx, dy = cx - ax, cy - ay
+                r = math.sqrt(dx**2 + dy**2) + 1e-5
+                rho_offset = math.log(r)
+                theta_offset = math.atan2(dy, dx)
+                
+                # 选取当前注视点的一个特征作为 Peripheral
+                peri_node = active_gmem1_nodes[0]
+                
+                # 挂载到 Gmemory II
+                if peri_node.node_id not in active_sem_node.peripheral_links and peri_node.node_id != active_sem_node.anchor_id:
+                    gmem_ii.add_peripheral(active_sem_node, peri_node.node_id, rho_offset, theta_offset)
+            
+            # 建构了一个外围节点后，进入校验状态，准备验证其他已知外围节点
             self.state = SaccadeState.CONSOLIDATE
-            
+            # 挑选该语义节点的一个已有外围节点去校验
+            if active_sem_node and active_sem_node.peripheral_links:
+                target_peri_id = list(active_sem_node.peripheral_links.keys())[0]
+                link = active_sem_node.peripheral_links[target_peri_id]
+                
+                # 推算预测坐标 (制导眼跳)
+                pred_r = math.exp(link['rho_offset'])
+                pred_theta = link['theta_offset']
+                pred_x = int(ax + pred_r * math.cos(pred_theta))
+                pred_y = int(ay + pred_r * math.sin(pred_theta))
+                
+                self._inject_gaussian_peak(pred_x, pred_y, gain=self.cfg.saccade_consolidate_gain)
+                self.fixation_point = (pred_x, pred_y)
+            else:
+                self.state = SaccadeState.EXPLORE
+                self._execute_saccade_explore()
+
         elif self.state == SaccadeState.CONSOLIDATE:
-            # 校验缺失部件
-            predicted_x = self.fixation_point[0] + 20
-            predicted_y = self.fixation_point[1] + 20
+            # 巩固校验：眼跳抵达了预测的外围节点位置，校验形变误差并更新
+            active_sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
             
-            # 在兴趣图强制注入高斯峰，制导眼跳过去验证
-            self._inject_gaussian_peak(predicted_x, predicted_y, gain=self.cfg.saccade_consolidate_gain)
-            self.fixation_point = (predicted_x, predicted_y)
+            if active_sem_node and self.anchor_position:
+                ax, ay = self.anchor_position
+                # 计算实际注视点与 Anchor 的相对位姿
+                dx, dy = cx - ax, cy - ay
+                r_actual = math.sqrt(dx**2 + dy**2) + 1e-5
+                rho_actual = math.log(r_actual)
+                theta_actual = math.atan2(dy, dx)
+                
+                # 寻找当前视点中提取出的哪个特征最符合，计算局部形变 Energy
+                # (此处简化逻辑：假设提取出的 active_gmem1_nodes[0] 就是目标)
+                if active_gmem1_nodes:
+                    peri_id = active_gmem1_nodes[0].node_id
+                    if peri_id in active_sem_node.peripheral_links:
+                        expected = active_sem_node.peripheral_links[peri_id]
+                        # 简单的形变能量计算 (距离误差 + 角度误差)
+                        energy = abs(rho_actual - expected['rho_offset']) + abs(theta_actual - expected['theta_offset'])
+                        
+                        # 调用 Gmem II 的形变更新规则 (微调或触发新事物分支)
+                        gmem_ii.distortion_correction_and_branch(active_sem_node, peri_id, rho_actual, theta_actual, energy)
             
+            # 校验完毕，退回全局探索
             self.state = SaccadeState.EXPLORE
+            self.active_semantic_id = None
+            self._execute_saccade_explore()
             
     def _execute_saccade_explore(self):
         """全局探索长程眼跳"""
@@ -448,3 +582,19 @@ class Controller:
         peak = gain * torch.exp(-dist_sq / (2 * sigma**2))
         
         self.interest_map += peak.view(1, 1, H, W)
+    
+    def _execute_saccade_short_range(self, current_x: int, current_y: int):
+        """局部短程眼跳，用于 INSPECT 状态下寻找显著外围特征"""
+        if self.interest_map is not None:
+            # 生成一个以当前位置为中心的高斯衰减掩码，限制眼跳范围
+            H, W = self.interest_map.shape[-2], self.interest_map.shape[-1]
+            y_grid = torch.arange(H, device=self.device).view(H, 1)
+            x_grid = torch.arange(W, device=self.device).view(1, W)
+            dist_sq = (x_grid - current_x)**2 + (y_grid - current_y)**2
+            
+            # 只在局部半径 (例如 sigma=30) 内寻找最高兴趣点
+            local_mask = torch.exp(-dist_sq / (2 * 30**2)) 
+            local_interest = self.interest_map * local_mask.view(1, 1, H, W)
+            
+            idx = torch.argmax(local_interest).item()
+            self.fixation_point = (int(idx % W), int(idx // W))
