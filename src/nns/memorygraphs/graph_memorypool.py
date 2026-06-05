@@ -50,6 +50,19 @@ class MemoryConfig:
     coactivation_eta = 0.5
     spatial_affinity_threshold = 0.1
 
+    # Interest Map & Attention Dynamics Params
+    interest_margin_radius = 3                # 初始化基础层兴趣图边缘屏蔽半径
+    ior_suppression_sigma = 15.0              # 底部向上抑制(IOR)的高斯核 sigma
+    ior_suppression_gain = 0.5                # 底部向上抑制(IOR)幅值增益
+    expectation_decay_rate = 0.8              # m_comp (Top-Down期盼组件) 衰减率
+    expectation_max_clamp = 5.0              # m_comp 累积最大界限
+    local_interest_radius = 10                # 局部观测 (I_loc) 窗口半径
+    saccade_inspect_interest_threshold = 0.8  # 从 EXPLORE 进入 INSPECT 的兴趣唤起阈值
+    saccade_explore_interest_threshold = 0.5  # 在 INSPECT 中耗竭退回 EXPLORE 的底线兴趣阈值
+    saccade_consolidate_interest_threshold = 0.1 # 在 CONSOLIDATE 确认完成落回 EXPLORE 的残余兴趣阈值
+    short_saccade_sigma = 15.0                # INSPECT 局部短程眼跳的视野遮罩 sigma
+    short_saccade_noise_std = 0.1             # INSPECT 局部眼跳的随机噪声强度
+
 
 # =============================
 # Controller State Machine
@@ -326,6 +339,7 @@ class Controller:
 
     def initialize_interest_map(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None, r: int = 3):
         """生成基础层兴趣图"""
+        r = self.cfg.interest_margin_radius
         B, C, H, W = list(X_subspaces.values())[0].shape
         self.base_interest = torch.zeros((B, 1, H, W), device=self.device)
         self.m_trace = torch.ones((B, 1, H, W), device=self.device)
@@ -347,7 +361,9 @@ class Controller:
 
     def _update_interest_map_internal(self):
         if self.base_interest is not None:
-             self.interest_map = self.base_interest * self.m_trace * self.m_comp
+            self.interest_map = self.base_interest * self.m_trace * self.m_comp
+            # self.interest_map = self.base_interest * self.m_trace
+
 
     def post_step_update_interest(self, cx: int, cy: int):
         if self.base_interest is not None:
@@ -355,13 +371,13 @@ class Controller:
             y_grid = torch.arange(H, device=self.device).view(H, 1)
             x_grid = torch.arange(W, device=self.device).view(1, W)
             dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-            sigma = 15.0
+            sigma = self.cfg.ior_suppression_sigma
             peak = 1.0 * torch.exp(-dist_sq / (2 * sigma**2))
             
             # recovery
             # self.m_trace = 1.0 - (1.0 - self.m_trace) * 0.8
             # suppression
-            self.m_trace = torch.clamp(self.m_trace - peak.view(1, 1, H, W)*0.5, 0.0, 1.0)
+            self.m_trace = torch.clamp(self.m_trace - peak.view(1, 1, H, W)*self.cfg.ior_suppression_gain, 0.0, 1.0)
             self._update_interest_map_internal()
 
     def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
@@ -448,7 +464,7 @@ class Controller:
 
         # [修复] 衰减 top-down 的期待注意力，防止先前注入的高斯峰无限累积
         if self.m_comp is not None:
-            self.m_comp = 1.0 + (self.m_comp - 1.0) * 0.8
+            self.m_comp = 1.0 + (self.m_comp - 1.0) * self.cfg.expectation_decay_rate
             self._update_interest_map_internal()
 
         # -----------------------------
@@ -495,7 +511,7 @@ class Controller:
         # -----------------------------
         I_loc = 0.0
         if self.interest_map is not None:
-            r = 10
+            r = self.cfg.local_interest_radius
             x0 = max(0, cx - r); x1 = min(W, cx + r)
             y0 = max(0, cy - r); y1 = min(H, cy + r)
             # [修复] 将 .sum() 替换为 .max()，以合理评估局部是否存在未被彻底抑制的显著特征
@@ -511,17 +527,20 @@ class Controller:
         # -----------------------------
         # 控制器效能转移模型判定
         # -----------------------------
+        print("A_star_sem:", A_star_sem, "I_loc:", I_loc)
+        # 全局探索
         if self.state == SaccadeState.EXPLORE:
             # 如果发现了新颖高亮兴趣点，或者局部特征爆发
             local_gmem1_activation = sum([n.activation_level for n in active_gmem1_nodes])
             # [修复] 阈值因为 sum 改为了 max，需要同步下调至合理区间 (如 0.8)
-            if local_gmem1_activation > 1.0 or I_loc > 0.8:
+            if local_gmem1_activation > 1.0 or I_loc > self.cfg.saccade_inspect_interest_threshold:
                 self.state = SaccadeState.INSPECT
                 self.anchor_position = (cx, cy) # 设置审查基准点
                 self._execute_saccade_short_range(self.anchor_position[0], self.anchor_position[1])
             else:
                 self._execute_saccade_explore()
 
+        # 局部审查
         elif self.state == SaccadeState.INSPECT:
             if A_star_sem > self.cfg.tau_recognize:
                 # 认出了某个已有部件主体，进入校验环节
@@ -533,7 +552,7 @@ class Controller:
                 self._inject_gaussian_peak(pred_x, pred_y, gain=self.cfg.saccade_consolidate_gain)
                 self.fixation_point = (pred_x, pred_y)
             else:
-                if I_loc < 0.5:
+                if I_loc < self.cfg.saccade_explore_interest_threshold:
                     # 彻底耗干了局部的未知，是个毫无认知的新物，撤退让后台建图
                     self.state = SaccadeState.EXPLORE
                     self._execute_saccade_explore()
@@ -542,12 +561,14 @@ class Controller:
                     anch_x, anch_y = self.anchor_position if self.anchor_position else (cx, cy)
                     self._execute_saccade_short_range(anch_x, anch_y)
 
+        # 巩固校验
         elif self.state == SaccadeState.CONSOLIDATE:
             if A_star_sem < self.cfg.tau_recognize:
                 # 图坍塌，跌落回探索
                 self.state = SaccadeState.EXPLORE
                 self._execute_saccade_explore()
-            elif I_loc < 0.1:
+            elif I_loc < self.cfg.saccade_consolidate_interest_threshold:
+                # TODO: 可能是阈值的问题
                 # 验证成功并且兴趣探空，完成图校正 (现在基于 max 可以正常触发)
                 if self.active_semantic_id is not None:
                     sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
@@ -610,7 +631,7 @@ class Controller:
         peak = gain * torch.exp(-dist_sq / (2 * sigma**2))
         
         # [修复] 注入到 m_comp (Top-Down 期盼组件)，而不是直接修改会被立即覆盖的 interest_map
-        self.m_comp = torch.clamp(self.m_comp + peak.view(1, 1, H, W), 1.0, 10.0)
+        self.m_comp = torch.clamp(self.m_comp + peak.view(1, 1, H, W), 1.0, self.cfg.expectation_max_clamp) 
         self._update_interest_map_internal()
     
     def _execute_saccade_short_range(self, center_x: int, center_y: int):
@@ -621,8 +642,8 @@ class Controller:
             x_grid = torch.arange(W, device=self.device).view(1, W)
             dist_sq = (x_grid - center_x)**2 + (y_grid - center_y)**2
             
-            local_mask = torch.exp(-dist_sq / (2 * 15**2)) 
-            noise = torch.rand((1, 1, H, W), device=self.device) * 0.1
+            local_mask = torch.exp(-dist_sq / (2 * self.cfg.short_saccade_sigma**2)) 
+            noise = torch.rand((1, 1, H, W), device=self.device) * self.cfg.short_saccade_noise_std
             local_interest = self.interest_map * local_mask.view(1, 1, H, W) + noise
             
             idx = torch.argmax(local_interest).item()
