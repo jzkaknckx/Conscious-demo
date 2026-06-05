@@ -324,7 +324,7 @@ class Controller:
         self.anchor_position: Optional[Tuple[int, int]] = None
         self.current_step = 0
 
-    def initialize_interest_map(self, X_subspaces: Dict[int, torch.Tensor]):
+    def initialize_interest_map(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None, r: int = 3):
         """生成基础层兴趣图"""
         B, C, H, W = list(X_subspaces.values())[0].shape
         self.base_interest = torch.zeros((B, 1, H, W), device=self.device)
@@ -335,7 +335,12 @@ class Controller:
              self.base_interest += torch.norm(X_subspaces[0], dim=1, keepdim=True)
         if 1 in X_subspaces:
              self.base_interest += torch.norm(X_subspaces[1], dim=1, keepdim=True)
-             
+
+        h1, h2 = H//2-(H_orig-r)//2, H//2+(H_orig-r)//2
+        w1, w2 = W//2-(W_orig-r)//2, W//2+(W_orig-r)//2
+        self.base_interest[:, :, :h1, :] = 0; self.base_interest[:, :, h2:, :] = 0
+        self.base_interest[:, :, :, :w1] = 0; self.base_interest[:, :, :, w2:] = 0
+
         b_max = self.base_interest.max() + 1e-5
         self.base_interest /= b_max
         self._update_interest_map_internal()
@@ -354,7 +359,7 @@ class Controller:
             peak = 1.0 * torch.exp(-dist_sq / (2 * sigma**2))
             
             # recovery
-            self.m_trace = 1.0 - (1.0 - self.m_trace) * 0.8
+            # self.m_trace = 1.0 - (1.0 - self.m_trace) * 0.8
             # suppression
             self.m_trace = torch.clamp(self.m_trace - peak.view(1, 1, H, W)*0.5, 0.0, 1.0)
             self._update_interest_map_internal()
@@ -412,6 +417,12 @@ class Controller:
                 if gmem_ii.co_activation_matrix[(n1.node_id, n2.node_id)] > self.cfg.W_genesis_threshold:
                     bound = False
                     for sem_node in gmem_ii.semantic_nodes.values():
+                        # [修复] 1. 明确防止生成完全重复的拓扑边 (防止无限增殖)
+                        if (sem_node.anchor_id == n1.node_id and n2.node_id in sem_node.peripheral_links) or \
+                           (sem_node.anchor_id == n2.node_id and n1.node_id in sem_node.peripheral_links):
+                            bound = True
+                            break
+                        # 2. 原始的活跃度拓扑绑定检查
                         if sem_node.activation_level > self.cfg.tau_recognize:
                             members = [sem_node.anchor_id] + list(sem_node.peripheral_links.keys())
                             if n1.node_id in members or n2.node_id in members:
@@ -423,7 +434,9 @@ class Controller:
                         new_sem_node = gmem_ii.add_semantic_node(n1.node_id)
                         gmem_ii.add_peripheral(new_sem_node, n2.node_id, rho_offset=0.5, theta_offset=0.0)
                         new_sem_node.update_activation(self.current_step, 1.0, self.cfg.decay_rate)
-                        gmem_ii.co_activation_matrix[(n1.node_id, n2.node_id)] = 0.0
+                        
+                    # [修复] 无论是否 bound，都必须清空共激活累积，防止死循环无限生成
+                    gmem_ii.co_activation_matrix[(n1.node_id, n2.node_id)] = 0.0
 
     def run_step(self, X_subspaces: Dict[int, torch.Tensor], 
                  gmem_i: GmemoryI, gmem_ii: GmemoryII, gpos: Gposition):
@@ -432,6 +445,11 @@ class Controller:
         cx, cy = self.fixation_point
         B, C, H, W = list(X_subspaces.values())[0].shape
         cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
+
+        # [修复] 衰减 top-down 的期待注意力，防止先前注入的高斯峰无限累积
+        if self.m_comp is not None:
+            self.m_comp = 1.0 + (self.m_comp - 1.0) * 0.8
+            self._update_interest_map_internal()
 
         # -----------------------------
         # 节点时间衰减更新
@@ -477,10 +495,11 @@ class Controller:
         # -----------------------------
         I_loc = 0.0
         if self.interest_map is not None:
-            r = 15
+            r = 10
             x0 = max(0, cx - r); x1 = min(W, cx + r)
             y0 = max(0, cy - r); y1 = min(H, cy + r)
-            I_loc = float(self.interest_map[0, 0, y0:y1, x0:x1].sum().item())
+            # [修复] 将 .sum() 替换为 .max()，以合理评估局部是否存在未被彻底抑制的显著特征
+            I_loc = float(self.interest_map[0, 0, y0:y1, x0:x1].max().item())
             
         A_star_sem = -1.0
         A_star_node = None
@@ -495,7 +514,8 @@ class Controller:
         if self.state == SaccadeState.EXPLORE:
             # 如果发现了新颖高亮兴趣点，或者局部特征爆发
             local_gmem1_activation = sum([n.activation_level for n in active_gmem1_nodes])
-            if local_gmem1_activation > 1.0 or I_loc > 2.0:
+            # [修复] 阈值因为 sum 改为了 max，需要同步下调至合理区间 (如 0.8)
+            if local_gmem1_activation > 1.0 or I_loc > 0.8:
                 self.state = SaccadeState.INSPECT
                 self.anchor_position = (cx, cy) # 设置审查基准点
                 self._execute_saccade_short_range(self.anchor_position[0], self.anchor_position[1])
@@ -528,7 +548,7 @@ class Controller:
                 self.state = SaccadeState.EXPLORE
                 self._execute_saccade_explore()
             elif I_loc < 0.1:
-                # 验证成功并且兴趣探空，完成图校正
+                # 验证成功并且兴趣探空，完成图校正 (现在基于 max 可以正常触发)
                 if self.active_semantic_id is not None:
                     sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
                     if sem_node and self.anchor_position:
@@ -571,7 +591,8 @@ class Controller:
     def _execute_saccade_explore(self):
         """全局探索长程眼跳"""
         if self.interest_map is not None:
-            smoothed = F.avg_pool2d(self.interest_map, kernel_size=15, stride=1, padding=7)
+            # smoothed = F.avg_pool2d(self.interest_map, kernel_size=15, stride=1, padding=7)
+            smoothed = self.interest_map
             idx = torch.argmax(smoothed).item()
             W = self.interest_map.shape[-1]
             self.fixation_point = (int(idx % W), int(idx // W))
@@ -588,7 +609,9 @@ class Controller:
         sigma = self.cfg.saccade_explore_sigma
         peak = gain * torch.exp(-dist_sq / (2 * sigma**2))
         
-        self.interest_map += peak.view(1, 1, H, W)
+        # [修复] 注入到 m_comp (Top-Down 期盼组件)，而不是直接修改会被立即覆盖的 interest_map
+        self.m_comp = torch.clamp(self.m_comp + peak.view(1, 1, H, W), 1.0, 10.0)
+        self._update_interest_map_internal()
     
     def _execute_saccade_short_range(self, center_x: int, center_y: int):
         """局部短程眼跳，用于 INSPECT 状态下寻找显著外围特征"""
@@ -634,7 +657,7 @@ class MultilevelCoordinator:
              
         if not X_subspaces:
             return
-            
+        
         if self.controller.base_interest is None:
             self.controller.initialize_interest_map(X_subspaces)
             
