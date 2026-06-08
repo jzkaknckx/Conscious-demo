@@ -1,104 +1,155 @@
-# Memory Graphs 理论框架重构与算法落地规范 (V5.0)
+# Memory Graphs 理论框架重构与算法落地规范 (V6.0)
 
-本项目基于人类视觉认知生物学与动力系统交叉视角，针对前序版本的机械循迹和死锁缺陷进行重构。根据最新指示，算法架构被严格解耦为 **`InterestOptimizer` (兴趣场动态优化器)** 与 **`Controller` (状态机与视线控制器)** 两个核心模块。通过 $1+n_1+n_2+n_1$ 个矩阵空间的解耦叠加，实现自然涌现的视觉注意流与循迹能力。
-
-以下为该框架的严谨算法流程、可能存在的问题评价及数学表述。
+本项目基于人类视觉认知生物学与动力系统交叉视角，架构被严格解耦为 **`InterestOptimizer` (兴趣场动态优化器)** 与 **`Controller` (状态机与视线控制器)** 两个核心模块。通过引入空间足迹矩阵与神经元状态权重的直接耦合，实现自然涌现的视觉注意流与严谨的循迹能力。
 
 ---
 
-## 零、 框架评估与潜在修正考虑
+## 零、 新增核心框架大类：特征通道属性分拣与态势足迹
 
-### 1. 结构优势与评价
-- **解耦之美与物理意义明晰**：通过剥离 `InterestOptimizer`，控制器的职能被极大地纯化（只负责根据 $I_{map}$ 落子并建立图拓扑结构）。兴趣图的演变更符合“多物理场叠加”的原理。
-- **孤立特征轨迹抑制 (Feature-Specific Inhibition)**：将“轨迹抑制”从单一的“全局扣减”变为对 $n_1$ 和 $n_2$ 个具体特征的“各自抑制矩阵”叠加。这是极具开创性的设计——它意味着系统注视红色区块产生的抑制，**不会**削弱重叠在该位置上方的一条垂直边缘的显著性。这完全符合人类视知觉的**特征特异性适应（Feature-Specific Adaptation）**规律。
-- **降级与兼容设计 (Trace Guide 补丁)**：将自发涌现循迹逻辑封装为 $I_{guide}$ 矩阵。如果前置的抑制与期望场不能完美达成平滑追踪，可以在权重组合中临时加强 $I_{guide}$ 矩阵以确保视觉锁边滑移（Smooth Pursuit）平稳执行。
+### 1. 静态初始场特征类型兼容引擎 (Feature Compatibility & Static Base)
+CNN 传入的多模态特征维度可能为 `[1, C, W, H]` 甚至包含未来新扩展矩阵。我们必须实现对各通道如何影响 $I_{map}$的解耦与配置化：
+- **属性配置文件 (Hyperparameter Dict)**：为各个特征通道指定 `STRENGTH` 或 `CONTINUITY` 的影响方式。
+- **绝对强度特征 $\mathcal{X}_{str}$**：代表边缘、高频亮斑等绝对刺激。它们对初始场的贡献直接与幅值正相关：
+  $I_{str}(\mathbf{q}) = \sum_{c \in \text{str\_channels}} w_c \cdot X_{str, c}(\mathbf{q})$
+- **连续性特征 $\mathcal{X}_{con}$**：代表色相(Hue)或平滑纹理。它们的意义在于其“空间同质性”而非自身读数大小，需通过计算梯度/局部方差取得分布：
+  $I_{con}(\mathbf{q}) = \sum_{c \in \text{con\_channels}} w_c \cdot \exp\left(-\frac{\|\nabla X_{con, c}(\mathbf{q})\|^2}{2\sigma_c^2}\right)$
+- **多通道融合底图**:
+  $I_{base}(\mathbf{q}) = I_{str}(\mathbf{q}) + I_{con}(\mathbf{q})$
 
-### 2. 潜在问题与解决方案
-- **问题：动态矩阵数量极多 ($1+n_1+n_2+n_1$) 带来的计算/显存爆炸**。由于随着记忆库庞大，活跃的 $n_1, n_2$ 数量可能很多个。高分辨率下每个特征都维护一个浮点矩阵会拖垮显存与运算速度。
-- **修正规避方案**：通过稀疏张量（Sparse Tensor）或仅在激活门限（Active）以上的节点生命周期内动态分配（Allocate）及其抑制矩阵内存。当神经元衰退至平静时，立即析构其对应的独立抑制场并归零。
+### 2. 生物态介导的特征空间足迹 (Spatial Footprint 代替单纯抑制)
+放弃单相扣除逻辑。$Gmem$ 节点的内部激活值 $A_k(t)$ 同时承担向 $I_{map}$ 输入“兴趣渴望”与“视疲劳抑制”的双向表达：
+- **普通激活期 ($A_k(t) > 0$)**：模型主动寻求该特征出现的其它域，引导产生正向期望。
+- **不应闭锁期 ($A_k(t) = -1$)**：生物视神经陷入疲劳状态。强烈的 $-1$ 权重赋予该特征足迹以极强的排斥惩罚！
+$I_{spatial\_I}(\mathbf{q}) = \sum_{k \in \mathcal{A}_I} A_k(t) \cdot M^{(k)}_{resp}(\mathbf{q}) \cdot \operatorname{Mask}_{local}(\mathbf{p}_t)$
+
+### 3. 不应期延迟驻留与缓存封存 (Refractory Retention)
+当神经元节点触发阈值进入不应期 ($A_k = -1$)：
+- **防疲劳缓存**：它**不能**被移出 $GposI$ 活跃查询池。它必须滞留在其中依靠其 $-1$ 的状态继续为兴趣图制造“抑制区 (厌恶区)”，直到计时器流逝使其回归为平静态 (0)，彻底失去对空间地图的话语权方可被移出。
+- **GposII 上层封存**：进入不应期的底层特征节点所属的高级 GmemII 对象暂时封存修改权限，直至底层绝大部分特征重新活跃或更换了新 Anchor。
+
+### 4. 基于眼跳轨迹同质性的连续挂载断言 (Trajectory Homogeneity)
+对于 GmemII 新节点的判定废除简单的点间距阈值，使用连线跨越判定：
+- 取连续两次眼跳落点 $\mathbf{p}_t$ 到 $\mathbf{p}_{t+1}$。
+- 在这两点连线构成的线段（或近缘轨迹）上抽取过渡特征。
+- 如果轨迹特征与当前物体的锚点特征相似度并未发生深渊级跌落（未跨越对象裂缝），则判定由于物理表面的平滑推延，应该继续挂载为现存 `Anchor_Current` 的 `peripheral_links`。
+- 如果轨迹在某处发生剧烈特征不匹配或响应“悬崖”，意味着跳越到了另一个物理对象，切断当前挂载并新开 GmemII 结构。
 
 ---
 
 ## 一、 动态兴趣优化器 (InterestOptimizer)
 
-负责多场矩阵叠加出实时的视觉兴趣地貌 $I_{map}$。
+负责解算实时的视觉兴趣地貌 $I_{map}$。
 
-### 1. 矩阵构成体系
-假定当前处于 Active 态的 $GposI$ （基础特征）对象子集为 $\mathcal{A}_I$ (数量为 $n_1$ )；处于 Active 态的 $GposII$ （高层语义组合）对象子集为 $\mathcal{A}_{II}$ (数量为 $n_2$)。则实时 $I_{map}$ 为下述矩阵的加权求和（权重作为开放超参数）：
+实时 $I_{map}$ 组成为基底加上底/高层足迹及引导的超参加权求和：
+$I_{map}(\mathbf{q}) = w_{base} I_{base}(\mathbf{q}) + w_{sp\_I} \sum_{k \in \mathcal{A}_I} I_{spatial\_I}^{(k)}(\mathbf{q}) + w_{sp\_II} \sum_{j \in \mathcal{A}_{II}} I_{spatial\_II}^{(j)}(\mathbf{q}) + w_{exp} \sum_{k \in \mathcal{A}_I} I_{exp}^{(k)}(\mathbf{q}) + w_{guide} I_{guide}(\mathbf{q})$
 
-$I_{map}(\mathbf{q}) = w_{base} I_{base}(\mathbf{q}) - w_{inh\_I} \sum_{k \in \mathcal{A}_I} I_{inh\_I}^{(k)}(\mathbf{q}) - w_{inh\_II} \sum_{j \in \mathcal{A}_{II}} I_{inh\_II}^{(j)}(\mathbf{q}) + w_{exp} \sum_{k \in \mathcal{A}_I} I_{exp}^{(k)}(\mathbf{q}) + w_{guide} I_{guide}(\mathbf{q})$
-
-*(为保证合规输出，所有累加后可通过 $\text{ReLU}$ 或 $\text{Sigmoid}$ 归一化至 $[0,\infty)$ 区间)*
-
-### 2. 矩阵详细演算规则
-**【矩阵一】静态初始场 $I_{base}$ (1个)**
-基于 CNN 张量，依照对 $I_{map}$ 的影响机理划分为两大属性子空间：
-- 绝对强度特征 $\mathcal{X}_{str}$ (如：边缘幅值、亮度)：$I_{str} = \sum X_{str}$ 
-- 连续性特征 $\mathcal{X}_{con}$ (如：色相 Hue、特定纹理变异度)：利用空间均一化/梯度方差演算：$I_{con}(\mathbf{q}) = \sum \exp(-\|\nabla X_{con}(\mathbf{q})\|^2 / 2\sigma_{c}^2)$
-$$I_{base}(\mathbf{q}) = w_{str} I_{str} + w_{con} I_{con}$$
-
-**【矩阵二】底层特征的轨迹抑制 $I_{inh\_I}$ ($n_1$ 个)**
-当视线落于 $\mathbf{p}_t$ 并激活/识别出属于子集 $\mathcal{A}_I$ 的特征 $k$ 时。它的抑制矩阵受到局部高斯增长，从而表示“我看过这个特征的这一小块了”：
-$$I_{inh\_I}^{(k)}(\mathbf{q}, t) = I_{inh\_I}^{(k)}(\mathbf{q}, t-1) + \eta_{inh} \cdot \exp\left(-\frac{\|\mathbf{q} - \mathbf{p}_t\|^2}{2\sigma_{local}^2}\right)$$
-
-**【矩阵三】高层组合对象的抑制 $I_{inh\_II}$ ($n_2$ 个)**
-如果视线移动促使 GmemII 中的组合对象 $j$ 处于激活态，该对象整体亦散发“满足感”抑制其宏观势力范围：
-$$I_{inh\_II}^{(j)}(\mathbf{q}, t) = I_{inh\_II}^{(j)}(\mathbf{q}, t-1) + \text{GaussianMask}(\mu_{obj}, \Sigma_{obj})$$
-
-**【矩阵四】拓扑空间跨态预期 $I_{exp}^{(k)}$ ($n_1$ 个)**
-如果已知语义组合 $j \in \mathcal{A}_{II}$ 已经被唤醒，且依据其内部建构的图谱拓扑已知它在相对坐标 $\Delta \vec{r}_m$ 处存在子特征 $k$。$GposII$ 遂释出“预期”，直接向特征 $k$ 对应的矩阵注入吸引峰：
-$$I_{exp}^{(k)}(\mathbf{q}) = \sum_{j \in \mathcal{A}_{II}} \sum_{\text{link}} w_{exp} \cdot \exp\left(-\frac{\|\mathbf{q} - (\mathbf{p}_{anchor}^{(j)} + \Delta \vec{r}_m)\|^2}{2\sigma_{exp}^2}\right)$$
-当视窗抵达并确认此预期后，$I_{exp}^{(k)}$ 即刻在该位面清空。
-
-**【矩阵五】动态循迹引导风格矩阵 $I_{guide}$ (1个)**
-提取当前注视点 $\mathbf{p}_t$ 被强烈激活的所有特征响应 $M_{resp}$。生成向边缘滑移或远端跳跃的动力差分：
-$$M_{periphery} = \text{ReLU}\left( \text{Blur}(M_{resp}) - M_{resp} \right), \quad M_{remote} = \text{ReLU}\left( M_{resp} - G_{\mathbf{p}_t}(M_{resp}) \right)$$
-$$I_{guide}(\mathbf{q}, t) = \alpha \cdot M_{periphery} + \beta \cdot M_{remote}$$
-*(此项可确保控制器沿着连续边界和色块向外拓长或跳跃。)*
+**矩阵演算细节：**
+- $I_{base}$：前述通道分离的加和基底。
+- $I_{spatial\_I}^{(k)}, I_{spatial\_II}^{(j)}$：带有神经元激活与不应正负权重特性的足迹场。
+- $I_{exp}^{(k)}$：高层下发给底层缺失部分的局部预期吸引峰。
+- $I_{guide}$：循迹风格的自动补全矩阵 $I_{guide} = \alpha M_{periphery} + \beta M_{remote}$。
+*(利用张量的生命周期作内存管理，只为 $A_k(t) \neq 0$ 的非平静节点分配局部高斯脚印内存)。*
 
 ---
 
-## 二、 神经元三态制基础 (Gmem Nodes Engine)
+## 二、 三态运行神经元网组 (Gmem Nodes Engine)
 
 所有的状态与网络链接由 Gmem 记忆池负责演化：
-1. **Calm状态 ($A=0$)**：无响应。被注视或预期激活拉升电位，若 $A(t) > T_{excite}$，转为 Active。若 $A(t) > T_{inject}$，反馈给图检索操作。
-2. **Active状态 ($A > 0$)**：锁定并维持高电平兴奋数帧，产生强烈的抑制写入与拓扑推算。倒数完成后强制突变坠入 Refractory。
-3. **Refractory状态 (不应期, $-1$)**：一段时间内免疫外界任何电位激励与检索匹配。充作生物视疲劳残像，杜绝“看一眼走不开”的死循环。
+1. **Calm 状态 ($A=0$)**：无响应。被注视或预期激活拉升电位，若 $A(t) > T_{excite}$，转为 Active。若 $A(t) > T_{inject}$，反馈给图检索。
+2. **Active 状态 ($A > 0$)**：锁定并兴奋，积极拉高该特征周边区域图寻找并扩充自身。倒数完成后跌入 Refractory。
+3. **Refractory 状态 (不应期, $-1$)**：一段时间内免疫外界激励，但在 Gpos 检索场中释放 $-1$ 负压。彻底屏蔽“一直看同一特征”。完毕后返回 Calm 状态。
 
 ---
 
 ## 三、 状态控制机与眼跳决断 (Controller)
 
-控制器通过调用 Optimizer 解出的 $I_{map}$ 进行位移投机，并根据局部状态切换大网络逻辑（REVIEW 或 LEARN）。
+控制器下发 Saccade 指定与维护图对象切分。
 
 ### 1. Saccade: 视点抉择方程
-无论处于哪个宏观状态，眼动的发生服从统一跳跃决策：
-$$\mathbf{p}_{t+1} = \operatorname{argmax}_{\mathbf{q}} \left[ I_{map}(\mathbf{q}) \cdot \exp\left(-\frac{\|\mathbf{q} - \mathbf{p}_t\|^2}{2\sigma_{\text{jump\_cost}}^2}\right) \right]$$
-*(距离惩罚迫使模型进行小幅度寻迹探索。当局部被 $I_{inh}$ 完全压平，$I_{map}$ 极小时，系统会豁免费跳至远端 $M_{remote}$)*
-
----
+$\mathbf{p}_{t+1} = \operatorname{argmax}_{\mathbf{q}} \left[ I_{map}(\mathbf{q}) \cdot \exp\left(-\frac{\|\mathbf{q} - \mathbf{p}_t\|^2}{2\sigma_{\text{jump\_cost}}^2}\right) \right]$
 
 ### 2. 双周宏观运行态 (Macro-States Flow)
 
-每个新视野优先送入 **REVIEW (复习验证态)**，不能被复习解释的区域残骸（仍然残存高亮 $I_{map}$）下放至 **LEARN (学习态)**。
+#### Phase I: REVIEW 复习验证态
+1. 全图选点打乱激发 $GmemI$ 态。
+2. 在图神经网络发酵并反馈连通已知语义态 $GposII$。
+3. 下放预期引导眼跳 $I_{exp}$，按预设山峰踏过校验。相符即进入 $-1$ 闭关清图，图平息代表审核全部通过。无连通则退给 LEARN。
 
-#### 相位 I: REVIEW 复习验证态
-1. **随机预视**: 挑选 $I_{base}$ 的一个显著高点，直接抓取周围特征，触发它们的状态冲入 `Active` $(n_1)$。
-2. **广度记忆查询**: 此动作反向刺激了 $GmemII$ 的神经网路进行广度优先搜索。若它们成功拼贴，识别出某个高层对象，导致该对象的 $GmemII$ 神经元跃迁至 `Active` $(n_2)$。
-3. **期望发散**: 处于 $A_{II}$ 中的神经元根据自身连接，向 Optimizer 下达预期场 $I_{exp}$ (产生 $n_1$ 个矩阵的变动)。
-4. **校验追踪**: 在 $I_{exp}$ 制导下（也就是所谓的循着预填的兴趣山峰走），Controller 开始落子 $\mathbf{p}_{t+1}$。符合预期的特征瞬间被点亮（并扣减 $I_{inh\_I}$），数帧后又跌落 -1 不应期，这引致期望峰值和基底均被清剿。
-5. **出口判定**: 预期查验完毕，若图的局部兴趣跌入低谷，判定该区域认识完成。如果某大片区域组合查无此物，跳入 `LEARN` 处理陌生世界。
+#### Phase II: LEARN 新认知块建构态
+围绕剩余或异样区域进行的连续描摹：
+1. **落定新原点 (Anchor Start)**: 从残骸高点起建立 $GmemI$ 并根立新 $GmemII$ Anchor。
+2. **自感滑移 (Self-driven Tracing Loop)**:
+   - 步进解算新视点 $\mathbf{p}_{t+1}$，压入提取。
+   - 调用**轨迹同质性判定算法**。如果在 $\mathbf{p}_t$ 至 $\mathbf{p}_{t+1}$ 之间的所有过渡域特征表现出连续性：追加至 `peripheral_links`。
+   - 特征节点的自身状态机让其在 Active 发烧后相继掉入 $-1$，迫使 Optimizer 生成向外的推斥力。眼跳自然沿着未遍历的同质边缘一直爬行。
+3. **跃阶断层与自动终了 (Leap & Halt)**:
+   - 一旦周边跌入低谷逼出大跃迁，或者连线轨迹发生同质性破裂（越跨异物边界）。
+   - 切断 Anchor。针对落脚的彼岸另起新炉灶。全图肃静时任务退出。
 
-#### 相位 II: LEARN 新认知块建构态
-这是围绕尚未归类、兴趣涌动的高亮残骸发生的循迹式构建。
 
-1. **落定新原点 (Anchor Start)**: $I_{map}$ 剩余最亮点作为新事物的第一瞥，抽取写入 $GmemI$，于 $GmemII$ 建库新对象 `Anchor_Obj`。
-2. **自发寻迹与吸积 (Self-driven Tracing Loop)**:
-   在此循环中逐帧执行直至破坏条件满足：
-   - 依赖 Saccade 方程产生新落点 $\mathbf{p}_{t+1}$。
-   - 读取该点的所有底层特征，加入 `Active`，在图 $GmemII$ 的当前 `Anchor_Obj` 下新增相对 `peripheral_links`。
-   - 被关注特征 $k$ 向 Optimizer 抛去更新参数， Optimizer 中的 $I_{inh\_I}^{(k)}$ 会被狠狠累加，强行掩埋来时路。而 $I_{guide}$ 会基于 $M_{resp}$ 释放向外拓展晕裙和远方跃迁点的信号。
-3. **自动结束与跃断 (Leap & Terminate)**:
-   伴随不断的吸收，$M_{local}$ 被 $I_{inh\_I}$ 彻底踩烂，$I_{map}$ 在附近已无利可图。
-   由于“不应期”拒绝重复拾取，$I_{map}$ 最大极值只可能通过 $I_{guide}$ 产生的远端相似区提供。一旦 Saccade 点 $\mathbf{p}_{t+1}$ 相对上点发生了空间巨步跃迁（超过滑移允许范围）：
-   **打断逻辑执行**：当前物体对象外边缘描摹结束！封存当前 `Anchor_Obj` 及其所有挂载链接，跳跃至下一个 $I_{map}$ 高点的异地，重启 LEARN 的新 Anchor 进行循环。全图 $I_{map} \approx 0$ 时流程全终结。
+# graph_memorypool.py 视知觉重构技术规格书 (V6.0)
+
+## 0. 概述 (Overview)
+针对死锁和边界判定单调的问题，架构现已被解耦为 **`InterestOptimizer`** 与 **`Controller`**。
+特别加入了对于输入通道属性分类的兼容式 `_base_interest` 生成算法，以及将原先粗暴的兴趣抑制转换为由生物三态神经元介导的 **空间足迹场 (Spatial Footprint)**。同时，为了更精细的形变判断，加入 **基于轨迹同质性** 的拓扑断链判断体系。
+
+保留 interest_map 初始化时压低外围兴趣的部分（该部分置于 Optimizer 的基底场生成中）：
+```python
+h1, h2 = max(0, H//2-(H_orig-r)//2), min(H, H//2+(H_orig-r)//2)
+w1, w2 = max(0, W//2-(W_orig-r)//2), min(W, W//2+(W_orig-r)//2)
+self.base_interest[:, :, :w1, :] = 0; self.base_interest[:, :, w2:, :] = 0
+self.base_interest[:, :, :, :h1] = 0; self.base_interest[:, :, :, h2:] = 0
+```
+
+---
+
+## 1. 单独要点区：底层输入特征通道分类与初始基场构成
+为接纳形如 `[1, C, W, H]` 甚至未来的所有自定义通道张量集合，初始化与静态兴趣注入需执行属性映射：
+
+- **[修改点 1.0: 特征属性全局配置注入]**
+  - 在初始化处明确超参数大类划分：定义某通道属于 `STRENGTH` 还是属于 `CONTINUITY`。目前如边缘属于 STRENGTH，Hue/纹理属于 CONTINUITY。
+- **[修改点 1.1: `initialize_base_interest` 算法扩写]**
+  - **基于 STRENGTH 的通道**:
+    $$I_{str} = \sum_{c \in \text{strength}} w_{c} X_{c}$$
+  - **基于 CONTINUITY 的通道**:
+    以类似 Sobel 或直接的差分手段求取分布梯度梯级 $\|\nabla_c X_{c}\|^2$：
+    $$I_{con} = \sum_{c \in \text{continuity}} w_{c} \exp(-\|\nabla_c X_c\|^2 / 2\sigma_c^2)$$
+  - 基场合成为 $I_{base} = I_{str} + I_{con}$ 压入引擎作为地形地貌本底。
+
+---
+
+## 2. 三态制神经元与不应期滞留引擎 (Neuron Dynamics)
+
+- **[修改点 2.1: 追加神经元动态状态与不应期滞留/缓存]**
+  - 节点新增 `activation_level` $A(t)$、`state_flag` 和 `timer` 倒数。
+  - **状态演变**：
+    - `ACTIVE` 态 ($A>0$): 提供正向激活值参与制导场。计时若结束则将其态跌入 `REFRACTORY`，值为 $-1$，同时重置另一个长倒数。
+    - `REFRACTORY` 态 ($A=-1$): 执行 `timer -= 1`，倒数完毕状态恢复并切为 `CALM` ($A=0$)。
+  - **[核心机制 - 滞留场中投递抑制]**: 当神经元处在 `-1` 态，**坚决不从 Gpos 查询活跃检索池内剔除它**。由于它的激活值为强负值，它在 Optimizer 中构筑起强大的排斥足迹！在上层 $GmemII$，对掉入不应期的旧特征下属语义节点实行挂载权限封存，直到底层特征大部分重构或更换了新 Anchor。
+- **[修改点 2.2: Gpos注入检索屏蔽门限]**
+  - 不应期节点仍能提供 $I_{map}$ 投射。但其在**被当前视窗提取查询匹配时**，将被筛除拒绝对上游匹配联结（即抽取满足 $A(t) > T_{inject}$ 且 state_flag != REFRACTORY 的节点以进入图检索）以防视察幻觉。
+
+---
+
+## 3. InterestOptimizer 模块的空间足迹场改造
+
+摒弃死板抑制，将 `I_inh_I` 及 `I_inh_II` 升级为结合神经元激活值 $A$ 的空间足迹 $I_{spatial\_I}$ 和 $I_{spatial\_II}$：
+
+- **[修改点 3.1: 耦合节点状态激活权值的加权求和计算]**
+  把特征自身的 $A_k(t)$ 提取出来做场的有符号系数：
+  $$I_{spatial\_I}^{(k)}(\mathbf{q}) = A_k(t) \cdot M^{(k)}_{resp}(\mathbf{q}) \cdot G_{\text{local}}(\mathbf{p}_t)$$
+  对于激活状态的正极 $A_k > 0$（活跃），场正向引流（期望聚集）；而当其倒数进入不应期变为 $-1$，该局部直接塌陷成负值抑制区，实现了用特征本身状态流形天然表达防重叠视疲劳的生物本能。
+- **$I_{map}$ 实时呈现**:
+  $$I_{map} = w_{base} I_{base} + w_{sp\_I} \sum I_{spatial\_I} + w_{sp\_II} \sum I_{spatial\_II} + w_{exp} \sum I_{exp} + w_{guide} I_{guide}$$
+
+---
+
+## 4. Controller 基于眼跳轨迹同质性的断链挂载法则
+
+摈弃由距离过长判断边界（这种判据极为脆弱）。
+
+- **[修改点 4.1: 对象挂载切断的动态连线判定]**
+  - 在 `LEARN` 阶段两点跃迁 $\mathbf{p}_t \to \mathbf{p}_{t+1}$ 时，验证这段眼跳轨迹：
+  - **判定执行**: 提取 $\mathbf{p}_t$ 到 $\mathbf{p}_{t+1}$ 轨迹连线中途的特征样本。计算这些特征同 $GmemII$ 中当前 `Anchor_Current` 的相似性（即便使用低复杂度运算如判断是否出现相似度断层深渊）。
+    - **同质挂载**: 如果未出现跨越性深落，即轨迹上特征跟物体的关联仍然被保持，视同此动作没有跨越物体边界，仍然在表面游走追踪。顺势接续挂载至 `peripheral_links` 内，GmemII 继续攀加延发。
+    - **异质切断**: 若轨迹在某处发生了特征悬崖/严重不相似（说明视界越过了物体边界，落到了背景环境上再返回部分边缘），跨越了真实物理边界。此时不论空间远近强制**封死当前 `Anchor`** 切断联系，就地单立一套新 $GmemII$ 纪元。

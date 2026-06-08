@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 
 # =============================
-# Unified Config (v5.1)
+# Unified Config (v2.1)
 # =============================
 class MemoryConfig:
     H = 256
@@ -42,18 +42,11 @@ class MemoryConfig:
     decay_rate = 0.95
     
     # Interest Map New Params
-    interest_margin_radius = 8
+    interest_margin_radius = 3
     alpha_local = 0.5
     beta_periphery = 0.8
     gamma_remote = 0.2
-    saccade_sigma = 20.0
-    
-    # Optimizer weights
-    w_base = 1.0
-    w_inh_i = 1.0
-    w_inh_ii = 1.0
-    w_exp = 1.0
-    w_guide = 4.0
+    saccade_sigma = 200.0
     
     # Topology Mount Params
     D_thres = 30.0
@@ -92,13 +85,12 @@ class ModalityNode:
         self.state_flag = NeuronState.CALM
         self.timer = 0
 
-    def tick_update(self, E_input: float, cfg: MemoryConfig, optimizer: 'InterestOptimizer', is_semantic: bool = False):
+    def tick_update(self, E_input: float, cfg: MemoryConfig):
         if self.state_flag == NeuronState.REFRACTORY:
             self.timer -= 1
             if self.timer <= 0:
                 self.state_flag = NeuronState.CALM
                 self.activation_level = 0.0
-                optimizer.clear_node_fields(self.node_id, is_semantic=is_semantic)
             else:
                 self.activation_level = 0.0
         elif self.state_flag == NeuronState.ACTIVE and self.timer > 0:
@@ -126,13 +118,12 @@ class SemanticNode:
         self.state_flag = NeuronState.CALM
         self.timer = 0
 
-    def tick_update(self, E_input: float, cfg: MemoryConfig, optimizer: 'InterestOptimizer', is_semantic: bool = False):
+    def tick_update(self, E_input: float, cfg: MemoryConfig):
         if self.state_flag == NeuronState.REFRACTORY:
             self.timer -= 1
             if self.timer <= 0:
                 self.state_flag = NeuronState.CALM
                 self.activation_level = 0.0
-                optimizer.clear_node_fields(self.node_id, is_semantic=is_semantic)
             else:
                 self.activation_level = 0.0
         elif self.state_flag == NeuronState.ACTIVE and self.timer > 0:
@@ -215,7 +206,7 @@ class Gposition:
                 continue
                 
             w_m = node.prototype.to(self.device).view(1, -1, 1, 1)
-            B, C_m, W, H = X_m.shape
+            B, C_m, H, W = X_m.shape
             
             S_m = torch.sum(X_m * w_m, dim=1, keepdim=True)
             
@@ -303,137 +294,6 @@ class Gposition:
 
 
 # =============================
-# Interest Optimizer (场动力引擎)
-# =============================
-class InterestOptimizer:
-    """InterestOptimizer: 负责多场矩阵叠加出实时的视觉兴趣地貌 I_map"""
-    def __init__(self, cfg: MemoryConfig):
-        self.cfg = cfg
-        self.device = cfg.device
-        
-        self.base_interest: Optional[torch.Tensor] = None
-        self.I_inh_I: Dict[int, torch.Tensor] = {} # Feature specific inhibition
-        self.I_inh_II: Dict[int, torch.Tensor] = {} # Object specific inhibition
-        self.I_exp: Dict[int, torch.Tensor] = {} # Topological expectations
-        
-    def initialize_base_interest(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None):
-        r = self.cfg.interest_margin_radius
-        B, C, W, H = list(X_subspaces.values())[0].shape
-        self.base_interest = torch.zeros((B, 1, H, W), device=self.device)
-        
-        if 0 in X_subspaces:
-             self.base_interest += torch.norm(X_subspaces[0], dim=1, keepdim=True)
-        if 1 in X_subspaces:
-             self.base_interest += torch.norm(X_subspaces[1], dim=1, keepdim=True)
-
-        if H_orig is not None and W_orig is not None:
-            # 保留兴趣压制：初始化时压低外围兴趣
-            h1, h2 = max(0, H//2-(H_orig-r)//2), min(H, H//2+(H_orig-r)//2)
-            w1, w2 = max(0, W//2-(W_orig-r)//2), min(W, W//2+(W_orig-r)//2)
-            self.base_interest[:, :, :w1, :] = 0; self.base_interest[:, :, w2:, :] = 0
-            self.base_interest[:, :, :, :h1] = 0; self.base_interest[:, :, :, h2:] = 0
-
-        b_max = self.base_interest.max() + 1e-5
-        self.base_interest /= b_max
-
-    def generate_I_guide(self, M_resp: torch.Tensor, pt: Tuple[int, int]) -> torch.Tensor:
-        W, H = M_resp.shape[-2], M_resp.shape[-1]
-        cx, cy = pt
-        y_grid = torch.arange(H, device=self.device).view(H, 1)
-        x_grid = torch.arange(W, device=self.device).view(1, W)
-        
-        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        sigma_local = self.cfg.saccade_sigma
-        G_pt = torch.exp(-dist_sq / (2 * sigma_local**2)).view(1, 1, H, W)
-        
-        M_local = M_resp * G_pt
-        
-        padding = 5
-        kernel_size = 11
-        blurred = F.avg_pool2d(M_resp, kernel_size, stride=1, padding=padding)
-        M_periphery = F.relu(blurred - M_resp)
-        M_remote = F.relu(M_resp - M_local)
-        
-        alpha, beta = self.cfg.alpha_local, self.cfg.beta_periphery
-        return alpha * M_periphery + beta * M_remote
-
-    def calculate_I_map(self, active_gmem_i: List['ModalityNode'], active_gmem_ii: List['SemanticNode'], M_resp: torch.Tensor, pt: Tuple[int, int]) -> torch.Tensor:
-        if self.base_interest is None:
-            return torch.zeros((1, 1, 1, 1), device=self.device)
-            
-        I_map = self.cfg.w_base * self.base_interest.clone()
-        
-        # - w_inh_I * sum I_inh_I
-        for node in active_gmem_i:
-            if node.node_id in self.I_inh_I:
-                I_map -= self.cfg.w_inh_i * self.I_inh_I[node.node_id]
-                
-        # - w_inh_II * sum I_inh_II
-        for node in active_gmem_ii:
-            if node.node_id in self.I_inh_II:
-                I_map -= self.cfg.w_inh_ii * self.I_inh_II[node.node_id]
-                
-        # + w_exp * sum I_exp
-        for node in active_gmem_i:
-            if node.node_id in self.I_exp:
-                I_map += self.cfg.w_exp * self.I_exp[node.node_id]
-                
-        # + w_guide * I_guide
-        I_guide = self.generate_I_guide(M_resp, pt)
-        I_map += self.cfg.w_guide * I_guide
-        
-        return F.relu(I_map)
-
-    def add_inhibition_I(self, node_id: int, pt: Tuple[int, int], H: int, W: int):
-        if node_id not in self.I_inh_I:
-            self.I_inh_I[node_id] = torch.zeros((1, 1, H, W), device=self.device)
-        
-        cx, cy = pt
-        y_grid = torch.arange(H, device=self.device).view(H, 1)
-        x_grid = torch.arange(W, device=self.device).view(1, W)
-        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        sigma_local = self.cfg.saccade_sigma
-        
-        eta_inh = 1.0 
-        self.I_inh_I[node_id] += eta_inh * torch.exp(-dist_sq / (2 * sigma_local**2)).view(1, 1, H, W)
-        
-    def add_inhibition_II(self, node_id: int, pt: Tuple[int, int], H: int, W: int):
-        if node_id not in self.I_inh_II:
-            self.I_inh_II[node_id] = torch.zeros((1, 1, H, W), device=self.device)
-            
-        cx, cy = pt
-        y_grid = torch.arange(H, device=self.device).view(H, 1)
-        x_grid = torch.arange(W, device=self.device).view(1, W)
-        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        sigma_obj = self.cfg.saccade_sigma * 2.0
-        
-        eta_inh = 0.5
-        self.I_inh_II[node_id] += eta_inh * torch.exp(-dist_sq / (2 * sigma_obj**2)).view(1, 1, H, W)
-        
-    def add_expectation(self, node_id: int, pt: Tuple[int, int], H: int, W: int):
-        if node_id not in self.I_exp:
-            self.I_exp[node_id] = torch.zeros((1, 1, H, W), device=self.device)
-            
-        cx, cy = pt
-        cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
-        
-        y_grid = torch.arange(H, device=self.device).view(H, 1)
-        x_grid = torch.arange(W, device=self.device).view(1, W)
-        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        sigma_exp = self.cfg.saccade_sigma
-        
-        eta_exp = 2.0
-        self.I_exp[node_id] += eta_exp * torch.exp(-dist_sq / (2 * sigma_exp**2)).view(1, 1, H, W)
-
-    def clear_node_fields(self, node_id: int, is_semantic: bool = False):
-        if not is_semantic:
-            self.I_inh_I.pop(node_id, None)
-            self.I_exp.pop(node_id, None)
-        else:
-            self.I_inh_II.pop(node_id, None)
-
-
-# =============================
 # Controller
 # =============================
 class Controller:
@@ -443,7 +303,8 @@ class Controller:
         self.device = cfg.device
         
         self.state = MainPhase.REVIEW
-        self.optimizer = InterestOptimizer(cfg)
+        self.interest_map: Optional[torch.Tensor] = None
+        self.base_interest: Optional[torch.Tensor] = None
         
         self.fixation_point = (cfg.W // 2, cfg.H // 2)
         self.prev_fixation_point = self.fixation_point
@@ -452,7 +313,26 @@ class Controller:
         self.anchor_position: Optional[Tuple[int, int]] = None
         self.current_step = 0
 
-        self.current_interest_map = None
+    def initialize_interest_map(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None, r: int = 3):
+        r = self.cfg.interest_margin_radius
+        B, C, H, W = list(X_subspaces.values())[0].shape
+        self.base_interest = torch.zeros((B, 1, H, W), device=self.device)
+        
+        if 0 in X_subspaces:
+             self.base_interest += torch.norm(X_subspaces[0], dim=1, keepdim=True)
+        if 1 in X_subspaces:
+             self.base_interest += torch.norm(X_subspaces[1], dim=1, keepdim=True)
+
+        # 压低外围兴趣
+        h1, h2 = H//2-(H_orig-r)//2, H//2+(H_orig-r)//2
+        w1, w2 = W//2-(W_orig-r)//2, W//2+(W_orig-r)//2
+        self.base_interest[:, :, :h1, :] = 0; self.base_interest[:, :, h2:, :] = 0
+        self.base_interest[:, :, :, :w1] = 0; self.base_interest[:, :, :, w2:] = 0
+
+        b_max = self.base_interest.max() + 1e-5
+        self.base_interest /= b_max
+        
+        self.interest_map = self.base_interest.clone()
 
     def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
                                           gmem_i: GmemoryI, x: int, y: int, 
@@ -513,31 +393,41 @@ class Controller:
             return list(recognized_semantics)[0]
         return None
 
-    def _decide_next_saccade(self, I_map: torch.Tensor) -> Tuple[int, int]:
-        W, H = I_map.shape[-2], I_map.shape[-1]
-        cx, cy = self.fixation_point
+    def post_step_update_interest(self, cx: int, cy: int, M_resp: torch.Tensor):
+        H, W = M_resp.shape[-2], M_resp.shape[-1]
         y_grid = torch.arange(H, device=self.device).view(H, 1)
         x_grid = torch.arange(W, device=self.device).view(1, W)
         
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        jump_cost_sigma = self.cfg.saccade_sigma
+        sigma_local = self.cfg.saccade_sigma
+        G_sigma = torch.exp(-dist_sq / (2 * sigma_local**2)).view(1, 1, H, W)
         
-        # 绝对统一的眼跳视距惩罚决断
-        penalty = torch.exp(-dist_sq / (2 * jump_cost_sigma**2)).view(1, 1, H, W)
-        saccade_target_map = I_map * penalty
+        M_local = M_resp * G_sigma
         
+        padding = 5
+        kernel_size = 11
+        blurred_M_local = F.avg_pool2d(M_local, kernel_size, stride=1, padding=padding)
+        M_periphery = F.relu(blurred_M_local - M_local)
+        M_remote = F.relu(M_resp - M_local)
+        
+        alpha, beta, gamma = self.cfg.alpha_local, self.cfg.beta_periphery, self.cfg.gamma_remote
+        self.interest_map = F.relu(self.interest_map - alpha * M_local + beta * M_periphery + gamma * M_remote)
+        
+        saccade_target_map = self.interest_map * torch.exp(-dist_sq / (2 * self.cfg.saccade_sigma**2)).view(1, 1, H, W)
+        # Avoid zero maps logic
         if saccade_target_map.max() < 1e-6:
             idx = torch.randint(0, H*W, (1,)).item()
         else:
             idx = torch.argmax(saccade_target_map).item()
-            
-        return (int(idx % W), int(idx // W))
+        
+        self.prev_fixation_point = self.fixation_point
+        self.fixation_point = (int(idx % W), int(idx // W))
 
     def run_step(self, X_subspaces: Dict[int, torch.Tensor], 
                  gmem_i: GmemoryI, gmem_ii: GmemoryII, gpos: Gposition):
         self.current_step += 1
         cx, cy = self.fixation_point
-        B, C, W, H = list(X_subspaces.values())[0].shape
+        B, C, H, W = list(X_subspaces.values())[0].shape
         cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
 
         local_nodes = self._extract_and_match_local_features(X_subspaces, gmem_i, cx, cy)
@@ -551,29 +441,15 @@ class Controller:
         req_nodes = list(gmem_i.nodes.values())
         S_maps = gpos.l1_modality_routing_projection(X_subspaces, req_nodes)
         
-        M_resp = self.optimizer.base_interest.clone()
+        M_resp = self.base_interest.clone()
         if S_maps:
             sum_smaps = torch.sum(torch.stack(list(S_maps.values())), dim=0)
             M_resp = M_resp + sum_smaps
             M_resp /= (M_resp.max() + 1e-5)
 
-        for n in gmem_i.nodes.values():
-            n.tick_update(E_input_gmem_i[n.node_id], self.cfg, self.optimizer, is_semantic=False)
-        for n in gmem_ii.semantic_nodes.values():
-            n.tick_update(E_input_gmem_ii[n.node_id], self.cfg, self.optimizer, is_semantic=True)
-
-        active_gmem_i = [n for n in gmem_i.nodes.values() if n.state_flag == NeuronState.ACTIVE]
-        active_gmem_ii = [n for n in gmem_ii.semantic_nodes.values() if n.state_flag == NeuronState.ACTIVE]
-
         if self.state == MainPhase.REVIEW:
             recognized_sem_id = self._bfs_recognize(local_nodes, gmem_ii, self.cfg.k_depth)
-            
             if recognized_sem_id is not None:
-                 if gmem_ii.semantic_nodes[recognized_sem_id].state_flag != NeuronState.ACTIVE:
-                     gmem_ii.semantic_nodes[recognized_sem_id].activation_level += 2.0
-                     gmem_ii.semantic_nodes[recognized_sem_id].state_flag = NeuronState.ACTIVE
-                     gmem_ii.semantic_nodes[recognized_sem_id].timer = self.cfg.tau_active
-                     
                  sem_node = gmem_ii.semantic_nodes[recognized_sem_id]
                  if self.anchor_position is None:
                      self.anchor_position = (cx, cy)
@@ -586,19 +462,20 @@ class Controller:
                      pred_y = int(ay + pred_r * math.sin(pred_theta))
                      pred_x, pred_y = max(0, min(pred_x, W-1)), max(0, min(pred_y, H-1))
                      
-                     self.optimizer.add_expectation(pid, (pred_x, pred_y), H, W)
+                     dist_sq = (torch.arange(W, device=self.device).view(1, W) - pred_x)**2 + \
+                               (torch.arange(H, device=self.device).view(H, 1) - pred_y)**2
+                     peak = 2.0 * torch.exp(-dist_sq / (2 * 10.0**2)).view(1, 1, H, W)
+                     self.interest_map += peak
                      
                  for n in local_nodes:
-                     if n.node_id in self.optimizer.I_exp:
-                         self.optimizer.I_exp.pop(n.node_id, None)
+                     n.state_flag = NeuronState.REFRACTORY
+                     n.timer = self.cfg.tau_refractory
             else:
                  self.state = MainPhase.LEARN
                  if local_nodes:
                      new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
                      self.active_semantic_id = new_sem_node.node_id
                      self.anchor_position = (cx, cy)
-                     for n in local_nodes:
-                         self.optimizer.add_inhibition_I(n.node_id, (cx, cy), H, W)
                      
         elif self.state == MainPhase.LEARN:
             px, py = self.prev_fixation_point
@@ -615,23 +492,20 @@ class Controller:
                         for n in local_nodes:
                             if n.node_id != sem_node.anchor_id and n.node_id not in sem_node.peripheral_links:
                                 gmem_ii.add_peripheral(sem_node, n.node_id, rho, theta)
-                            
-                            self.optimizer.add_inhibition_I(n.node_id, (cx, cy), H, W)
-                            
-                        self.optimizer.add_inhibition_II(sem_node.node_id, (cx, cy), H, W)
             else:
-                self.active_semantic_id = None
-                self.anchor_position = (cx, cy)
+                if self.active_semantic_id is not None:
+                    E_input_gmem_ii[self.active_semantic_id] += 1.0
                 if local_nodes:
                     new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
                     self.active_semantic_id = new_sem_node.node_id
+                    self.anchor_position = (cx, cy)
 
-        I_map = self.optimizer.calculate_I_map(active_gmem_i, active_gmem_ii, M_resp, (cx, cy))
-        
-        self.prev_fixation_point = self.fixation_point
-        self.fixation_point = self._decide_next_saccade(I_map)
+        for n in gmem_i.nodes.values():
+            n.tick_update(E_input_gmem_i[n.node_id], self.cfg)
+        for n in gmem_ii.semantic_nodes.values():
+            n.tick_update(E_input_gmem_ii[n.node_id], self.cfg)
 
-        self.current_interest_map = I_map
+        self.post_step_update_interest(cx, cy, M_resp)
 
 
 # =============================
@@ -663,11 +537,11 @@ class MultilevelCoordinator:
         if not X_subspaces:
             return
         
-        if self.controller.optimizer.base_interest is None:
-            B, C, W, H = list(X_subspaces.values())[0].shape
+        if self.controller.base_interest is None:
+            B, C, H, W = list(X_subspaces.values())[0].shape
             H_o = H_orig if H_orig is not None else H
             W_o = W_orig if W_orig is not None else W
-            self.controller.optimizer.initialize_base_interest(X_subspaces, H_o, W_o)
+            self.controller.initialize_interest_map(X_subspaces, H_o, W_o)
             
         self.controller.run_step(X_subspaces, self.gmem_i, self.gmem_ii, self.gpos)
         self.current_view = self.controller.fixation_point

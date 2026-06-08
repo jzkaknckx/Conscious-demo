@@ -13,7 +13,7 @@
 
 高斯峰不对 m_comp和m_trace都应当限制为node预测/激活的范围.
 
-# GmemII结构 review时大量特征输入
+# review时大量特征输入
 
 转化为线性并检索/转化为卷积 ?
 
