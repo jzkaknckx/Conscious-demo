@@ -10,17 +10,34 @@
 CNN 传入的多模态特征维度可能为 `[1, C, W, H]` 甚至包含未来新扩展矩阵。我们必须实现对各通道如何影响 $I_{map}$的解耦与配置化：
 - **属性配置文件 (Hyperparameter Dict)**：为各个特征通道指定 `STRENGTH` 或 `CONTINUITY` 的影响方式。
 - **绝对强度特征 $\mathcal{X}_{str}$**：代表边缘、高频亮斑等绝对刺激。它们对初始场的贡献直接与幅值正相关：
-  $I_{str}(\mathbf{q}) = \sum_{c \in \text{str\_channels}} w_c \cdot X_{str, c}(\mathbf{q})$
+  $$I_{str}(\mathbf{q}) = \sum_{c \in \text{str\_channels}} w_c \cdot X_{str, c}(\mathbf{q})$$
 - **连续性特征 $\mathcal{X}_{con}$**：代表色相(Hue)或平滑纹理。它们的意义在于其“空间同质性”而非自身读数大小，需通过计算梯度/局部方差取得分布：
-  $I_{con}(\mathbf{q}) = \sum_{c \in \text{con\_channels}} w_c \cdot \exp\left(-\frac{\|\nabla X_{con, c}(\mathbf{q})\|^2}{2\sigma_c^2}\right)$
+  $$I_{con}(\mathbf{q}) = \sum_{c \in \text{con\_channels}} w_c \cdot \exp\left(-\frac{\|\nabla X_{con, c}(\mathbf{q})\|^2}{2\sigma_c^2}\right)$$
 - **多通道融合底图**:
-  $I_{base}(\mathbf{q}) = I_{str}(\mathbf{q}) + I_{con}(\mathbf{q})$
+  $$I_{base}(\mathbf{q}) = I_{str}(\mathbf{q}) + I_{con}(\mathbf{q})$$
 
 ### 2. 生物态介导的特征空间足迹 (Spatial Footprint 代替单纯抑制)
-放弃单相扣除逻辑。$Gmem$ 节点的内部激活值 $A_k(t)$ 同时承担向 $I_{map}$ 输入“兴趣渴望”与“视疲劳抑制”的双向表达：
-- **普通激活期 ($A_k(t) > 0$)**：模型主动寻求该特征出现的其它域，引导产生正向期望。
-- **不应闭锁期 ($A_k(t) = -1$)**：生物视神经陷入疲劳状态。强烈的 $-1$ 权重赋予该特征足迹以极强的排斥惩罚！
-$I_{spatial\_I}(\mathbf{q}) = \sum_{k \in \mathcal{A}_I} A_k(t) \cdot M^{(k)}_{resp}(\mathbf{q}) \cdot \operatorname{Mask}_{local}(\mathbf{p}_t)$
+放弃单相扣除逻辑。$Gmem$ 节点的内部激活值 $A_n(t)$ 同时承担向 $I_{map}$ 输入“兴趣渴望”与“视疲劳抑制”的双向表达。
+针对此前的动力学死锁（如：连续3-4次注视点落于同局域，或重复行走相同路线），我们需要利用**空心化促进场（Donut Projection）**与**陨石坑绝压场（Crater Inhibition）**的代数统一。
+
+我们定义两种高斯分布：
+- 全局感受野 $G_{local}$：代表眼跳的有效探索范围（方差较大，如 $\sigma_{out} = 400$）。
+- 中央凹抑制区 $G_{foveal}$：代表当前注视点及其极小邻域（方差较小，如 $\sigma_{in} = 30$）。
+
+我们将底层特征 $n$ 对全局兴趣图的贡献定义为：
+$$I_{spatial\_I}^{(n)}(\mathbf{q}) = M^{(n)}_{resp}(\mathbf{q}) \cdot \Phi(A_n, d)$$
+
+核心创新在于空间调制算子 $\Phi(A_n, d)$ 的设计，利用绝对值巧妙构建双态场：
+$$\Phi(A_n, d) = A_n \cdot G_{local}(\mathbf{q}, \mathbf{p}_t) - |A_n| \cdot G_{foveal}(\mathbf{q}, \mathbf{p}_t)$$
+
+这个纯粹的代数算子，在神经元的不同生命周期内会自适应地演化出截然不同的动力学拓扑：
+- **状态一：特征兴奋期 ($A_n > 0$) -> 自动形成空心化促进场 (Donut Projection)**
+  当模型注视红色块，$A_n = 1.0$。此时公式变为：$1.0 \cdot G_{local} - 1.0 \cdot G_{foveal}$。这正是高斯差分（DoG）。在注视点中心，$G_{local} \approx 1, G_{foveal} \approx 1$，两者相减为 $0$；而在中心周围，$G_{local} > G_{foveal}$，产生正向促进。
+  **效果**：模型由于脚下无利益可图，会被周围的正向场牵引，在同质特征内平滑游走，彻底**破除了连续原地注视的死锁**。
+  
+- **状态二：特征不应期 ($A_n < 0$) -> 自动形成陨石坑式绝对抑制 (Crater Inhibition)**
+  当游走完毕，神经元疲劳进入不应期，$A_n = -1.0$。此时公式变为：$-1.0 \cdot G_{local} - |-1.0| \cdot G_{foveal} = -(G_{local} + G_{foveal})$。引力场由相减互斥瞬间崩塌为相加取负。
+  **效果**：对眼跳途经区域施加了强烈的全局抑制（$-G_{local}$），并且在注视坑位砸出了一个极深的“陨石坑”（$-G_{foveal}$）。该特征的兴趣度被彻底抹平，底层 $I_{base}$ 中未被抑制的边缘（梯度）特征立刻成为全局最高点，迫使眼跳离开此地貌，**彻底杜绝重复走相同路线**。
 
 ### 3. 不应期延迟驻留与缓存封存 (Refractory Retention)
 当神经元节点触发阈值进入不应期 ($A_k = -1$)：
@@ -41,7 +58,7 @@ $I_{spatial\_I}(\mathbf{q}) = \sum_{k \in \mathcal{A}_I} A_k(t) \cdot M^{(k)}_{r
 负责解算实时的视觉兴趣地貌 $I_{map}$。
 
 实时 $I_{map}$ 组成为基底加上底/高层足迹及引导的超参加权求和：
-$I_{map}(\mathbf{q}) = w_{base} I_{base}(\mathbf{q}) + w_{sp\_I} \sum_{k \in \mathcal{A}_I} I_{spatial\_I}^{(k)}(\mathbf{q}) + w_{sp\_II} \sum_{j \in \mathcal{A}_{II}} I_{spatial\_II}^{(j)}(\mathbf{q}) + w_{exp} \sum_{k \in \mathcal{A}_I} I_{exp}^{(k)}(\mathbf{q}) + w_{guide} I_{guide}(\mathbf{q})$
+$$I_{map}(\mathbf{q}) = w_{base} I_{base}(\mathbf{q}) + w_{sp\_I} \sum_{k \in \mathcal{A}_I} I_{spatial\_I}^{(k)}(\mathbf{q}) + w_{sp\_II} \sum_{j \in \mathcal{A}_{II}} I_{spatial\_II}^{(j)}(\mathbf{q}) + w_{exp} \sum_{k \in \mathcal{A}_I} I_{exp}^{(k)}(\mathbf{q}) + w_{guide} I_{guide}(\mathbf{q})$$
 
 **矩阵演算细节：**
 - $I_{base}$：前述通道分离的加和基底。
@@ -66,7 +83,7 @@ $I_{map}(\mathbf{q}) = w_{base} I_{base}(\mathbf{q}) + w_{sp\_I} \sum_{k \in \ma
 控制器下发 Saccade 指定与维护图对象切分。
 
 ### 1. Saccade: 视点抉择方程
-$\mathbf{p}_{t+1} = \operatorname{argmax}_{\mathbf{q}} \left[ I_{map}(\mathbf{q}) \cdot \exp\left(-\frac{\|\mathbf{q} - \mathbf{p}_t\|^2}{2\sigma_{\text{jump\_cost}}^2}\right) \right]$
+$$\mathbf{p}_{t+1} = \operatorname{argmax}_{\mathbf{q}} \left[ I_{map}(\mathbf{q}) \cdot \exp\left(-\frac{\|\mathbf{q} - \mathbf{p}_t\|^2}{2\sigma_{\text{jump\_cost}}^2}\right) \right]$$
 
 ### 2. 双周宏观运行态 (Macro-States Flow)
 
@@ -133,12 +150,14 @@ self.base_interest[:, :, :, :h1] = 0; self.base_interest[:, :, :, h2:] = 0
 
 ## 3. InterestOptimizer 模块的空间足迹场改造
 
-摒弃死板抑制，将 `I_inh_I` 及 `I_inh_II` 升级为结合神经元激活值 $A$ 的空间足迹 $I_{spatial\_I}$ 和 $I_{spatial\_II}$：
+摒弃死板抑制，将 `I_inh_I` 及 `I_inh_II` 升级为结合神经元激活值 $A_n$ 的空间调制足迹 $I_{spatial\_I}$ 和 $I_{spatial\_II}$：
 
-- **[修改点 3.1: 耦合节点状态激活权值的加权求和计算]**
-  把特征自身的 $A_k(t)$ 提取出来做场的有符号系数：
-  $$I_{spatial\_I}^{(k)}(\mathbf{q}) = A_k(t) \cdot M^{(k)}_{resp}(\mathbf{q}) \cdot G_{\text{local}}(\mathbf{p}_t)$$
-  对于激活状态的正极 $A_k > 0$（活跃），场正向引流（期望聚集）；而当其倒数进入不应期变为 $-1$，该局部直接塌陷成负值抑制区，实现了用特征本身状态流形天然表达防重叠视疲劳的生物本能。
+- **[修改点 3.1: 空心化促进场与绝对值双高斯调制结合]**
+  提取特征自身的 $A_n(t)$，构建大感受野 $G_{local}$ 和小感受野（中央凹） $G_{foveal}$。利用绝对值算子实现统一的空间调制脚印：
+  $$I_{spatial\_I}^{(n)}(\mathbf{q}) = M^{(n)}_{resp}(\mathbf{q}) \cdot \Big( A_n(t) \cdot G_{local}(\mathbf{p}_t) - |A_n(t)| \cdot G_{foveal}(\mathbf{p}_t) \Big)$$
+  
+  - 对于激活状态的正极 $A_n > 0$（活跃），该足迹化为 $G_{local} - G_{foveal}$ (即高斯差分 DoG)。注视点靶心利益抵消为 $0$，周边生成正向晕环，引诱视点向周围同质区域滑动，**杜绝原地横跳徘徊死锁**。
+  - 对于倒数进入不应期的倒转极 $A_n = -1$（闭锁），该足迹化为 $-(G_{local} + G_{foveal})$。两高斯场相加为纯负，在原地砸出极深的引力陨石坑并向外释放宽域压制，有效扑灭整条迹线，**强制系统切越对象，杜绝重复游走原坑**。
 - **$I_{map}$ 实时呈现**:
   $$I_{map} = w_{base} I_{base} + w_{sp\_I} \sum I_{spatial\_I} + w_{sp\_II} \sum I_{spatial\_II} + w_{exp} \sum I_{exp} + w_{guide} I_{guide}$$
 
