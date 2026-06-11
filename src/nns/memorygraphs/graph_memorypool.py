@@ -36,22 +36,26 @@ class MemoryConfig:
         4: 0.3,
     }
     
-    # [新增] 通道属性划分 (STRENGTH vs CONTINUITY)
-    modality_attributes = {
-        0: 'STRENGTH',     # grad: 绝对响应强度
-        1: 'CONTINUITY',   # hue: 连续同质区域
-        2: 'STRENGTH',     # curvature
-        3: 'CONTINUITY',   # aspect
-        4: 'CONTINUITY',   # orientation
+    # [修改] 通道属性划分 (STRENGTH vs CONTINUITY vs IGNORE)
+    feature_attributes = {
+        0: {0: 'STRENGTH', 1: 'CONTINUITY'},   # grad: 0=intensity, 1=orientation
+        1: {0: 'CONTINUITY', 1: 'CONTINUITY'}, # hue, etc.
+        2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},     # curvature components
+        3: {0: 'CONTINUITY', 1: 'CONTINUITY', 2: 'CONTINUITY'},                  # aspect
+        4: {0: 'CONTINUITY', 1: 'CONTINUITY', 2: 'CONTINUITY'},                  # orientation
     }
     sigma_continuity = 0.5
+    
+    # [新增] 动态写入门限
+    tau_str_gate = 0.2
+    tau_con_gate = 0.6
 
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
     T_inject_I = 0.5
-    tau_active_I = 2
-    tau_refractory_I = 4
-    decay_rate_I = 0.95
+    tau_active_I = 5
+    tau_refractory_I = 10
+    decay_rate_I = 0.6
     
     # Neuron Dynamics GmemII
     T_excite_II = 2
@@ -61,21 +65,27 @@ class MemoryConfig:
     decay_rate_II = 0.95
     
     # Interest Map New Params
-    interest_margin_radius = 8
+    interest_margin_radius = 24
     alpha_local = 0.5
     beta_periphery = 0.8
     gamma_remote = 0.2
-    saccade_sigma = 400
+    saccade_sigma = 50
+    foveal_sigma = 25
     
     # Optimizer weights
-    w_base = 1.0
-    w_sp_i = 1.2
-    w_sp_ii = 1.5
-    w_exp = 1.0
-    w_guide = 4.0
+    w_base = 0.5
+    w_sp_i = 3
+    w_sp_ii = 0.5
+    w_exp = 0.5
+    w_guide = 2
     
     # Topology Mount Params
     k_depth = 2
+    
+    # Other new params
+    guide_padding = 5
+    guide_kernel_size = 11
+    eta_exp = 2.0
 
 
 # =============================
@@ -224,6 +234,7 @@ class Gposition:
         """
         S_maps = {}
         active_nodes = [n for n in target_nodes if n.activation_level > self.cfg.T_inject_I and n.state_flag != NeuronState.REFRACTORY]
+        print(len(active_nodes))
         for node in active_nodes:
             mod_id = node.modality_id
             X_m = X_subspaces.get(mod_id)
@@ -351,46 +362,58 @@ class InterestOptimizer:
         self.base_interest: Optional[torch.Tensor] = None
         self.I_exp: Dict[int, torch.Tensor] = {} # Topological expectations
         
+        # 供调试观测的开放变量
+        self.sum_I_spatial_I: Optional[torch.Tensor] = None
+        self.sum_I_spatial_II: Optional[torch.Tensor] = None
+        self.sum_I_exp: Optional[torch.Tensor] = None
+        self.I_guide: Optional[torch.Tensor] = None
+
+        self.H_orig: Optional[int] = None
+        self.W_orig: Optional[int] = None
+        self.r: Optional[int] = None
+        
     def initialize_base_interest(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None):
-        r = self.cfg.interest_margin_radius
+        self.H_orig = H_orig
+        self.W_orig = W_orig
+        self.r = self.cfg.interest_margin_radius
         B, C, H, W = list(X_subspaces.values())[0].shape
         self.base_interest = torch.zeros((B, 1, H, W), device=self.device)
         
         I_str = torch.zeros((B, 1, H, W), device=self.device)
         I_con = torch.zeros((B, 1, H, W), device=self.device)
 
-        for mod_id, X_c in X_subspaces.items():
+        for mod_id, X_m in X_subspaces.items():
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
-            attr = self.cfg.modality_attributes.get(mod_id, 'STRENGTH')
-            # X_c = torch.nan_to_num(X_c, nan=0.0)
+            attrs = self.cfg.feature_attributes.get(mod_id, {})
             
-            if attr == 'STRENGTH':
-                I_str += weight * torch.norm(X_c, dim=1, keepdim=True)
-                # I_str += weight * torch.sum(torch.abs(X_c), dim=1, keepdim=True)
-            
-            elif attr == 'CONTINUITY':
-                # Sobel-like simple spatial difference for gradient
-                dx = X_c[:, :, :, 1:] - X_c[:, :, :, :-1]
-                dy = X_c[:, :, 1:, :] - X_c[:, :, :-1, :]
-                dx = F.pad(dx, (0, 1, 0, 0))
-                dy = F.pad(dy, (0, 0, 0, 1))
-                grad_norm_sq = torch.sum(dx**2 + dy**2, dim=1, keepdim=True)
-                I_con += weight * torch.exp(-grad_norm_sq / (2 * self.cfg.sigma_continuity**2))
-                # grad_norm_sq_c = dx**2 + dy**2
-                # I_con += weight * torch.sum(torch.exp(-grad_norm_sq_c / (2 * self.cfg.sigma_continuity**2)), dim=1, keepdim=True)
-                # channel_grad_sq = dx**2 + dy**2
-                # channel_I_con = torch.exp(-channel_grad_sq / (2 * self.cfg.sigma_continuity**2))
-                # I_con += weight * torch.mean(channel_I_con, dim=1, keepdim=True)
-    
-        self.base_interest = I_str + I_con
-        print(I_str.max(), I_con.max())
+            C_m = X_m.shape[1]
+            for c in range(C_m):
+                attr = attrs.get(c, 'STRENGTH')
+                if attr == 'IGNORE':
+                    continue
+                    
+                channel_X = X_m[:, c:c+1, :, :]
+                
+                if attr == 'STRENGTH':
+                    I_str += weight * torch.abs(channel_X)
+                
+                elif attr == 'CONTINUITY':
+                    # Sobel-like simple spatial difference for gradient
+                    dx = channel_X[:, :, :, 1:] - channel_X[:, :, :, :-1]
+                    dy = channel_X[:, :, 1:, :] - channel_X[:, :, :-1, :]
+                    dx = F.pad(dx, (0, 1, 0, 0))
+                    dy = F.pad(dy, (0, 0, 0, 1))
+                    grad_norm_sq = dx**2 + dy**2
+                    I_con += weight * torch.exp(-grad_norm_sq / (2 * self.cfg.sigma_continuity**2))
 
-        if H_orig is not None and W_orig is not None:
+        self.base_interest = I_str + I_con
+
+        if self.H_orig is not None and self.W_orig is not None:
             # 保留兴趣压制：初始化时压低外围兴趣
-            h1, h2 = max(0, H//2-(H_orig-r)//2), min(H, H//2+(H_orig-r)//2)
-            w1, w2 = max(0, W//2-(W_orig-r)//2), min(W, W//2+(W_orig-r)//2)
-            self.base_interest[:, :, :h1, :] = 0; self.base_interest[:, :, h2:, :] = 0
-            self.base_interest[:, :, :, :w1] = 0; self.base_interest[:, :, :, w2:] = 0
+            h1, h2 = max(0, H//2-(self.H_orig-self.r)//2), min(H, H//2+(self.H_orig-self.r)//2)
+            w1, w2 = max(0, W//2-(self.W_orig-self.r)//2), min(W, W//2+(self.W_orig-self.r)//2)
+            self.base_interest[:, :, :w1, :] = 0; self.base_interest[:, :, w2:, :] = 0
+            self.base_interest[:, :, :, :h1] = 0; self.base_interest[:, :, :, h2:] = 0
 
         b_max = self.base_interest.max() + 1e-5
         self.base_interest /= b_max
@@ -407,8 +430,8 @@ class InterestOptimizer:
         
         M_local = M_resp * G_pt
         
-        padding = 5
-        kernel_size = 11
+        padding = self.cfg.guide_padding
+        kernel_size = self.cfg.guide_kernel_size
         blurred = F.avg_pool2d(M_resp, kernel_size, stride=1, padding=padding)
         M_periphery = F.relu(blurred - M_resp)
         M_remote = F.relu(M_resp - M_local)
@@ -423,23 +446,35 @@ class InterestOptimizer:
             
         I_map = self.cfg.w_base * self.base_interest.clone()
         H, W = I_map.shape[-2], I_map.shape[-1]
+        
+        self.sum_I_spatial_I = torch.zeros_like(I_map)
+        self.sum_I_spatial_II = torch.zeros_like(I_map)
+        self.sum_I_exp = torch.zeros_like(I_map)
+        self.I_guide = torch.zeros_like(I_map)
+        
         cx, cy = pt
         y_grid = torch.arange(H, device=self.device).view(H, 1)
         x_grid = torch.arange(W, device=self.device).view(1, W)
         
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
         sigma_local_I = self.cfg.saccade_sigma
+        sigma_foveal_I = getattr(self.cfg, 'foveal_sigma', 30.0)
         G_local_I = torch.exp(-dist_sq / (2 * sigma_local_I**2)).view(1, 1, H, W)
+        G_foveal_I = torch.exp(-dist_sq / (2 * sigma_foveal_I**2)).view(1, 1, H, W)
         
         sigma_local_II = self.cfg.saccade_sigma * 2.0
+        sigma_foveal_II = getattr(self.cfg, 'foveal_sigma', 30.0) * 2.0
         G_local_II = torch.exp(-dist_sq / (2 * sigma_local_II**2)).view(1, 1, H, W)
+        G_foveal_II = torch.exp(-dist_sq / (2 * sigma_foveal_II**2)).view(1, 1, H, W)
         
         # + w_sp_I * sum I_spatial_I
         for node in active_gmem_i:
             if node.state_flag != NeuronState.CALM and node.node_id in S_maps_I:
                 A_k = node.activation_level
                 M_resp = S_maps_I[node.node_id]
-                I_spatial = A_k * M_resp * G_local_I
+                Phi_I = A_k * G_local_I - abs(A_k) * G_foveal_I
+                I_spatial = M_resp * Phi_I
+                self.sum_I_spatial_I += I_spatial
                 I_map += self.cfg.w_sp_i * I_spatial
                 
         # + w_sp_II * sum I_spatial_II
@@ -457,18 +492,27 @@ class InterestOptimizer:
                         count += 1
                 if count > 0:
                     M_resp_sum /= count
-                    I_spatial = A_k * M_resp_sum * G_local_II
+                    Phi_II = A_k * G_local_II - abs(A_k) * G_foveal_II
+                    I_spatial = M_resp_sum * Phi_II
+                    self.sum_I_spatial_II += I_spatial
                     I_map += self.cfg.w_sp_ii * I_spatial
                 
         # + w_exp * sum I_exp
-        for node in active_gmem_i:
-            if node.node_id in self.I_exp:
-                I_map += self.cfg.w_exp * self.I_exp[node.node_id]
+        for exp_map in self.I_exp.values():
+            self.sum_I_exp += exp_map
+            I_map += self.cfg.w_exp * exp_map
                 
         # + w_guide * I_guide
-        I_guide = self.generate_I_guide(self.base_interest, pt)
-        I_map += self.cfg.w_guide * I_guide
+        self.I_guide = self.generate_I_guide(self.base_interest, pt)
+        I_map += self.cfg.w_guide * self.I_guide
         
+        if self.H_orig is not None and self.W_orig is not None:
+            # 保留兴趣压制：初始化时压低外围兴趣
+            h1, h2 = max(0, H//2-(self.H_orig-self.r)//2), min(H, H//2+(self.H_orig-self.r)//2)
+            w1, w2 = max(0, W//2-(self.W_orig-self.r)//2), min(W, W//2+(self.W_orig-self.r)//2)
+            I_map[:, :, :w1, :] = 0; I_map[:, :, w2:, :] = 0
+            I_map[:, :, :, :h1] = 0; I_map[:, :, :, h2:] = 0
+
         return F.relu(I_map)
 
     def add_expectation(self, node_id: int, pt: Tuple[int, int], H: int, W: int):
@@ -483,7 +527,7 @@ class InterestOptimizer:
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
         sigma_exp = self.cfg.saccade_sigma
         
-        eta_exp = 2.0
+        eta_exp = self.cfg.eta_exp
         self.I_exp[node_id] += eta_exp * torch.exp(-dist_sq / (2 * sigma_exp**2)).view(1, 1, H, W)
 
     def clear_node_fields(self, node_id: int, is_semantic: bool = False):
@@ -517,7 +561,31 @@ class Controller:
                                           similarity_threshold: float = 0.85) -> List[ModalityNode]:
         active_nodes = []
         for mod_id, X_m in X_subspaces.items():
-            local_vec = X_m[0, :, y, x].unsqueeze(0)
+            C_m = X_m.shape[1]
+            H, W = X_m.shape[-2], X_m.shape[-1]
+            mod_attrs = self.cfg.feature_attributes.get(mod_id, {})
+            
+            valid_mask = torch.zeros((1, C_m), device=self.device)
+            # Evaluate Write Gating Threshold
+            for c in range(C_m):
+                attr = mod_attrs.get(c, 'STRENGTH')
+                if attr == 'IGNORE':
+                    continue
+                vc = X_m[0, c, y, x].item()
+                if attr == 'STRENGTH':
+                    if abs(vc) > self.cfg.tau_str_gate:
+                        valid_mask[0, c] = 1.0
+                elif attr == 'CONTINUITY':
+                    dx = X_m[0, c, y, min(x+1, W-1)].item() - vc
+                    dy = X_m[0, c, min(y+1, H-1), x].item() - vc
+                    sc = math.exp(-(dx**2 + dy**2) / (2 * self.cfg.sigma_continuity**2))
+                    if sc > self.cfg.tau_con_gate:
+                        valid_mask[0, c] = 1.0
+                        
+            if torch.sum(valid_mask) == 0:
+                continue
+
+            local_vec = X_m[0, :, y, x].unsqueeze(0) * valid_mask
             local_norm = F.normalize(local_vec, p=2, dim=1)
             
             matched_node = None
@@ -583,6 +651,7 @@ class Controller:
         # 绝对统一的眼跳视距惩罚决断
         penalty = torch.exp(-dist_sq / (2 * jump_cost_sigma**2)).view(1, 1, H, W)
         saccade_target_map = I_map * penalty
+        # saccade_target_map = I_map
         
         if saccade_target_map.max() < 1e-6:
             idx = torch.randint(0, H*W, (1,)).item()
@@ -686,7 +755,7 @@ class Controller:
                                 local_norm = F.normalize(local_vec, p=2, dim=1)
                                 node_norm = F.normalize(anchor_mod_node.prototype.unsqueeze(0), p=2, dim=1)
                                 sim = torch.sum(local_norm * node_norm).item()
-                                if sim < 0.6:  # 跌入不相似深渊，意味着越过了物体边界
+                                if sim < 0.6:  # 越过物体边界
                                     homogeneity_broken = True
                                     break
                                     
