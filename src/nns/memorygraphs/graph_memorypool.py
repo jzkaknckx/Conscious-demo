@@ -36,19 +36,21 @@ class MemoryConfig:
         4: 0.3,
     }
     
-    # [修改] 通道属性划分 (STRENGTH vs CONTINUITY vs IGNORE)
+    # [修改] 通道属性划分 (STRENGTH vs CONTINUITY_SURFACE vs CONTINUITY_TRACE vs IGNORE)
     feature_attributes = {
-        0: {0: 'STRENGTH', 1: 'CONTINUITY'},   # grad: 0=intensity, 1=orientation
-        1: {0: 'CONTINUITY', 1: 'CONTINUITY'}, # hue, etc.
+        0: {0: 'STRENGTH', 1: 'CONTINUITY_TRACE'},   # grad: 0=intensity, 1=orientation
+        1: {0: 'CONTINUITY_SURFACE', 1: 'CONTINUITY_SURFACE'}, # hue, etc.
         2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},     # curvature components
-        3: {0: 'CONTINUITY', 1: 'CONTINUITY', 2: 'CONTINUITY'},                  # aspect
-        4: {0: 'CONTINUITY', 1: 'CONTINUITY', 2: 'CONTINUITY'},                  # orientation
+        3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # aspect
+        4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # orientation
     }
-    sigma_continuity = 0.5
+    sigma_surf = 0.5
+    sigma_trace = 0.5
     
     # [新增] 动态写入门限
     tau_str_gate = 0.2
-    tau_con_gate = 0.6
+    tau_surf_gate = 0.8
+    tau_trace_gate = 0.3
 
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
@@ -73,10 +75,10 @@ class MemoryConfig:
     foveal_sigma = 25
     
     # Optimizer weights
-    w_base = 0.5
-    w_sp_i = 3
-    w_sp_ii = 0.5
-    w_exp = 0.5
+    w_base = 1.0
+    w_sp_i = 1.2
+    w_sp_ii = 1.5
+    w_exp = 1.0
     w_guide = 2
     
     # Topology Mount Params
@@ -86,6 +88,12 @@ class MemoryConfig:
     guide_padding = 5
     guide_kernel_size = 11
     eta_exp = 2.0
+    
+    # Semantic Mask Params
+    alpha_mask = 15.0
+    beta_mask = 5.0
+    sigma_mask = 50.0
+    epsilon_breakout = 0.05
 
 
 # =============================
@@ -98,7 +106,8 @@ class NeuronState(Enum):
 
 class MainPhase(Enum):
     REVIEW = 1
-    LEARN = 2
+    LEARN_MACRO = 2
+    LEARN_MICRO = 3
 
 
 # =============================
@@ -234,7 +243,6 @@ class Gposition:
         """
         S_maps = {}
         active_nodes = [n for n in target_nodes if n.activation_level > self.cfg.T_inject_I and n.state_flag != NeuronState.REFRACTORY]
-        print(len(active_nodes))
         for node in active_nodes:
             mod_id = node.modality_id
             X_m = X_subspaces.get(mod_id)
@@ -397,16 +405,27 @@ class InterestOptimizer:
                 if attr == 'STRENGTH':
                     I_str += weight * torch.abs(channel_X)
                 
-                elif attr == 'CONTINUITY':
+                elif attr == 'CONTINUITY_SURFACE':
                     # Sobel-like simple spatial difference for gradient
                     dx = channel_X[:, :, :, 1:] - channel_X[:, :, :, :-1]
                     dy = channel_X[:, :, 1:, :] - channel_X[:, :, :-1, :]
                     dx = F.pad(dx, (0, 1, 0, 0))
                     dy = F.pad(dy, (0, 0, 0, 1))
                     grad_norm_sq = dx**2 + dy**2
-                    I_con += weight * torch.exp(-grad_norm_sq / (2 * self.cfg.sigma_continuity**2))
+                    I_con += weight * torch.exp(-grad_norm_sq / (2 * self.cfg.sigma_surf**2))
+
+                elif attr == 'CONTINUITY_TRACE':
+                    kernel_size = 3
+                    padding = 1
+                    v_x = torch.cos(channel_X)
+                    v_y = torch.sin(channel_X)
+                    blur_vx = F.avg_pool2d(v_x, kernel_size, stride=1, padding=padding)
+                    blur_vy = F.avg_pool2d(v_y, kernel_size, stride=1, padding=padding)
+                    coherence = torch.sqrt(blur_vx**2 + blur_vy**2 + 1e-6)
+                    I_con += weight * coherence
 
         self.base_interest = I_str + I_con
+        print(I_str.max(), I_con.max())
 
         if self.H_orig is not None and self.W_orig is not None:
             # 保留兴趣压制：初始化时压低外围兴趣
@@ -555,6 +574,10 @@ class Controller:
         self.current_step = 0
 
         self.current_interest_map = None
+        
+        # Semantic Mask / Macro-Micro Saccade
+        self.semantic_mask: Optional[torch.Tensor] = None
+        self.sigma_micro: float = 50.0
 
     def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
                                           gmem_i: GmemoryI, x: int, y: int, 
@@ -575,11 +598,21 @@ class Controller:
                 if attr == 'STRENGTH':
                     if abs(vc) > self.cfg.tau_str_gate:
                         valid_mask[0, c] = 1.0
-                elif attr == 'CONTINUITY':
+                elif attr == 'CONTINUITY_SURFACE':
                     dx = X_m[0, c, y, min(x+1, W-1)].item() - vc
                     dy = X_m[0, c, min(y+1, H-1), x].item() - vc
-                    sc = math.exp(-(dx**2 + dy**2) / (2 * self.cfg.sigma_continuity**2))
-                    if sc > self.cfg.tau_con_gate:
+                    sc = math.exp(-(dx**2 + dy**2) / (2 * self.cfg.sigma_surf**2))
+                    if sc > self.cfg.tau_surf_gate:
+                        valid_mask[0, c] = 1.0
+                elif attr == 'CONTINUITY_TRACE':
+                    padding = 1
+                    y1, y2 = max(0, y-padding), min(H, y+padding+1)
+                    x1, x2 = max(0, x-padding), min(W, x+padding+1)
+                    local_window = X_m[0, c, y1:y2, x1:x2]
+                    v_x = torch.cos(local_window)
+                    v_y = torch.sin(local_window)
+                    coherence = torch.sqrt(torch.sum(v_x)**2 + torch.sum(v_y)**2) / (local_window.numel() + 1e-6)
+                    if coherence.item() > self.cfg.tau_trace_gate:
                         valid_mask[0, c] = 1.0
                         
             if torch.sum(valid_mask) == 0:
@@ -639,14 +672,54 @@ class Controller:
             return list(recognized_semantics)[0]
         return None
 
-    def _decide_next_saccade(self, I_map: torch.Tensor) -> Tuple[int, int]:
+    def _generate_semantic_mask(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition, 
+                                anchor_nodes: List[ModalityNode], p_macro: Tuple[int, int]) -> torch.Tensor:
+        
+        S_maps = gpos.l1_footprint_projection(X_subspaces, anchor_nodes)
+        
+        B, C, H, W = list(X_subspaces.values())[0].shape
+        M_resp_con = torch.zeros((1, 1, H, W), device=self.device)
+        count = 0
+        
+        for node in anchor_nodes:
+            mod_id = node.modality_id
+            attrs = self.cfg.feature_attributes.get(mod_id, {})
+            has_continuity_surface = any(attr == 'CONTINUITY_SURFACE' for attr in attrs.values())
+            
+            if has_continuity_surface and node.node_id in S_maps:
+                M_resp_con += S_maps[node.node_id]
+                count += 1
+                
+        if count == 0:
+            for node in anchor_nodes:
+                if node.node_id in S_maps:
+                    M_resp_con += S_maps[node.node_id]
+                    count += 1
+                    
+        if count > 0:
+            M_resp_con /= count
+            
+        cx, cy = p_macro
+        y_grid = torch.arange(H, device=self.device).view(H, 1)
+        x_grid = torch.arange(W, device=self.device).view(1, W)
+        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
+        
+        sigma_mask = self.cfg.sigma_mask
+        alpha = self.cfg.alpha_mask
+        beta = self.cfg.beta_mask
+        
+        gaussian = torch.exp(-dist_sq / (2 * sigma_mask**2)).view(1, 1, H, W)
+        M_semantic = torch.sigmoid(alpha * M_resp_con * gaussian - beta)
+        return M_semantic
+
+    def _decide_next_saccade(self, I_map: torch.Tensor, sigma_jump: Optional[float] = None) -> Tuple[int, int]:
         H, W = I_map.shape[-2], I_map.shape[-1]
         cx, cy = self.fixation_point
         y_grid = torch.arange(H, device=self.device).view(H, 1)
         x_grid = torch.arange(W, device=self.device).view(1, W)
         
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        jump_cost_sigma = self.cfg.saccade_sigma
+        jump_cost_sigma = sigma_jump if sigma_jump is not None else self.cfg.saccade_sigma
         
         # 绝对统一的眼跳视距惩罚决断
         penalty = torch.exp(-dist_sq / (2 * jump_cost_sigma**2)).view(1, 1, H, W)
@@ -718,77 +791,69 @@ class Controller:
                      if n.node_id in self.optimizer.I_exp:
                          self.optimizer.I_exp.pop(n.node_id, None)
             else:
-                 self.state = MainPhase.LEARN
                  if local_nodes:
+                     self.state = MainPhase.LEARN_MICRO
                      new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
                      self.active_semantic_id = new_sem_node.node_id
                      self.anchor_position = (cx, cy)
                      
-        elif self.state == MainPhase.LEARN:
-            px, py = self.prev_fixation_point
-            
-            if self.active_semantic_id is not None and self.anchor_position is not None:
-                sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
-                if sem_node:
-                    ax, ay = self.anchor_position
-                    
-                    anchor_mod_node = gmem_i.nodes.get(sem_node.anchor_id)
-                    is_sealed = False
-                    if anchor_mod_node is not None and anchor_mod_node.state_flag == NeuronState.REFRACTORY:
-                        is_sealed = True
-                    
-                    steps = max(int(math.sqrt((cx - px)**2 + (cy - py)**2) / 5), 3)
-                    homogeneity_broken = False
-                    
-                    # 验证眼跳轨迹 (Trajectory Homogeneity Check)
-                    for i in range(1, steps + 1):
-                        tx = int(px + (cx - px) * i / steps)
-                        ty = int(py + (cy - py) * i / steps)
-                        tx = max(0, min(tx, W-1))
-                        ty = max(0, min(ty, H-1))
-                        
-                        if anchor_mod_node is not None:
-                            mod_id = anchor_mod_node.modality_id
-                            X_m = X_subspaces.get(mod_id)
-                            if X_m is not None:
-                                local_vec = X_m[0, :, ty, tx].unsqueeze(0)
-                                local_norm = F.normalize(local_vec, p=2, dim=1)
-                                node_norm = F.normalize(anchor_mod_node.prototype.unsqueeze(0), p=2, dim=1)
-                                sim = torch.sum(local_norm * node_norm).item()
-                                if sim < 0.6:  # 越过物体边界
-                                    homogeneity_broken = True
-                                    break
-                                    
-                    if not homogeneity_broken:
-                        if not is_sealed:
-                            r = math.sqrt((cx - ax)**2 + (cy - ay)**2) + 1e-5
-                            rho = math.log(r)
-                            theta = math.atan2(cy - ay, cx - ax)
-                            
-                            for n in local_nodes:
-                                if n.node_id != sem_node.anchor_id and n.node_id not in sem_node.peripheral_links:
-                                    gmem_ii.add_peripheral(sem_node, n.node_id, rho, theta)
-                    else:
-                        # 切断连线，另起炉灶
-                        self.active_semantic_id = None
-                        self.anchor_position = (cx, cy)
-                        if local_nodes:
-                            new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
-                            self.active_semantic_id = new_sem_node.node_id
-                            self.anchor_position = (cx, cy)
+                     self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
+                     area = torch.sum(self.semantic_mask > 0.5).item()
+                     R_scale = math.sqrt(area / math.pi)
+                     self.sigma_micro = max(R_scale, 5.0)
+                 else:
+                     self.state = MainPhase.LEARN_MACRO
+                     
+        elif self.state == MainPhase.LEARN_MICRO:
+            # Micro-Saccade: Collection Phase
+            sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
+            if sem_node and self.anchor_position is not None:
+                ax, ay = self.anchor_position
+                
+                r = math.sqrt((cx - ax)**2 + (cy - ay)**2) + 1e-5
+                rho = math.log(r)
+                theta = math.atan2(cy - ay, cx - ax)
+                
+                for n in local_nodes:
+                    if n.node_id != sem_node.anchor_id and n.node_id not in sem_node.peripheral_links:
+                        gmem_ii.add_peripheral(sem_node, n.node_id, rho, theta)
             else:
-                self.active_semantic_id = None
-                self.anchor_position = (cx, cy)
-                if local_nodes:
-                    new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
-                    self.active_semantic_id = new_sem_node.node_id
+                self.state = MainPhase.LEARN_MACRO
+
+        elif self.state == MainPhase.LEARN_MACRO:
+            # Macro-Saccade: Drop Point
+            self.anchor_position = (cx, cy)
+            if local_nodes:
+                new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
+                self.active_semantic_id = new_sem_node.node_id
+                
+                self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
+                area = torch.sum(self.semantic_mask > 0.5).item()
+                R_scale = math.sqrt(area / math.pi)
+                self.sigma_micro = max(R_scale, 5.0)
+                
+                self.state = MainPhase.LEARN_MICRO
 
         I_map = self.optimizer.calculate_I_map(active_gmem_i, active_gmem_ii, S_maps_footprint, (cx, cy))
         
         self.prev_fixation_point = self.fixation_point
-        self.fixation_point = self._decide_next_saccade(I_map)
 
-        self.current_interest_map = I_map
+        if self.state == MainPhase.LEARN_MICRO and self.active_semantic_id is not None and self.semantic_mask is not None:
+            I_masked = I_map * self.semantic_mask
+            if I_masked.max() < self.cfg.epsilon_breakout:
+                # Halt & Breakout
+                self.active_semantic_id = None
+                self.anchor_position = None
+                self.semantic_mask = None
+                self.state = MainPhase.LEARN_MACRO
+                self.fixation_point = self._decide_next_saccade(I_map, None)
+                self.current_interest_map = I_map
+            else:
+                self.fixation_point = self._decide_next_saccade(I_masked, self.sigma_micro)
+                self.current_interest_map = I_masked
+        else:
+            self.fixation_point = self._decide_next_saccade(I_map, None)
+            self.current_interest_map = I_map
 
 
 # =============================
