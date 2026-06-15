@@ -44,13 +44,13 @@ class MemoryConfig:
         3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # aspect
         4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # orientation
     }
-    sigma_surf = 0.5
+    sigma_surf = 0.1
     sigma_trace = 0.5
     
     # [新增] 动态写入门限
     tau_str_gate = 0.2
-    tau_surf_gate = 0.8
-    tau_trace_gate = 0.3
+    tau_surf_gate = 0.5
+    tau_trace_gate = 0.6
 
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
@@ -92,8 +92,12 @@ class MemoryConfig:
     # Semantic Mask Params
     alpha_mask = 15.0
     beta_mask = 5.0
-    sigma_mask = 50.0
+    sigma_mask = 100.0
     epsilon_breakout = 0.05
+    lambda_con1 = 2.0
+    lambda_con2 = 2.0   
+    lambda_str = 2.0
+    mask_dilation_steps = 20
 
 
 # =============================
@@ -379,6 +383,10 @@ class InterestOptimizer:
         self.H_orig: Optional[int] = None
         self.W_orig: Optional[int] = None
         self.r: Optional[int] = None
+
+        self.I_str: Optional[torch.Tensor] = None
+        self.I_con1: Optional[torch.Tensor] = None
+        self.I_con2: Optional[torch.Tensor] = None
         
     def initialize_base_interest(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None):
         self.H_orig = H_orig
@@ -388,7 +396,9 @@ class InterestOptimizer:
         self.base_interest = torch.zeros((B, 1, H, W), device=self.device)
         
         I_str = torch.zeros((B, 1, H, W), device=self.device)
-        I_con = torch.zeros((B, 1, H, W), device=self.device)
+        I_con1 = torch.zeros((B, 1, H, W), device=self.device)
+        I_con2 = torch.zeros((B, 1, H, W), device=self.device)
+
 
         for mod_id, X_m in X_subspaces.items():
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
@@ -412,7 +422,7 @@ class InterestOptimizer:
                     dx = F.pad(dx, (0, 1, 0, 0))
                     dy = F.pad(dy, (0, 0, 0, 1))
                     grad_norm_sq = dx**2 + dy**2
-                    I_con += weight * torch.exp(-grad_norm_sq / (2 * self.cfg.sigma_surf**2))
+                    I_con1 += weight * torch.exp(-grad_norm_sq / (2 * self.cfg.sigma_surf**2))
 
                 elif attr == 'CONTINUITY_TRACE':
                     kernel_size = 3
@@ -422,10 +432,12 @@ class InterestOptimizer:
                     blur_vx = F.avg_pool2d(v_x, kernel_size, stride=1, padding=padding)
                     blur_vy = F.avg_pool2d(v_y, kernel_size, stride=1, padding=padding)
                     coherence = torch.sqrt(blur_vx**2 + blur_vy**2 + 1e-6)
-                    I_con += weight * coherence
+                    I_con2 += weight * coherence
 
-        self.base_interest = I_str + I_con
-        print(I_str.max(), I_con.max())
+        self.I_str = I_str
+        self.I_con1 = I_con1
+        self.I_con2 = I_con2
+        self.base_interest = I_str + I_con1 + I_con2
 
         if self.H_orig is not None and self.W_orig is not None:
             # 保留兴趣压制：初始化时压低外围兴趣
@@ -547,7 +559,16 @@ class InterestOptimizer:
         sigma_exp = self.cfg.saccade_sigma
         
         eta_exp = self.cfg.eta_exp
-        self.I_exp[node_id] += eta_exp * torch.exp(-dist_sq / (2 * sigma_exp**2)).view(1, 1, H, W)
+        
+        sigma_surround = sigma_exp
+        sigma_crater = sigma_exp / 2.0
+        
+        surround = torch.exp(-dist_sq / (2 * sigma_surround**2))
+        crater = torch.exp(-dist_sq / (2 * sigma_crater**2))
+        
+        # 大感受野正，小极坑负 (带有 -1 不应权)
+        dog = surround - 2.0 * crater
+        self.I_exp[node_id] += eta_exp * dog.view(1, 1, H, W)
 
     def clear_node_fields(self, node_id: int, is_semantic: bool = False):
         if not is_semantic:
@@ -578,6 +599,11 @@ class Controller:
         # Semantic Mask / Macro-Micro Saccade
         self.semantic_mask: Optional[torch.Tensor] = None
         self.sigma_micro: float = 50.0
+
+        # trail
+        self.matrix1 = None
+        self.matrix2 = None
+        self.matrix3 = None
 
     def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
                                           gmem_i: GmemoryI, x: int, y: int, 
@@ -674,7 +700,6 @@ class Controller:
 
     def _generate_semantic_mask(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition, 
                                 anchor_nodes: List[ModalityNode], p_macro: Tuple[int, int]) -> torch.Tensor:
-        
         S_maps = gpos.l1_footprint_projection(X_subspaces, anchor_nodes)
         
         B, C, H, W = list(X_subspaces.values())[0].shape
@@ -690,26 +715,55 @@ class Controller:
                 M_resp_con += S_maps[node.node_id]
                 count += 1
                 
-        if count == 0:
-            for node in anchor_nodes:
-                if node.node_id in S_maps:
-                    M_resp_con += S_maps[node.node_id]
-                    count += 1
-                    
         if count > 0:
             M_resp_con /= count
-            
+
+        # 1. Permeability Map
+        I_str = self.optimizer.I_str
+        I_con1 = self.optimizer.I_con1
+        I_con2 = self.optimizer.I_con2
+        # P_map = M_resp_con * torch.sigmoid(1.0 - self.cfg.lambda_str * I_str)
+        # P_map = self.optimizer.I_con1 * torch.sigmoid((1.0 - self.cfg.lambda_str * I_str))
+        I_con1_norm = I_con1 / (I_con1.max() + 1e-6)
+        I_con2_norm = I_con2 / (I_con2.max() + 1e-6)
+        I_str_norm = I_str / (I_str.max() + 1e-6)
+        I_con1_clamp = torch.clamp(1.0 - self.cfg.lambda_con1 * I_con1, 0.0, 1.0)
+        I_con2_clamp = torch.clamp(1.0 - self.cfg.lambda_con2 * I_con2, 0.0, 1.0)
+        I_str_clamp = torch.clamp(1.0 - self.cfg.lambda_str * I_str, 0.0, 1.0)
+        P_surf_map = I_con1_norm * I_str_clamp
+        P_edge_map = I_str_norm * I_con1_clamp
+        P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp
+
+        self.matrix1 = P_surf_map
+        self.matrix3 = P_edge_map       
+
+        # 2. Seed Initialization
         cx, cy = p_macro
-        y_grid = torch.arange(H, device=self.device).view(H, 1)
-        x_grid = torch.arange(W, device=self.device).view(1, W)
-        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        
-        sigma_mask = self.cfg.sigma_mask
+        print('cx, cy', cx, cy)
+        V = torch.zeros((B, 1, H, W), device=self.device)
+        V[0, 0, cy, cx] = 1.0
+
+        # 3. Iterative Matrix Dilation
+        self.matrix2 = []
+        pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        for _ in range(self.cfg.mask_dilation_steps):
+            self.matrix2.append(V)
+            V = pool(V) * P_surf_map
+
+        edge_pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        for _ in range(5):
+            self.matrix2.append(V)
+            V = edge_pool(V)
+        '''
+        for _ in range(20):
+            self.matrix2.append(V)
+            V = V + edge_pool(V) * P_trace_map
+        '''
+        # 4. Final Mask Output
         alpha = self.cfg.alpha_mask
         beta = self.cfg.beta_mask
+        M_semantic = torch.sigmoid(alpha * V - beta)
         
-        gaussian = torch.exp(-dist_sq / (2 * sigma_mask**2)).view(1, 1, H, W)
-        M_semantic = torch.sigmoid(alpha * M_resp_con * gaussian - beta)
         return M_semantic
 
     def _decide_next_saccade(self, I_map: torch.Tensor, sigma_jump: Optional[float] = None) -> Tuple[int, int]:
@@ -741,6 +795,7 @@ class Controller:
         cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
 
         local_nodes = self._extract_and_match_local_features(X_subspaces, gmem_i, cx, cy)
+        print('local_nodes: ', len(local_nodes))
         
         E_input_gmem_i = defaultdict(float)
         E_input_gmem_ii = defaultdict(float)
@@ -826,7 +881,6 @@ class Controller:
             if local_nodes:
                 new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
                 self.active_semantic_id = new_sem_node.node_id
-                
                 self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
                 area = torch.sum(self.semantic_mask > 0.5).item()
                 R_scale = math.sqrt(area / math.pi)

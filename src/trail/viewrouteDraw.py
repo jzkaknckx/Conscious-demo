@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from typing import List, Tuple, Optional, Union
 import matplotlib.pyplot as plt
+from PIL import Image
 
 try:
     import torch
@@ -397,4 +398,76 @@ def _display_in_notebook(img: np.ndarray, figsize: Tuple[int, int] = (10, 8)):
     plt.figure(figsize=figsize)
     plt.imshow(img_rgb)
     plt.axis('off')
+    plt.show()
+
+def debug_show(image, A):
+    """
+    调试工具：显示原图、张量A的黑白图、以及它们的叠加图。
+    
+    输入:
+        image: torch.Tensor [1,1,W,H] 或 [1,3,W,H] 或 PIL Image 对象
+        A: torch.Tensor [1,1,W,H] 或 PIL Image 对象（灰度图）
+    """
+    # ---- 辅助函数：将输入转为 H×W numpy 灰度图或 H×W×3 彩色图 ----
+    def to_numpy(img):
+        if isinstance(img, torch.Tensor):
+            img = img.squeeze(0).cpu()           # [C, W, H]
+            if img.shape[0] == 1:                # 灰度
+                # return img.squeeze(0).numpy().T   # (H, W)
+                return img.squeeze(0).numpy()
+            else:                                # 彩色
+                return img.permute(1, 2, 0).numpy()  # (H, W, 3)
+        elif isinstance(img, Image.Image):
+            if img.mode == 'RGB':
+                return np.array(img)             # (H, W, 3)
+            else:  # L, LA, etc. 转为灰度
+                return np.array(img.convert('L'))  # (H, W)
+        else:
+            raise TypeError("image must be torch.Tensor or PIL.Image")
+
+    # 转换图像
+    img_np = to_numpy(image)          # (H, W) 或 (H, W, 3)
+    
+    # 转换张量 A（确保是单通道灰度）
+    if isinstance(A, torch.Tensor):
+        A_np = A.squeeze().cpu().numpy()   # (W, H)
+        A_np = A_np.T                      # (H, W)
+    elif isinstance(A, Image.Image):
+        A_np = np.array(A.convert('L'))    # (H, W)
+    else:
+        raise TypeError("A must be torch.Tensor or PIL.Image")
+    
+    # 归一化 A 到 [0,1]
+    A_min, A_max = A_np.min(), A_np.max()
+    if A_max - A_min > 1e-8:
+        A_norm = (A_np - A_min) / (A_max - A_min)
+    else:
+        A_norm = np.zeros_like(A_np)
+    
+    # 绘图
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    
+    # 原图
+    if len(img_np.shape) == 2:
+        axes[0].imshow(img_np, cmap='gray')
+    else:
+        axes[0].imshow(img_np)
+    axes[0].set_title("Original Image")
+    axes[0].axis('off')
+    
+    # 张量 A 灰度图
+    axes[1].imshow(A_norm, cmap='gray')
+    axes[1].set_title("Tensor A (grayscale)")
+    axes[1].axis('off')
+    
+    # 叠加图
+    if len(img_np.shape) == 2:
+        axes[2].imshow(img_np, cmap='gray')
+    else:
+        axes[2].imshow(img_np)
+    axes[2].imshow(A_norm, cmap='hot', alpha=0.6)
+    axes[2].set_title("Overlay (Image + A)")
+    axes[2].axis('off')
+    
+    plt.tight_layout()
     plt.show()
