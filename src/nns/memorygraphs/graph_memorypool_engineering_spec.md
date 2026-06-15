@@ -1,78 +1,53 @@
-# 语义掩码 (Semantic Mask) 生成算法方案探讨
+# 视觉大模型认知算法架构：眼跳驱动与图记忆更新
 
-针对“寻找一个连续的纯色区域（如苹果内部及其外围边缘），同时拒绝外侧具有相似特征但物理不连通的噪点或其他物体”的目标，采用基于张量化形态学的拓扑连通域扩散生成语义掩码。
+该文档确立了在`REVIEW`, `LEARN_MACRO`, `LEARN_MICRO`三种认知状态下的眼跳驱动机制、特征写入方案以及图神经网络状态的更新逻辑，以解决注意力粘滞与状态机非正常闭环等问题。
 
-### 基于张量化形态学的拓扑连通域扩散 (Tensor-based Topologic Diffusion)
+## 一、新眼跳驱动策略
 
-为了提取严格连通的纯色域和过渡边缘，我们使用**“拓扑路径连通度”代替单纯的“直线距离”**。在基于 PyTorch 张量体系中，可基于最大池化与系数控制执行极其快速的“张量域漫水扩散”（Tensor Dilation/Diffusion）。
+为适应不同探索阶段的目的，眼跳驱动模型现解耦为三种独立的策略。
 
-#### 1. 算法定式
+### 1. REVIEW 状态（记忆验证阶段）
+*   **驱动目标**：对已有记忆特征（`interest_map`）高响应区域进行复查。
+*   **计算模型**：注视点 $p_{next}$ 取决于记忆兴趣值与空间抑制的结合。
+    $$p_{next} = \arg\max \left[ I_{map}(\mathbf{q}) - \alpha \cdot IoR(\mathbf{q}) - \gamma \cdot Dist(\mathbf{p}_{curr}, \mathbf{q}) \right]$$
+*   **IoR演化**：全局抑制图 $IoR(\mathbf{q})$ 每次注视后在当前点 $\mathbf{p}_{curr}$ 进行高斯叠加并自然衰减，强制打破多次定焦死锁。
 
-**步骤 1：生成全局通透率图 (Permeability Map)**
-利用 Gpos 相似度生成面域响应 $M_{resp\_con}$，并将原始的基础底场强度 $I_{base}$ 中不属于面连续性的高频强突变点（如非此颜色的锋利划痕）视作屏障（阻力）：
-$$P_{map}(\mathbf{q}) = M_{resp\_con}(\mathbf{q}) \cdot \operatorname{Sigmoid}(1 - \lambda \cdot I_{str}(\mathbf{q}))$$
-它代表了流体在底图上的穿行许可率。若此时与起跳点同质，通过率 $\approx 1$；若为异质对象或强墙壁，通过率 $\approx 0$。
+### 2. LEARN_MACRO 状态（宏观锚点搜索阶段）
+*   **驱动目标**：寻找视觉中大面积连续平坦色块区域，并**规避已经探索学习过的语义区域**。
+*   **计算模型**：
+    由于原始 $S_{base}$ 多由边缘高频特征主导导致最大值易出现在物体边缘，故改用从神经计算中提取的代表连续色块响应的连续性提取图 $I_{con1}$：
+    $$I_{macro}(\mathbf{q}) = I_{con1}(\mathbf{q}) \odot \left(1 - \overline{\sum I_{spatial}^{II}}(\mathbf{q}) \right)$$
+    其中 $\overline{\sum I_{spatial}^{II}}$ 为GmemoryII（已经学习到的语义团）空间激活响应对数和的归一化抑制掩码，用于防止眼跳在已建构宏观锚点的区域内打转。
+    利用形态学空间低通滤波 $K_{lowpass}$ 进行平滑：
+    $$p_{next} = \arg\max \left( I_{macro} * K_{lowpass} \right)$$
+    以确保宏观锚点降落在大面积连续色块的内心物理几何中心。
 
-**步骤 2：初始化种子核心 (Seed Initialization)**
-建立一个全 0 掩码张量，仅在注视锚点中心 $\mathbf{p}_{macro}$ 点燃核心：
-$$V_0(\mathbf{p}_{macro}) = 1.0, \quad V_0(\mathbf{q} \neq \mathbf{p}_{macro}) = 0.0$$
+### 3. LEARN_MICRO 状态（微观特征精细扫描阶段）
+*   **驱动目标**：在软掩模 $M_{semantic}$ 限制下的辖区内深度扫描。
+*   **计算模型**：抛弃全局记忆分布 $I_{map}$，回归无偏的底层特征，且仅对软掩模辖区激发。
+    $$p_{next} = \arg\max \left( S_{base}(\mathbf{q}) \odot M_{semantic}(\mathbf{q}) \odot (1 - M_{aversion}(\mathbf{q})) \right)$$
+*   **厌恶足迹机制（跳出机制）**：
+    初始化生命周期单次 `LEARN_MICRO` 的状态变量 $M_{aversion}$。每次扫描 $p_i$ 后，叠加中央凹尺寸的抑制分布：
+    $$M_{aversion}^{(t+1)}(\mathbf{q}) = \max \left( M_{aversion}^{(t)}(\mathbf{q}) , \exp \left( -\frac{||\mathbf{q} - \mathbf{p}_i||^2}{2\sigma_{fovea}^2} \right) \right)$$
+*   **退出条件计算**：每次眼跳检查厌恶足迹对当前语义结构的覆盖率指标 $\rho$：
+    $$\rho = \frac{\sum (M_{aversion} \odot M_{semantic})}{\sum M_{semantic}}$$
+    若 $\rho > \theta_{exit}$，表示该面状区内信息已被吸干，将该 `semantic_mask` 从缓存彻底清空，并将状态机退出为 `LEARN_MACRO`。
 
-**步骤 3：张量蔓延迭代 (Iterative Matrix Dilation)**
-利用最大池化算子（`MaxPool2d(kernel_size=3, stride=1, padding=1)`），每一帧向外“膨胀”一圈，但每次膨胀后必须再与 $P_{map}$ 逐元素相乘。这确保了掩码在每一次外扩时都会受到相似度边界的严格阻挡。
-迭代 $T$ 步（使得膨胀能覆盖假设中的最大可能特征域，或差值收敛）：
-$$V_{t+1} = \text{MaxPool2d}(V_t) \odot P_{map}$$
+## 二、特征写入策略
 
-**步骤 4：生成归一化掩码 (Final Mask Output)**
-蔓延终止后，由于池化的降权和相乘的滤波，形成一片中间高两边自然衰减的水坑，它完美适配物体真形。采用平滑锐化出图：
-$$M_{semantic} = \operatorname{Sigmoid}(\gamma \cdot V_T - \delta)$$
+*   **延迟隔离存储（延期挂载机制）**：`LEARN_MICRO` 过程的所有 Peripheral 特征采集仅推入临时内存队里 `peripheral_buffer` 中。期间不改变大图主存储网络，从而确保 $sum\_I\_spatial$ 等宏观掩模场形依然静置不动。
+*   **中心爆发汇聚网络**：微观扫描破笼结束并转移回 `LEARN_MACRO` 时，调用批处理（Batch Processing），将之前产生的核心面特征即 Anchor，作为连接的主干点。网络将队列内 Peripheral 特征集合挂接成隶属该锚点的次级辐射特征星团边。
 
-#### 2. 卓越表现对照
-- **天然切割孤立杂质**：即使附近有一个与之颜色一样的噪点，只要这处噪点与核心之间，隔了一条“其他颜色或强对比环境的沟壑”，迭代扩散就**根本无法翻越**那条导致 $P_{map} \to 0$ 的鸿沟，完美根除了外侧噪点粘附现象。
-- **精确吸附连续边缘**：在同质面域边缘处，$P_{map}$ 将伴随相似度的下降呈现滑坡衰减。扩散引擎会向外爬坡衰弱并天然静止在外围的半坡地带，将连续面量与自身附着的轮廓边缘极其漂亮地卷入一个张量中。
-- **算力相容开销极小**：相较传统的 CPU 基于像素/图论的深搜泛滥算法，这个操作完美映射到 GPU 的 Conv2D 核下。$T=20$ 或 $30$ 次的 Pooling+乘法迭代，只需耗时不到 1~2 毫秒，且具备 100% 的张量梯度连贯形式。
+## 三、tick_update 机制调整
 
+针对局部神经元频繁进入不应期并产生非预期粘滞及由于过高频建图造成的计算灾难，更新机制被解耦：
 
-# graph_memorypool.py 视知觉重构技术规格书 (V6.0)
+### 1. 连续微时间动力学（局部状态迭代）
+眼跳内部（特别是指代大量微眼跳发生时），**不触发**任何诸如神经元充放电、图网络神经元层级的更新操作，即**彻底挂起 `tick_update`**。由于图电位不发生实质修改，神经元永远不因此陷入不应期（Refractory Period）导致的感受野过饱和破溃。
 
-## 0. 概述 (Overview)
-针对特征跨越物体边界“拉丝”与原地停留的死锁，必须基于通道解构将控制器改迁为 **Macro-Micro 双轨控制模型**，同时将“空间同质性”进行更加细粒度的降维打散：分别进行**表面颜料面评价**与**骨骼走线方向评价**以获得精纯无噪的 $I_{map}$。
-
----
-
-## 1. 深度属性分拣：CONTINUITY 面域与线域的独立拆分解析
-
-为了从根源上剔除非对象同质特征（避免噪声导致的掩码和注意力外泄），必须对原先粗暴的 `CONTINUITY` 进行解囊，剥离维数特性。
-
-- **[修改点 1.1: 特征属性配置映射表重构]**
-  构建更为精细的字典映射：`cfg.feature_attributes[mod_idx][channel_idx]`。枚举合法值为：`STRENGTH`（绝对强弱量）、`CONTINUITY_SURFACE`（面量，如明度光影或Hue）、`CONTINUITY_TRACE`（线量，如Orientation方向走势）以及 `IGNORE`。
-- **[修改点 1.2: Base Interest 与 GmemI 门限动态投递核审]**
-  - **STRENGTH**: 
-    - 基础场提供: 纯振幅绝对拉抬 $I_{str} \leftarrow \sum X_c$
-    - GmemI收录核审: 绝对值 $\mathbf{v}_c > \tau_{\text{str\_gating}}$。
-  - **CONTINUITY_SURFACE**:
-    - 基础场评价: 无方向各向同性方差评估 $val_{surf} = \exp(-\|\nabla X_c\|^2 / 2\sigma_{surf}^2)$
-    - GmemI收录核审: 取点周边一致形变分 $val_{surf} > \tau_{\text{surf\_gating}}$。
-  - **CONTINUITY_TRACE**:
-    - 基础场评价: 取样片区内单位矢量走向相干聚合度 $val_{trace} = \frac{\|\text{Blur}(\vec{v}_{c})\|}{\text{Blur}(\|\vec{v}_{c}\|)}$。
-    - GmemI收录核审: 提供片段线段高一致度 $val_{trace} > \tau_{\text{trace\_gating}}$ 才允准挂载，规避碎叶花点写入。
-
----
-
-## 2. 宏观/微观双轨切换控制与纯化特征域生成的软掩码约束
-
-废弃粗放型判断。引入 $M_{semantic}$ 注意力界限软光圈，实现从粗落点寻找物体再到辖区内部细瞄的双流程控制。
-
-- **[修改点 2.1: Semantic Mask 由且仅由 CONTINUITY_SURFACE 高纯供给生成]**
-  - **触发**: 在 Macro 大步跨越后，成功降落起锚生成了新 Anchor 节点时刻。
-  - **执行提取**: 遍历此刻为该原点位置被激发的初盘 GmemI Active 节点集合，**极其严格地筛除掉一切不是 `CONTINUITY_SURFACE` 类的特征对象**。
-  - **场回波重构与拓扑扩散生成掩码**:
-    1. **通透率图生成 (Permeability Map)**：利用 Gpos 提取由上述纯面特征生成的响应度 $M_{resp\_con}$，结合非面连续性（如强度边缘）突变点作为环境阻力网格构建阻值：$P_{map}(\mathbf{q}) = M_{resp\_con}(\mathbf{q}) \cdot \operatorname{Sigmoid}(1 - \lambda \cdot I_{str}(\mathbf{q}))$。
-    2. **张量蔓延迭代 (Iterative Matrix Dilation)**：以注视锚点中心 $\mathbf{p}_{macro}$ 创建单值源初值 $V_0(\mathbf{p}_{macro})=1.0$ 的零矩阵。利用底层可导的连续极大约束算子执行 $T$ 步膨胀控制：$V_{t+1} = \text{MaxPool2d}(V_t) \odot P_{map}$。
-    3. 最终蔓延水坑经过平滑化 $M_{semantic} = \operatorname{Sigmoid}(\gamma \cdot V_T - \delta)$ 输送为崭新掩码态载入 Controller。
-- **[修改点 2.2: Micro-Saccade 封锁态 (局部深耕)]**
-  - **锁入机制**: 上个周期生成掩码及记录 `active_semantic_id`，立即锁转 Micro 引擎。
-  - **场力斩截**: 生成出来的全图兴趣场必须通过 $M_{semantic}$ 阿尔法相乘：$I_{masked} = I_{map} \odot M_{semantic}$。从而绝育周边界限上的所有其余环境 $I_{base}$ 及引导力召唤。
-  - **辖区罚距折算**: 将该软掩码非零域面积近似视作面积 $S$，推演出等效圆半径 $R_{scale}$，从而动态折返配用小粒度的视跨越跳行衰减距离 $\sigma_{micro} \propto R_{scale}$。使得跳步永远紧缩在本域。
-- **[修改点 2.3: 陨坑满溢与退行破溃 (Breakout)]**
-  - **判定阈值退行**: Micro 眼跳下经过的锚区将受到带有 $-1$ 不应权的空间双调制（大感受野正小极坑负）疯狂摧残，留下全是一路死寂的连串坑洞。当该区域被踏平使全区残值 $\max(I_{masked}) < \epsilon$ 时，标志当前物体已无法剥削。
-  - **破笼重生**: 丢弃清空 $M_{semantic}$ 矩阵，$active\_semantic\_id \leftarrow \text{None}$，彻底解绑该 GmemII 组。放归为 Macro，跳眼被未踏足区域庞大的全新 Base Interest 远吸走。
+### 2. 离散宏时间动力学（拓扑级同步刷新）
+*   **触发时机**：**仅当系统从 LEARN_MICRO 状态发生跃迁且强制回归到 LEARN_MACRO 时段时**，执行一次全局的 `tick_update` 过程。
+*   **状态同步统一结算**：
+    1.  执行 Peripheral 向 Anchor 的批次向心挂载。
+    2.  全局进行电位消散、激活及不应期的集体统筹。
+    3.  系统获得全新的稳定视觉兴趣基底，在下一次 $I_{macro}$ 计算时，旧有的已被探索物体的区域 $\sum I_{spatial}^{II}$ 掩护成功生效，驱动视眼探索全图未知域。

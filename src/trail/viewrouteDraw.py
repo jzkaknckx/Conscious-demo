@@ -296,7 +296,7 @@ def debug_mark_advanced(
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             ax.imshow(img_rgb)
             ax.set_title(title)
-            ax.axis('off')
+            ax.axis('on')
         plt.tight_layout()
         plt.show()
 

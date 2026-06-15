@@ -732,7 +732,10 @@ class Controller:
         I_str_clamp = torch.clamp(1.0 - self.cfg.lambda_str * I_str, 0.0, 1.0)
         P_surf_map = I_con1_norm * I_str_clamp
         P_edge_map = I_str_norm * I_con1_clamp
-        P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp      
+        P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp
+
+        self.matrix1 = P_surf_map
+        self.matrix3 = P_edge_map       
 
         # 2. Seed Initialization
         cx, cy = p_macro
@@ -741,12 +744,15 @@ class Controller:
         V[0, 0, cy, cx] = 1.0
 
         # 3. Iterative Matrix Dilation
+        self.matrix2 = []
         pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
         for _ in range(self.cfg.mask_dilation_steps):
+            self.matrix2.append(V)
             V = pool(V) * P_surf_map
 
         edge_pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
         for _ in range(5):
+            self.matrix2.append(V)
             V = edge_pool(V)
         '''
         for _ in range(20):
@@ -787,8 +793,19 @@ class Controller:
         H, W = base_interest.shape[-2], base_interest.shape[-1]
         kernel_size = 15
         padding = kernel_size // 2
-        K_lowpass = F.avg_pool2d(base_interest, kernel_size, stride=1, padding=padding)
-        self.matrix1 = K_lowpass
+        
+        if self.optimizer.I_con1 is not None:
+            target_map = self.optimizer.I_con1.clone()
+        else:
+            target_map = base_interest.clone()
+            
+        if self.optimizer.sum_I_spatial_II is not None:
+            sum_II = self.optimizer.sum_I_spatial_II
+            if sum_II.max() > 1e-6:
+                norm_II = torch.clamp(sum_II / sum_II.max(), 0.0, 1.0)
+                target_map = target_map * (1.0 - norm_II)
+                
+        K_lowpass = F.avg_pool2d(target_map, kernel_size, stride=1, padding=padding)
         idx = torch.argmax(K_lowpass).item()
         return (int(idx % W), int(idx // W))
 
@@ -817,11 +834,13 @@ class Controller:
         if semantic_mask is None:
             return True
         sum_mask = torch.sum(semantic_mask).item()
+        print(sum_mask, "sum_mask")
         if sum_mask < 1e-5:
             return True
         covered = torch.sum(self.m_aversion * semantic_mask).item()
         rho = covered / sum_mask
         theta_exit = 0.85
+        print(rho, "rho")
         return rho > theta_exit
 
     def _transition_to_macro(self, gmem_i: GmemoryI, gmem_ii: GmemoryII):
