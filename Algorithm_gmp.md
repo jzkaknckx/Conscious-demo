@@ -1,67 +1,65 @@
-# 视觉大模型认知算法架构：眼跳驱动与图记忆更新
+# 视觉认知与记忆流形重构算法规范 (Algorithm_gmp)
 
-> **【算法版图全维合并宣告与重心转移】**
-> 以下文档中探讨重构的包括 `REVIEW`、`LEARN_MACRO`、`LEARN_MICRO` 三态引擎驱动机制、全新的 `tick_update` 延宕挂载时序设计，以及自适应面积步长等计算模型，**如今已作为最新全局规范并入至 `Algorithm_gmp.md` 主文档中**。
-> 即日起，由 `Algorithm_gmp.md` （特别是其中的 _4. Controller 双极流状态机伺服循环_ 章节落定的新规则）掌管本项目双轨流视知觉引擎系统的全局权威。
+本模块聚焦于 `graph_memorypool.py` 中最基础、原生的数据结构——记忆图谱池（Gmem）与空间动力投影网（Gpos），并详述两者交互的精确数学定义。这是更高阶场驱动与宏微观眼跳引擎运转的地基。
 
-该文档确立了在`REVIEW`, `LEARN_MACRO`, `LEARN_MICRO`三种认知状态下的眼跳驱动机制、特征写入方案以及图神经网络状态的更新逻辑。并在微观尺度上引入了基于语义掩码的动态步长约束，在宏观尺度引入基于空间检索图（GposII）的绝对语义排斥机制。
+## 一、 分层分布记忆网池 (Gmem: Modality & Semantic Nodes)
 
-## 一、新眼跳驱动策略
+Gmem 采用物理脱钩的双层拓扑设计。底层 `ModalityNode` (GmemI) 直指感知孤立块特征；上层 `SemanticNode` (GmemII) 不保存像素数据本身，仅存取指向对象的指针与极坐标骨架结构（外围拓扑约束）。一切神经元节点的流形生命周期均服从统一的状态机。
 
-为适应不同探索阶段的目的，眼跳驱动模型现解耦为三种独立的策略。
+### 1. 神经元激活衰减状态机 (Neuron Dynamics)
+每一个在池内生根的节点记录当前的激活电位 $A_t$ (`activation_level`)、枚举标志态 $S_t$ (`state_flag`) 与疲劳计时器 $\tau_t$ (`timer`)。
+其状态变迁依赖输入的外部能量 $E_{input}$ 并遵循三极稳态模型：
 
-### 1. REVIEW 状态（记忆验证阶段）
-*   **驱动目标**：对已有记忆特征（`interest_map`）高响应区域进行复查。
-*   **计算模型**：注视点 $p_{next}$ 取决于记忆兴趣值与空间抑制的结合。
-    $$p_{next} = \arg\max \left[ I_{map}(\mathbf{q}) - \alpha \cdot IoR(\mathbf{q}) - \gamma \cdot Dist(\mathbf{p}_{curr}, \mathbf{q}) \right]$$
-*   **IoR演化**：全局抑制图 $IoR(\mathbf{q})$ 每次注视后在当前点 $\mathbf{p}_{curr}$ 进行高斯叠加并自然衰减，强制打破多次定焦死锁。
+- **平复渴求态 (CALM, $S_t = 0$)**:
+  在安静环境缺乏关注度时等待能量输入，具有记忆时延衰减系数 $\gamma$（分 `decay_rate_I` 与 `decay_rate_II`）：
+  $$A_{t+1} = \gamma \cdot A_t + E_{input}$$
+  若电位受视觉关注而抬升一旦越过起燃阈值（$A_{t+1} > T_{excite}$），节点神经元状态将发生跳跃，切入并锁定为 **ACTIVE**：
+  $$S_{t+1} = 1, A_{t+1} = 1.0, \tau_{t+1} = \tau_{active}$$
 
-### 2. LEARN_MACRO 状态（宏观锚点搜索阶段）
-*   **驱动目标**：寻找视觉中大面积连续平坦色块区域，并**严格规避已经探索建构的物体（语义特征团）辖区**。
-*   **计算模型**：
-    原采用历史空间的累积抑制 $\sum I_{spatial}^{II}$ 易造成时序衰减或重置，导致抑制失效，引发系统在探索上的周期性震荡（如11步循环死锁）。现调整为直接获取高阶位置图网络（GposII）对当前视野的真实空间位置响应图 $M_{GposII}$ 作为绝对掩码约束。
-    $$I_{macro}(\mathbf{q}) = I_{con1}(\mathbf{q}) \odot \left(1 - \operatorname{Norm}(M_{GposII}(\mathbf{q})) \right)$$
-    利用形态学空间低通滤波 $K_{lowpass}$ 进行平滑以剔除高频孤立噪声：
-    $$p_{next} = \arg\max \left( I_{macro} * K_{lowpass} \right)$$
-    以此确保宏观观察点准确降落在未被建构认知区域的大面积连续面状色块的几何中心。
+- **高燃辐射态 (ACTIVE, $S_t = 1$)**:
+  神经元电位锁定为满负荷正极 $A_{t+1} = 1.0$，向 Gpos 发出强查询，同时计时器递减：$\tau_{t+1} = \tau_t - 1$。
+  不可逾越的生理法则在此生效：当计时器燃尽（$\tau_{t} \le 0$），将不可阻挡地跌入不应期，抛出厌恶负能量。
+  $$S_{t+1} = -1, A_{t+1} = -1.0, \tau_{t+1} = \tau_{refractory}$$
 
-### 3. LEARN_MICRO 状态（微观特征精细扫描阶段）
-*   **驱动目标**：在软掩模 $M_{semantic}$ 限制下的辖区内深度扫描，并实行与该视野面积特征自适应的眼跳约束。
-*   **计算模型**：
-    回归无偏的底层特征，且仅对软掩模辖区激发。
-    $$p_{next} = \arg\max \left( S_{base}(\mathbf{q}) \odot M_{semantic}(\mathbf{q}) \odot (1 - M_{aversion}(\mathbf{q})) \right)$$
-*   **动态扫描步长（自适应 $\sigma_{fovea}$）与厌恶足迹机制**：
-    固定步长面对比例悬殊的掩码时，极易造成局部遍历过载或边缘越界。需引入几何面积向一维跨度投射的动态调节因子 $\sigma_{fovea}$（映射当前微观扫视的步幅与抑制半径）：
-    计算语义掩码面积积分 $A_{semantic} = \sum M_{semantic}(\mathbf{q})$
-    进行量纲对齐并缩放生成步幅：
-    $$\sigma_{fovea} = \eta \cdot \sqrt{A_{semantic}} + \epsilon_{base}$$
-    （其中 $\eta$ 为缩放常数，$\epsilon_{base}$ 确保基础解析限度）
-    每次产生新注视点 $\mathbf{p}_i$ 后，使用该自适应 $\sigma_{fovea}$ 在周围施加抑制分布：
-    $$M_{aversion}^{(t+1)}(\mathbf{q}) = \max \left( M_{aversion}^{(t)}(\mathbf{q}) , \exp \left( -\frac{||\mathbf{q} - \mathbf{p}_i||^2}{2\sigma_{fovea}^2} \right) \right)$$
-*   **退出条件计算**：每次眼跳检查自适应厌恶足迹对当前语义结构的覆盖率指标 $\rho$：
-    $$\rho = \frac{\sum (M_{aversion} \odot M_{semantic})}{A_{semantic}}$$
-    若 $\rho > \theta_{exit}$ （通常设为 $0.85$ 左右），表示该面状区内信息扫描已达期望水平，触发状态机无条件退出至 `LEARN_MACRO`。
+- **闭锁冰川态 (REFRACTORY, $S_t = -1$)**:
+  隔离任何外界电位 $E_{input}$，电位锁定在坚硬的深负极处 ($A_t = -1.0$) 拒绝重复探索且强制抹除周边场。直至倒数熬出封锁线 $\tau \le 0$：
+  $$S_{t+1} = 0, A_{t+1} = 0.0$$
 
-## 二、特征写入策略
+### 2. GmemI 孤立特征节点 (ModalityNode)
+GmemI 定义了视觉的最底核单元：
+- **归属模态 ($m$)**: 定位所属的物理信道（如灰度拉普拉斯、色彩渐变波等）。
+- **空间局域原型核 ($\mathbf{w}^{(n)}$ / Prototype)**: 剥片并独立于原始图像帧被摘除出的抽象张量。
 
-*   **延迟隔离存储（延期挂载机制）**：`LEARN_MICRO` 过程的所有 Peripheral 特征采集仅推入临时内存队里 `peripheral_buffer` 中。期间系统不改变大图主存储网络的结构，只做只读探测，从而确保外围宏观网络状态不会因局部特征的不稳定采入产生震荡。
-*   **中心爆发汇聚网络**：微观扫描结束并因厌恶足迹覆盖完全而向 `LEARN_MACRO` 转移时，调用批处理操作（Batch Processing）。网络将进入前确定的核心面特征（Anchor），作为连接的主干节点结构，将队列内的 Peripheral 特征集合挂接成隶属该锚点的次级特征网络簇。
+### 3. GmemII 高阶拓扑节点 (SemanticNode)
+GmemII 的建立使纯孤立特征组合成为空间物体结构：
+- **心锚 (Anchor_ID)**: 标记对象的绝对原点（指向一枚在物体中心的 ModalityNode）。
+- **极引力挂载树 (Peripheral Links)**:
+  对外围所拾获之点 $k$，建立起相对于其主锚 $anc$ 空间之极坐标关系结构对 $(\Delta\rho_k, \Delta\theta_k)$。以及每个关联所具备的容忍弹性系数 $(\lambda_\rho, \gamma_\theta)$。
 
-## 三、时序更新与 tick_update 机制重构
+---
 
-针对调试过程中发现的“时序状态机停摆引发激活值归零失效”问题，前置版本中为规避不应期干扰而强行挂起全局 `tick_update` 的做法已被废除。现将图动力学演化严格划分为 **节点内源时序能量演进（纯连续计算）** 与 **宏观图拓扑结构建构（离散跨界突变）** 两个相互解耦的推进系统。这不仅保证了算法的优雅抽象，更是系统正常流转的物理法则底层保障。
+## 二、 动态投影与空间回放网络 (Gpos: Dynamic Projection Network)
 
-### 1. 普遍性的单步节点能量结算 (连续动力学恢复)
-在控制器常态的伺服驱动流中（即每一次完整的 `run_step()` 执行周期末尾），**必须做统一且普遍的 `tick_update()` 结算**。
-*   **触发时机**：无视当前状态机处于 `REVIEW`、`LEARN_MACRO` 还是 `LEARN_MICRO`，系统的统一时钟都会在这一步终点敲击推进。
-*   **物理意义与操作**：所有节点根据该微观步中由于视框捕获而被累加的输入能量（`E_input`），带入其自身的状态机公式。完成基于生物钟的能量消散计算、状态流转（CALM $\to$ SPKE $\to$ ACTIVE $\to$ REFRACTORY），并且切实推演其激活水平增减（`node.activation_level`）。
-*   **优雅性论证**：微观扫视（`LEARN_MICRO` 阶段）既然已利用软掩模与底层刺激彻底接管了驱动力并无视了 $I_{map}$，就无需再顾虑因为正常结算使得被探视区域节点进入 REFRACTORY 状态从而影响锁定的伪命题。释放时序锁定后，才能使得宏观认知库具备健康的电位演化模型。
+Gpos 充当检索枢纽库。负责将孤立提取的特征张量 $\mathbf{w}$，放入不断变幻的输入视野流（多模矩阵字典 $X_{subspaces}$）中进行空间卷积找寻响度点。
 
-### 2. 边缘拓扑挂载的离散跃迁 (离散突变保留)
-虽然节点内部能量电位恢复为时钟步频级的丝滑变更，但外部网络拓扑结构（即边的增删改）维持原来的突变逻辑。
-*   **隔离探测存储**：处于 `LEARN_MICRO` 周期时的所有探视记录，依然作为局部孤岛，只注入暂存空间（`peripheral_buffer`），绝不实时与主锚点产生刚性物理边。
-*   **跃迁挂载点**：仅在 `LEARN_MICRO` 状态覆盖结束，系统发出重置指令且强制发生跃迁并返回 `LEARN_MACRO` 的瞬间，才发起一次 **Batch Processing**。
-*   **时序效用关联**：由于在 `LEARN_MICRO` 的几十步中，系统默默推进了 `tick_update`，当破除禁锢回归 `LEARN_MACRO` 需要计算宏观抑制掩码（$M_{GposII}$ 或 $\sum I_{spatial}^{II}$）用于引导下一跳跨度时，系统中的 GmemII 乃至 GmemI 的所有参与节点其激活值才得以爬升至丰满顶点（或正处于正常放电曲线中）。此时释放出的排斥场模型才是真实有效、严密符合物理规律的空间占用遮罩。
+### 1. 模版通道路由式投影 (L1: Modality Routing Projection)
+仅当 GmemI 节点满足准入门限（处于 ACTIVE，并且没有在 REFRACTORY 态被隔离）且具有足月起充势量时：
+将目标节点 $n$ 的核 $\mathbf{w}_n$ 对入所属通道源 $X_m$，并结合人工专家经验预置权重 $W_{mod}(m)$：
+$$S_n(\mathbf{q}) = W_{mod}(m) \cdot \Big[ \mathbf{w}_n \ast X_{m}(\mathbf{q}) \Big]$$
+上述式中 $\ast$ 为在局域 C 通道上之点积等价汇和，在整幅空间维度上表现为全局空间相似响应图（Heatmap）。
+
+*(补注：`l1_footprint_projection` 不受限源节点的平静态校验，只要存在激活迹象即强行向空间播撒投射，用于下放基盘之“足迹期望或厌恶”)*
+
+### 2. 拓扑同胚变换与结构共振网络 (L2: GposII Structure Synthesis)
+面向在当前视野找回以往记忆拓扑网络（识别复现物体）。以锚为中心对所有挂外源启动一次强行同构核准。
+
+**全息极坐标重采样 (Log-Polar Mesh Sampling)**
+搜寻全图中最契合的锚点候补中心 $\mathbf{p}_{anc_{i}} = (x_c, y_c)$。
+在该点建立局部的对数极坐标网格变换：
+$$r \leftarrow \log(\rho), \quad \theta \leftarrow \arctan\left(\frac{y}{x}\right)$$
+把此时刻下所有从属周围节点产生的 L1 特征响应场 $S_k(\mathbf{q})$ 进行张量采样剥离扭曲，转化为以核心锚为参照坐标的高维特征圆环面响应图 $S_{LP}^{(k)}$。
+
+**广义距离变换融合惩罚 (Generalized Distance Transform Approximation)**
 各个外围节点根据记录记忆历史之中心位移理想点 $(\Delta \rho_k, \Delta \theta_k)$ 并结合配置好的弹性宽容系数度，利用平滑卷积内核执行粗化弥散逼近：
 $$D^{(k)} = \mathcal{G}_{\text{blur}} \Big( S_{LP}^{(k)}(\rho - \Delta\rho_k, \theta - \Delta\theta_k) \Big)$$
 *利用卷积泛化出在偏离原记忆拓扑形状位置处响应的热力学衰减斜坡。*

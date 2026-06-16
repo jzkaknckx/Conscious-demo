@@ -73,6 +73,8 @@ class MemoryConfig:
     gamma_remote = 0.2
     saccade_sigma = 50
     foveal_sigma = 25
+    eta_foveal = 0.3
+    epsilon_foveal = 2.0
     
     # Optimizer weights
     w_base = 1.0
@@ -736,7 +738,6 @@ class Controller:
 
         # 2. Seed Initialization
         cx, cy = p_macro
-        print('cx, cy', cx, cy)
         V = torch.zeros((B, 1, H, W), device=self.device)
         V[0, 0, cy, cx] = 1.0
 
@@ -783,21 +784,64 @@ class Controller:
             idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W))
 
-    def _decide_next_saccade_macro(self, base_interest: torch.Tensor) -> Tuple[int, int]:
-        H, W = base_interest.shape[-2], base_interest.shape[-1]
+    def _decide_next_saccade_macro(self, gmem_ii: GmemoryII, S_maps: Dict[int, torch.Tensor]) -> Tuple[Tuple[int, int], torch.Tensor]:
+        I_con1 = self.optimizer.I_con1
+        H, W = I_con1.shape[-2], I_con1.shape[-1]
+        
+        sum_I_spatial_II = torch.zeros((1, 1, H, W), device=self.device)
+        print("len of gmem_ii.semantic_nodes",len(gmem_ii.semantic_nodes.values()))
+        for node in gmem_ii.semantic_nodes.values():
+            print("len of gmem_ii.peripheral_links",len(node.peripheral_links))
+            M_resp_sum = torch.zeros((1, 1, H, W), device=self.device)
+            if node.anchor_id in S_maps:
+                print("*")
+                M_resp_sum += S_maps[node.anchor_id]
+                print("anchor_id", S_maps[node.anchor_id].max(), S_maps[node.anchor_id].min())
+                print("M_resp_sum", M_resp_sum.max(), M_resp_sum.min())
+            for pid in node.peripheral_links:
+                if pid in S_maps:
+                    print("/")
+                    M_resp_sum += S_maps[pid]
+                    print("peripheral_links", S_maps[pid].max(), S_maps[pid].min())
+                    print("M_resp_sum", M_resp_sum.max(), M_resp_sum.min())
+            print("node.activation_level", node.activation_level)
+            sum_I_spatial_II += M_resp_sum * node.activation_level
+            
+        self.matrix2 = M_resp_sum
+        print("sum_I_spatial_II", sum_I_spatial_II.max(), sum_I_spatial_II.min())
+        sum_log = torch.log1p(sum_I_spatial_II)
+        if sum_log.max() > 1e-6:
+            mask_II = sum_log / sum_log.max()
+        else:
+            mask_II = torch.zeros_like(sum_log)
+            
+        I_macro = I_con1 * (1.0 - mask_II)
+        
+        if self.optimizer.H_orig is not None and self.optimizer.W_orig is not None:
+            # 保留兴趣压制：压低外围兴趣
+            h1, h2 = max(0, H//2-(self.optimizer.H_orig-self.optimizer.r)//2), min(H, H//2+(self.optimizer.H_orig-self.optimizer.r)//2)
+            w1, w2 = max(0, W//2-(self.optimizer.W_orig-self.optimizer.r)//2), min(W, W//2+(self.optimizer.W_orig-self.optimizer.r)//2)
+            I_macro[:, :, :w1, :] = 0; I_macro[:, :, w2:, :] = 0
+            I_macro[:, :, :, :h1] = 0; I_macro[:, :, :, h2:] = 0
+        
         kernel_size = 15
         padding = kernel_size // 2
-        K_lowpass = F.avg_pool2d(base_interest, kernel_size, stride=1, padding=padding)
-        self.matrix1 = K_lowpass
-        idx = torch.argmax(K_lowpass).item()
-        return (int(idx % W), int(idx // W))
+        K_lowpass = F.avg_pool2d(I_macro, kernel_size, stride=1, padding=padding)
+        
+        drive = I_macro * K_lowpass
+        self.matrix1 = drive
+        idx = torch.argmax(drive).item()
+        return (int(idx % W), int(idx // W)), drive
 
     def _decide_next_saccade_micro(self, base_interest: torch.Tensor, semantic_mask: torch.Tensor) -> Tuple[int, int]:
         H, W = base_interest.shape[-2], base_interest.shape[-1]
         cx, cy = self.fixation_point
         
-        # sigma_foveal = getattr(self.cfg, 'foveal_sigma', 25.0)
-        sigma_foveal = 10
+        A_semantic = torch.sum(semantic_mask).item()
+        eta = getattr(self.cfg, 'eta_foveal', 0.5)
+        eps = getattr(self.cfg, 'epsilon_foveal', 2.0)
+        sigma_foveal = eta * math.sqrt(A_semantic) + eps
+        
         y_grid = torch.arange(H, device=self.device).view(H, 1)
         x_grid = torch.arange(W, device=self.device).view(1, W)
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
@@ -807,7 +851,6 @@ class Controller:
         
         drive = base_interest * semantic_mask * (1.0 - self.m_aversion)
         if drive.max() < 1e-6:
-            print("drive.max() < 1e-6")
             idx = torch.randint(0, H*W, (1,)).item()
         else:
             idx = torch.argmax(drive).item()
@@ -825,13 +868,15 @@ class Controller:
         return rho > theta_exit
 
     def _transition_to_macro(self, gmem_i: GmemoryI, gmem_ii: GmemoryII):
-        self._trigger_macro_tick_update(gmem_i, gmem_ii)
         if self.active_semantic_id is not None:
             sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
             if sem_node:
                 for p in self.peripheral_buffer:
                     if p['nid'] not in sem_node.peripheral_links:
                         gmem_ii.add_peripheral(sem_node, p['nid'], p['rho'], p['theta'])
+        
+        self._trigger_macro_tick_update(gmem_i, gmem_ii)
+        
         self.peripheral_buffer.clear()
         self.active_semantic_id = None
         self.anchor_position = None
@@ -879,6 +924,7 @@ class Controller:
         
         # Generate spatial footprint projection mapping 
         S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, req_nodes)
+        self.matrix3 = S_maps_footprint 
 
         if self.state == MainPhase.REVIEW:
             recognized_sem_id = self._bfs_recognize(local_nodes, gmem_ii, self.cfg.k_depth)
@@ -941,21 +987,19 @@ class Controller:
         # Execute decision logic based on current state
         self.prev_fixation_point = self.fixation_point
         base_interest = self.optimizer.base_interest
-        if self.semantic_mask is not None:
-            print(self.semantic_mask[0, 0, cy, cx], "semantic_mask[0, 0, cy, cx]")
 
         if self.state == MainPhase.REVIEW:
             I_map = self.optimizer.calculate_I_map(active_gmem_i, active_gmem_ii, S_maps_footprint, (cx, cy))
             self.fixation_point = self._decide_next_saccade_review(I_map)
             self.current_interest_map = I_map
         elif self.state == MainPhase.LEARN_MACRO:
-            self.fixation_point = self._decide_next_saccade_macro(base_interest)
-            self.current_interest_map = base_interest
+            self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
+            self.current_interest_map = I_macro
         elif self.state == MainPhase.LEARN_MICRO:
             if self._check_micro_exit(self.semantic_mask):
                 self._transition_to_macro(gmem_i, gmem_ii)
-                self.fixation_point = self._decide_next_saccade_macro(base_interest)
-                self.current_interest_map = base_interest
+                self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
+                self.current_interest_map = I_macro
             else:
                 self.fixation_point = self._decide_next_saccade_micro(base_interest, self.semantic_mask)
                 self.current_interest_map = base_interest * self.semantic_mask
