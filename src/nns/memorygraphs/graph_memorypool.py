@@ -55,14 +55,14 @@ class MemoryConfig:
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
     T_inject_I = 0.5
-    tau_active_I = 5
+    tau_active_I = 50000
     tau_refractory_I = 10
     decay_rate_I = 0.6
     
     # Neuron Dynamics GmemII
     T_excite_II = 2
     T_inject_II = 0.5
-    tau_active_II = 15
+    tau_active_II = 15000
     tau_refractory_II = 30
     decay_rate_II = 0.95
     
@@ -73,8 +73,8 @@ class MemoryConfig:
     gamma_remote = 0.2
     saccade_sigma = 50
     foveal_sigma = 25
-    eta_foveal = 0.3
-    epsilon_foveal = 2.0
+    eta_foveal = 0.25
+    epsilon_foveal = 0.75
     
     # Optimizer weights
     w_base = 1.0
@@ -99,7 +99,7 @@ class MemoryConfig:
     lambda_con1 = 2.0
     lambda_con2 = 2.0   
     lambda_str = 2.0
-    mask_dilation_steps = 20
+    mask_dilation_steps = 200
 
 
 # =============================
@@ -606,6 +606,7 @@ class Controller:
         self.matrix1 = None
         self.matrix2 = None
         self.matrix3 = None
+        self.matrix4 = None
 
     def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
                                           gmem_i: GmemoryI, x: int, y: int, 
@@ -734,7 +735,8 @@ class Controller:
         I_str_clamp = torch.clamp(1.0 - self.cfg.lambda_str * I_str, 0.0, 1.0)
         P_surf_map = I_con1_norm * I_str_clamp
         P_edge_map = I_str_norm * I_con1_clamp
-        P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp      
+        P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp
+        self.matrix1 = P_surf_map
 
         # 2. Seed Initialization
         cx, cy = p_macro
@@ -744,7 +746,13 @@ class Controller:
         # 3. Iterative Matrix Dilation
         pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
         for _ in range(self.cfg.mask_dilation_steps):
-            V = pool(V) * P_surf_map
+            V_next = pool(V) * P_surf_map
+            A_V = torch.sum(V).item()
+            A_Vn = torch.sum(V_next).item()
+            if (A_Vn - A_V) / (A_V + 1e-6) < 1e-3:
+                break
+            V = V_next
+            # V = pool(V) * P_surf_map
 
         edge_pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
         for _ in range(5):
@@ -758,7 +766,7 @@ class Controller:
         alpha = self.cfg.alpha_mask
         beta = self.cfg.beta_mask
         M_semantic = torch.sigmoid(alpha * V - beta)
-        M_semantic[M_semantic < 0.0068] = 0
+        M_semantic[M_semantic < 0.01] = 0
 
         return M_semantic
 
@@ -789,33 +797,29 @@ class Controller:
         H, W = I_con1.shape[-2], I_con1.shape[-1]
         
         sum_I_spatial_II = torch.zeros((1, 1, H, W), device=self.device)
-        print("len of gmem_ii.semantic_nodes",len(gmem_ii.semantic_nodes.values()))
         for node in gmem_ii.semantic_nodes.values():
-            print("len of gmem_ii.peripheral_links",len(node.peripheral_links))
             M_resp_sum = torch.zeros((1, 1, H, W), device=self.device)
             if node.anchor_id in S_maps:
-                print("*")
                 M_resp_sum += S_maps[node.anchor_id]
-                print("anchor_id", S_maps[node.anchor_id].max(), S_maps[node.anchor_id].min())
-                print("M_resp_sum", M_resp_sum.max(), M_resp_sum.min())
             for pid in node.peripheral_links:
                 if pid in S_maps:
-                    print("/")
                     M_resp_sum += S_maps[pid]
-                    print("peripheral_links", S_maps[pid].max(), S_maps[pid].min())
-                    print("M_resp_sum", M_resp_sum.max(), M_resp_sum.min())
-            print("node.activation_level", node.activation_level)
+            print("activation_level", node.activation_level)
             sum_I_spatial_II += M_resp_sum * node.activation_level
-            
-        self.matrix2 = M_resp_sum
-        print("sum_I_spatial_II", sum_I_spatial_II.max(), sum_I_spatial_II.min())
+            # sum_I_spatial_II += M_resp_sum
+        self.matrix4 = sum_I_spatial_II
+        sum_I_spatial_II = sum_I_spatial_II.clamp(min=0.0)
         sum_log = torch.log1p(sum_I_spatial_II)
+        print("sum_I_spatial_II", sum_I_spatial_II.max(), sum_I_spatial_II.min())
+        print("sum_log", sum_log.max(), sum_log.min())
         if sum_log.max() > 1e-6:
             mask_II = sum_log / sum_log.max()
         else:
             mask_II = torch.zeros_like(sum_log)
             
         I_macro = I_con1 * (1.0 - mask_II)
+        self.matrix2 = I_macro
+        self.matrix3 = mask_II
         
         if self.optimizer.H_orig is not None and self.optimizer.W_orig is not None:
             # 保留兴趣压制：压低外围兴趣
@@ -829,7 +833,6 @@ class Controller:
         K_lowpass = F.avg_pool2d(I_macro, kernel_size, stride=1, padding=padding)
         
         drive = I_macro * K_lowpass
-        self.matrix1 = drive
         idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W)), drive
 
@@ -838,14 +841,15 @@ class Controller:
         cx, cy = self.fixation_point
         
         A_semantic = torch.sum(semantic_mask).item()
-        eta = getattr(self.cfg, 'eta_foveal', 0.5)
-        eps = getattr(self.cfg, 'epsilon_foveal', 2.0)
+        eta = self.cfg.eta_foveal
+        eps = self.cfg.epsilon_foveal
         sigma_foveal = eta * math.sqrt(A_semantic) + eps
+        # print("sigma_foveal", sigma_foveal, "A_semantic", A_semantic, "A_semantic_sqrt", math.sqrt(A_semantic))
         
         y_grid = torch.arange(H, device=self.device).view(H, 1)
         x_grid = torch.arange(W, device=self.device).view(1, W)
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
-        
+
         aversion_pt = torch.exp(-dist_sq / (2 * sigma_foveal**2)).view(1, 1, H, W)
         self.m_aversion = torch.max(self.m_aversion, aversion_pt)
         
@@ -865,6 +869,7 @@ class Controller:
         covered = torch.sum(self.m_aversion * semantic_mask).item()
         rho = covered / sum_mask
         theta_exit = 0.85
+        # print("rho", rho, "covered", covered, "sum_mask", sum_mask, "self.m_aversion", torch.sum(self.m_aversion).item())
         return rho > theta_exit
 
     def _transition_to_macro(self, gmem_i: GmemoryI, gmem_ii: GmemoryII):
@@ -874,8 +879,6 @@ class Controller:
                 for p in self.peripheral_buffer:
                     if p['nid'] not in sem_node.peripheral_links:
                         gmem_ii.add_peripheral(sem_node, p['nid'], p['rho'], p['theta'])
-        
-        self._trigger_macro_tick_update(gmem_i, gmem_ii)
         
         self.peripheral_buffer.clear()
         self.active_semantic_id = None
@@ -924,7 +927,20 @@ class Controller:
         
         # Generate spatial footprint projection mapping 
         S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, req_nodes)
-        self.matrix3 = S_maps_footprint 
+
+        # Cross-layer energy aggregation for semantic nodes (GmemII)
+        if self.state == MainPhase.LEARN_MICRO and getattr(self, 'active_semantic_id', None) is not None:
+            self.E_input_gmem_ii_acc[self.active_semantic_id] += 1.0
+            
+        for sem_node in gmem_ii.semantic_nodes.values():
+            overlap_val = 0.0
+            if sem_node.anchor_id in S_maps_footprint:
+                overlap_val += S_maps_footprint[sem_node.anchor_id][0, 0, cy, cx].item()
+            for pid in sem_node.peripheral_links:
+                if pid in S_maps_footprint:
+                    overlap_val += S_maps_footprint[pid][0, 0, cy, cx].item()
+            if overlap_val > 0.0:
+                self.E_input_gmem_ii_acc[sem_node.node_id] += overlap_val
 
         if self.state == MainPhase.REVIEW:
             recognized_sem_id = self._bfs_recognize(local_nodes, gmem_ii, self.cfg.k_depth)
@@ -1003,6 +1019,8 @@ class Controller:
             else:
                 self.fixation_point = self._decide_next_saccade_micro(base_interest, self.semantic_mask)
                 self.current_interest_map = base_interest * self.semantic_mask
+
+        self._trigger_macro_tick_update(gmem_i, gmem_ii)
 
 
 # =============================

@@ -21,8 +21,12 @@
 *   **计算模型**：
     原采用历史空间的累积抑制 $\sum I_{spatial}^{II}$ 易造成时序衰减或重置，导致抑制失效，引发系统在探索上的周期性震荡（如11步循环死锁）。现调整为直接获取高阶位置图网络（GposII）对当前视野的真实空间位置响应图 $M_{GposII}$ 作为绝对掩码约束。
     $$I_{macro}(\mathbf{q}) = I_{con1}(\mathbf{q}) \odot \left(1 - \operatorname{Norm}(M_{GposII}(\mathbf{q})) \right)$$
-    利用形态学空间低通滤波 $K_{lowpass}$ 进行平滑以剔除高频孤立噪声：
-    $$p_{next} = \arg\max \left( I_{macro} * K_{lowpass} \right)$$
+*   **全局已探索实体排斥保险机制**：
+    为了防止状态跃迁早期，高阶神经元的抑制响应由于电位攀升时延而尚未来得及生效，在宏观驱动模型中额外引入历史上全部微观扫描产生的真实掩模之和 $\sum M_{semantic\_history}$ 的绝对排压干预（如采用 `max` 合并或叠加惩罚），确保系统不会在任何已经被啃食殆尽的“枯竭坑洞”内再次寻找锚点：
+    $$M_{suppress} = \max \left( \operatorname{Norm}(M_{GposII}) , c \cdot \operatorname{Norm} \left( \textstyle\sum M_{semantic\_history} \right) \right)$$
+    （其中 $c$ 为惩罚权重常数）
+    随后利用形态学空间低通滤波 $K_{lowpass}$ 对带有联合绝缘屏蔽的 $I_{macro}$ 进行平滑，以剔除高频孤立噪声：
+    $$p_{next} = \arg\max \left( \left( I_{macro} \odot (1 - M_{suppress}) \right) * K_{lowpass} \right)$$
     以此确保宏观观察点准确降落在未被建构认知区域的大面积连续面状色块的几何中心。
 
 ### 3. LEARN_MICRO 状态（微观特征精细扫描阶段）
@@ -62,93 +66,23 @@
 *   **隔离探测存储**：处于 `LEARN_MICRO` 周期时的所有探视记录，依然作为局部孤岛，只注入暂存空间（`peripheral_buffer`），绝不实时与主锚点产生刚性物理边。
 *   **跃迁挂载点**：仅在 `LEARN_MICRO` 状态覆盖结束，系统发出重置指令且强制发生跃迁并返回 `LEARN_MACRO` 的瞬间，才发起一次 **Batch Processing**。
 *   **时序效用关联**：由于在 `LEARN_MICRO` 的几十步中，系统默默推进了 `tick_update`，当破除禁锢回归 `LEARN_MACRO` 需要计算宏观抑制掩码（$M_{GposII}$ 或 $\sum I_{spatial}^{II}$）用于引导下一跳跨度时，系统中的 GmemII 乃至 GmemI 的所有参与节点其激活值才得以爬升至丰满顶点（或正处于正常放电曲线中）。此时释放出的排斥场模型才是真实有效、严密符合物理规律的空间占用遮罩。
-各个外围节点根据记录记忆历史之中心位移理想点 $(\Delta \rho_k, \Delta \theta_k)$ 并结合配置好的弹性宽容系数度，利用平滑卷积内核执行粗化弥散逼近：
-$$D^{(k)} = \mathcal{G}_{\text{blur}} \Big( S_{LP}^{(k)}(\rho - \Delta\rho_k, \theta - \Delta\theta_k) \Big)$$
-*利用卷积泛化出在偏离原记忆拓扑形状位置处响应的热力学衰减斜坡。*
 
-**宏观结构共振坍缩 (Total Peak Resonance & Saccade Yield)**
-汇聚出物体拓扑复燃结构图，其最高山峰指出此帧变形与偏差参数位姿：
-$$D_{sum}(\rho_{grid}, \theta_{grid}) = \sum_{k} D^{(k)}(\rho_{grid}, \theta_{grid})$$
-寻找 $\operatorname{argmax}(D_{sum})$。其解除了印证被寻找主体于视野的可靠存在（Score 置信评分叠加）外，坐标偏移直接解译了主体此刻相较早前发生了何种扭转与伸缩尺度（$\theta_{star}, s_{star}$）。
+## 五、拓扑掩码蔓延的自适应终止优化 (Dynamic Early Stopping)
+在软光圈掩模 $M_{semantic}$ 的生成过程中，张量池化阻力扩散操作（`V_next = pool(V) * P_surf_map` 级联迭代）过去一直采用固定的步数（`mask_dilation_steps`）。这极易引发两类缺陷：一是固定步数在小色块上造成计算资源浪费，二是对于巨大的纯色面又容易出现“蔓延不充分”。
 
----
+由此我们对掩模生成循环引入了**面积变化率动态终止协议**：
+监控相邻传播步张量 $V$ 对空间面积的能量积分变化率 $\Delta \rho = \frac{|A_{t+1} - A_t|}{A_t + \epsilon}$。
+当拓展蔓延由于环境阻力（高频边缘或强梯度的衰减壁）的影响发生停滞（如 $\Delta \rho < 10^{-3}$），表明掩空间拓扑边界已被完全穷尽包裹，此时**果断截断循环**，提前生成软光圈。这不但大大减少了冗余算力消耗，同时极大保证了语义轮廓切割时的收缩贴合度。
+针对调试小组指出的“`SemanticNode` 节点 `activation_level` 恒定为 `0.0`”的重大漏洞，必须严格补全控制器单步执行（`run_step`）中对高阶图网络（GmemII）的能量采撷与聚合逻辑。这一修复与前述的时钟更新机制共同构成了感知节点状态演化的系统级物理闭环。
 
-## 三、 算法执行流与交互动力机制 (Execution Flow & Interaction Dynamics)
+### 1. 跨层能量捕获与向上传发机制 (Energy Aggregation)
+在控制器的微观探索或其他视野驻留期间，目前仅实现了对低阶图库（GmemI）节点的视框曝光电荷累加，为彻底盘活高级网络层，必须**补建向上传递的跨层联觉激活刺激**：
+*   **定向主充能**：在系统处于 `LEARN_MICRO` 微观辖区精细扫描状态时，当前正在被深耕挖掘的主导对象（即受 `active_semantic_id` 监管的顶级 `SemanticNode`）实际上承载了这片辖区的信息核心地位。必须在每一个微观观测步中不仅记录底层节点，更要直接给予该上层母节点能量哺育。即实质性地为该目标累加刺激输入：`E_input_gmem_ii_acc[active_semantic_id] += E_stimulus`（如单步常量 $1.0$ 或折算的辖区注意力强度）。
+*   **全景空间耦合反馈**：若在宏观跳跃或其他检索模式下，眼跳聚焦点与先验高层语义结节在空间上发生重叠与激活触发（如经由 GposII 或位置响应图的唤醒反馈），也同样应当顺应视野注意力的真实掠过，按重叠系数度量并录入相应的高阶输入增量至 `E_input_gmem_ii_acc` 中。
 
-数据池 Gmem 等待激活，检索网 Gpos 提供空间映射引擎，而连接二者的核心动力即在于 **InterestOptimizer 空间动力学优化算子**与 **Controller 宏微观双轨眼跳伺服状态机**。两者的持续交火涌现出视觉注意力的自发转移路径。
-
-### 1. 异构底层特征基场预处理 (Static Base Map Construction)
-每输入一帧新图像体系，首先对其多通道进行属性解耦与过滤：
-- **强度引力场** (STRENGTH): 纯振幅提取 $I_{str}(\mathbf{q}) = \sum w_{c} X_{str,c}(\mathbf{q})$
-- **表面期望场** (CONTINUITY_SURFACE): 各向同性连续度平滑评估 $val_{surf}(\mathbf{q}) = \exp(-\frac{\|\nabla X_{surf,c}(\mathbf{q})\|^2}{2\sigma_{surf}^2})$
-- **线域期望场** (CONTINUITY_TRACE): 求取局域局部张量场一致相干态，计算矢量模长的平滑衰减，聚合出 $I_{trace}(\mathbf{q})$。
-融合构建出静态全视角起跳基盘：$I_{base}(\mathbf{q}) = I_{str}(\mathbf{q}) + w_s I_{surf}(\mathbf{q}) + w_t I_{trace}(\mathbf{q})$。
-
-### 2. 空心化促进与绝压陨石坑双模空间调制场 (Spatial Activation Footprint)
-眼跳扫描进程中，Gmem 记忆池中正在起振的节点将自身内生神经元振幅 $A_n(t)$ 投射回全图，演化为截然不同的动态阻滞空间足迹 $I_{spatial}$。结合 Gpos 供给的空间相似回响盘 $M_{resp}^{(n)}(\mathbf{q})$，利用绝对值构建出代数统一的双高斯投影调和：
-$$I_{spatial}^{(n)}(\mathbf{q}) = M_{resp}^{(n)}(\mathbf{q}) \cdot \Big( A_n(t) \cdot G_{local}(\mathbf{q}, \mathbf{p}_t) - |A_n(t)| \cdot G_{foveal}(\mathbf{q}, \mathbf{p}_t) \Big)$$
-- **兴奋游走期 (ACTIVE, $A_n > 0$)**: 场表现为高斯差分（DoG 空心化促进场）。原心靶点处收益抵消趋 0，但在边外围产生诱导晕环，迫使系统自然向邻近未探索的同质介质滑步游走，断绝高分原地横跳死翘。
-- **疲劳不应期 (REFRACTORY, $A_n = -1$)**: 公式中差号塌缩成叠加。在曾经走过的热区原地砸出极为深不可测的“连贯陨石坑”（Crater Inhibition）并下施外放全局阴影压制。
-
-实时地形算谱将整合计算这片起伏不定的大陆拓扑：
-$$I_{map}(\mathbf{q}) = w_{base} I_{base}(\mathbf{q}) + w_{spI} \sum I_{spatialI} + w_{spII} \sum I_{spatialII}$$
-
-### 3. 微观纯化拓扑掩码的涌现 (Topologic Semantic Mask Diffusion)
-在建立 GmemII 锚点 (Anchor) 初期，基于纯提取出来的 `CONTINUITY_SURFACE` 类型节点以防范高频噪声导致的结构错乱，生成用于约束视野流的软拓扑掩码。
-**通透率介质导通阻力 $P_{map}$**: 用纯面 Gpos 相似性 $M_{resp\_con}$，叠加 $I_{str}$ 获取之物理锐利物切边作流控阻墙阻断连通性：
-$$P_{map}(\mathbf{q}) = M_{resp\_con}(\mathbf{q}) \cdot \operatorname{Sigmoid}(1 - \lambda \cdot I_{str}(\mathbf{q}))$$
-**张量蔓延扩散引擎 (Max-Pool Tensor Dilation)**:
-设定注视点原初星火 $V_0(\mathbf{p}_{macro}) = 1.0$。基于内置算子持续快速膨胀：
-$$V_{t+1} = \text{MaxPool2d}(V_t) \odot P_{map}$$
-直至完成预期探索直径内，截定锐化：$M_{semantic}(\mathbf{q}) = \operatorname{Sigmoid}(\gamma \cdot V_T(\mathbf{q}) - \delta)$
-
-### 4. Controller 双极流状态机伺服循环 (Macro / Micro Saccade Control)
-
-#### 4.1 系统依凭底层场形动力构建一套全自动的扫描、探视再遗忘的高级流转。
-
-- **第一极 (Macro-Saccade - 全域猎捕跃迁)**:
-  系统处于清空无拘束态（$M_{semantic} = null$）。视界以最原始和最活跃之 $I_{map}$ 制高点驱动进行大跨度飞腾跳跑 $\mathbf{p}_{macro}$。
-  落地时执行严谨审查准入录入 GmemI（对于门限值低的碎屑点直接废弃屏蔽不记录）。创建建立 GmemII 结构锚 Anchor。随后即刻通过上述过程唤起拓扑掩码涌现过程。
-
-- **第二极 (Micro-Saccade - 锁区贪婪挖掘)**:
-  辖区光圈出现。注意力兴趣被粗暴一刀切绝于禁区外侧：$I_{masked} = I_{map} \odot M_{semantic}$。
-  眼跳罚距迅速坍缩变为微距控制圈 $\sigma_{micro}$，确保眼跳链只能牢牢绑定在辖区身躯表皮及边缘上走钢丝。它在限制辖区内对连续暴露并挑出之最抢眼目标 $I_{masked\_max}$ 重复吞食，建立外围关联极元节点置入 Anchor 中附庸挂载。
-
-- **第三终结 (Breakout - 辖区榨衰破溃)**:
-  高分节点看一个死一个。满坑满谷全是 REFRACTORY 负压陨石坑的掩模图内部全面崩坏坠崖。
-  当全局探顶评估 $\max(I_{masked}) < \epsilon$ 时，确认此物体区域被解构收榨彻底完成。
-  当即销毁清除软光圈掩码矩阵 $M_{semantic} \to \text{None}$ 及抹除语义对象专有锁定态。机器解除罚步脚镣，视野重见天日，在辖区外茫茫深山未知迷雾的远核再次起跳复归 Macro Saccade 猎寻环节。
-
-#### 4.2 眼跳驱动策略
-
-1. REVIEW 状态（记忆验证阶段）
-*   **驱动目标**：对已有记忆特征（`interest_map`）高响应区域进行复查。
-*   **计算模型**：注视点 $p_{next}$ 取决于记忆兴趣值与空间抑制的结合。
-    $$p_{next} = \arg\max \left[ I_{map}(\mathbf{q}) - \alpha \cdot IoR(\mathbf{q}) - \gamma \cdot Dist(\mathbf{p}_{curr}, \mathbf{q}) \right]$$
-*   **IoR演化**：全局抑制图 $IoR(\mathbf{q})$ 每次注视后在当前点 $\mathbf{p}_{curr}$ 进行高斯叠加并自然衰减，强制打破多次定焦死锁。
-
-2. LEARN_MACRO 状态（宏观锚点搜索阶段）
-*   **驱动目标**：寻找视觉中大面积连续平坦色块区域，并**严格规避已经探索建构的物体（语义特征团）辖区**。
-*   **计算模型**：
-    原采用历史空间的累积抑制 $\sum I_{spatial}^{II}$ 易造成时序衰减或重置，导致抑制失效，引发系统在探索上的周期性震荡（如11步循环死锁）。现调整为直接获取高阶位置图网络（GposII）对当前视野的真实空间位置响应图 $M_{GposII}$ 作为绝对掩码约束。
-    $$I_{macro}(\mathbf{q}) = I_{con1}(\mathbf{q}) \odot \left(1 - \operatorname{Norm}(M_{GposII}(\mathbf{q})) \right)$$
-    利用形态学空间低通滤波 $K_{lowpass}$ 进行平滑以剔除高频孤立噪声：
-    $$p_{next} = \arg\max \left( I_{macro} * K_{lowpass} \right)$$
-    以此确保宏观观察点准确降落在未被建构认知区域的大面积连续面状色块的几何中心。
-
-3. LEARN_MICRO 状态（微观特征精细扫描阶段）
-*   **驱动目标**：在软掩模 $M_{semantic}$ 限制下的辖区内深度扫描，并实行与该视野面积特征自适应的眼跳约束。
-*   **计算模型**：
-    回归无偏的底层特征，且仅对软掩模辖区激发。
-    $$p_{next} = \arg\max \left( S_{base}(\mathbf{q}) \odot M_{semantic}(\mathbf{q}) \odot (1 - M_{aversion}(\mathbf{q})) \right)$$
-*   **动态扫描步长（自适应 $\sigma_{fovea}$）与厌恶足迹机制**：
-    固定步长面对比例悬殊的掩码时，极易造成局部遍历过载或边缘越界。需引入几何面积向一维跨度投射的动态调节因子 $\sigma_{fovea}$（映射当前微观扫视的步幅与抑制半径）：
-    计算语义掩码面积积分 $A_{semantic} = \sum M_{semantic}(\mathbf{q})$
-    进行量纲对齐并缩放生成步幅：
-    $$\sigma_{fovea} = \eta \cdot \sqrt{A_{semantic}} + \epsilon_{base}$$
-    （其中 $\eta$ 为缩放常数，$\epsilon_{base}$ 确保基础解析限度）
-    每次产生新注视点 $\mathbf{p}_i$ 后，使用该自适应 $\sigma_{fovea}$ 在周围施加抑制分布：
-    $$M_{aversion}^{(t+1)}(\mathbf{q}) = \max \left( M_{aversion}^{(t)}(\mathbf{q}) , \exp \left( -\frac{||\mathbf{q} - \mathbf{p}_i||^2}{2\sigma_{fovea}^2} \right) \right)$$
-*   **退出条件计算**：每次眼跳检查自适应厌恶足迹对当前语义结构的覆盖率指标 $\rho$：
-    $$\rho = \frac{\sum (M_{aversion} \odot M_{semantic})}{A_{semantic}}$$
-    若 $\rho > \theta_{exit}$ （通常设为 $0.85$ 左右），表示该面状区内信息扫描已达期望水平，触发状态机无条件退出至 `LEARN_MACRO`。
+### 2. 生态闭环的打通与有效力场的显现
+**物理意义决断与修复效益**：
+唯有在运行步内切实保障了 `E_input_gmem_ii_acc > 0` 的有效输送，并配以第三节中确立的在 `run_step()` 末尾的普遍单步 `tick_update()` 结算，`SemanticNode` 状态机的运转链条才算真正咬合驱动：
+1.  **脱离怠速死锁**：当系统在 `LEARN_MACRO` 执行降落验核确立心锚（通过实例化赋予初始状态值 `CALM` 与 `activation_level = 0.0`）后进入锁区收割。在漫长微观扫视的每一步中，该父级语义锚点由于得到了真实的跨层哺育，不再接收 `E_input = 0.0` 的无效空转刺激。
+2.  **势能跨越与引燃暴涨**：真实涌入的 `E_input` 参与时序化公式更新：`activation_level = activation_level * decay_rate + E_input`。该锚点的电位将在数次有效观测中迅速攀升并一举突破阈值红线 `T_excite_II`，从而成功引燃状态跨度，由沉寂态跃入 `ACTIVE`（甚至巅峰级的 `REFRACTORY`）。
+3.  **宏观排斥力场的真正显现**：当视野突围跳出，状态机回归宏观寻找阶段（`LEARN_MACRO`）时，系统计算掩护阻力（$M_{GposII}$ 或 $\sum I_{spatial}^{II}$）所依赖的所有已建构认知的 GmemII 节点网络，终将由于节点挂载了坚实、正常、充盈的 `activation_level` 参数，发挥真实的压制表现！这将严密履行彻底规避历史认知废墟的架构初衷，规避盲目循环震荡，展示算法的理论张力与模型架构的全局优雅性。
