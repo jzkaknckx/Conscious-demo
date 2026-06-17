@@ -44,13 +44,13 @@ class MemoryConfig:
         3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # aspect
         4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # orientation
     }
-    sigma_surf = 0.1
+    sigma_surf = 0.5
     sigma_trace = 0.5
     
     # [新增] 动态写入门限
-    tau_str_gate = 0.2
-    tau_surf_gate = 0.5
-    tau_trace_gate = 0.6
+    tau_str_gate = 0.6
+    tau_surf_gate = 0.99
+    tau_trace_gate = 0.8
 
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
@@ -98,8 +98,8 @@ class MemoryConfig:
     epsilon_breakout = 0.05
     lambda_con1 = 2.0
     lambda_con2 = 2.0   
-    lambda_str = 2.0
-    mask_dilation_steps = 200
+    lambda_str = 0.7
+    mask_dilation_steps = 20000
 
 
 # =============================
@@ -600,7 +600,15 @@ class Controller:
         
         # Semantic Mask / Macro-Micro Saccade
         self.semantic_mask: Optional[torch.Tensor] = None
+        self.semantic_history: Optional[torch.Tensor] = None
         self.sigma_micro: float = 50.0
+
+        # Run-step specific maps and buffers
+        self.ior_map: Optional[torch.Tensor] = None
+        self.m_aversion: Optional[torch.Tensor] = None
+        self.peripheral_buffer: List[Dict] = []
+        self.E_input_gmem_i_acc = defaultdict(float)
+        self.E_input_gmem_ii_acc = defaultdict(float)
 
         # trail
         self.matrix1 = None
@@ -625,12 +633,14 @@ class Controller:
                     continue
                 vc = X_m[0, c, y, x].item()
                 if attr == 'STRENGTH':
+                    print("vc", vc)
                     if abs(vc) > self.cfg.tau_str_gate:
                         valid_mask[0, c] = 1.0
                 elif attr == 'CONTINUITY_SURFACE':
                     dx = X_m[0, c, y, min(x+1, W-1)].item() - vc
                     dy = X_m[0, c, min(y+1, H-1), x].item() - vc
                     sc = math.exp(-(dx**2 + dy**2) / (2 * self.cfg.sigma_surf**2))
+                    print("sc", sc)
                     if sc > self.cfg.tau_surf_gate:
                         valid_mask[0, c] = 1.0
                 elif attr == 'CONTINUITY_TRACE':
@@ -641,6 +651,7 @@ class Controller:
                     v_x = torch.cos(local_window)
                     v_y = torch.sin(local_window)
                     coherence = torch.sqrt(torch.sum(v_x)**2 + torch.sum(v_y)**2) / (local_window.numel() + 1e-6)
+                    print("coherence", coherence)
                     if coherence.item() > self.cfg.tau_trace_gate:
                         valid_mask[0, c] = 1.0
                         
@@ -660,7 +671,8 @@ class Controller:
                     if sim > best_sim:
                         best_sim = sim
                         matched_node = node
-            
+                        
+            print("best_sim", best_sim, "0.85")
             if matched_node and best_sim >= similarity_threshold:
                 matched_node.count += 1
                 matched_node.last_seen = time.time()
@@ -733,10 +745,20 @@ class Controller:
         I_con1_clamp = torch.clamp(1.0 - self.cfg.lambda_con1 * I_con1, 0.0, 1.0)
         I_con2_clamp = torch.clamp(1.0 - self.cfg.lambda_con2 * I_con2, 0.0, 1.0)
         I_str_clamp = torch.clamp(1.0 - self.cfg.lambda_str * I_str, 0.0, 1.0)
+
         P_surf_map = I_con1_norm * I_str_clamp
+        # P_surf_map = I_str_clamp
+
         P_edge_map = I_str_norm * I_con1_clamp
         P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp
+
+        P_surf_map[P_surf_map < 0.01] = 0
+        P_surf_map[P_surf_map > 0.98] = 1
+
         self.matrix1 = P_surf_map
+        self.matrix2 = I_con1_norm
+        self.matrix3 = I_str_clamp
+        # self.matrix1 = I_con1_norm
 
         # 2. Seed Initialization
         cx, cy = p_macro
@@ -766,8 +788,7 @@ class Controller:
         alpha = self.cfg.alpha_mask
         beta = self.cfg.beta_mask
         M_semantic = torch.sigmoid(alpha * V - beta)
-        M_semantic[M_semantic < 0.01] = 0
-
+        M_semantic[M_semantic < 0.05] = 0
         return M_semantic
 
     def _decide_next_saccade_review(self, I_map: torch.Tensor) -> Tuple[int, int]:
@@ -804,7 +825,6 @@ class Controller:
             for pid in node.peripheral_links:
                 if pid in S_maps:
                     M_resp_sum += S_maps[pid]
-            print("activation_level", node.activation_level)
             sum_I_spatial_II += M_resp_sum * node.activation_level
             # sum_I_spatial_II += M_resp_sum
         self.matrix4 = sum_I_spatial_II
@@ -817,9 +837,15 @@ class Controller:
         else:
             mask_II = torch.zeros_like(sum_log)
             
-        I_macro = I_con1 * (1.0 - mask_II)
-        self.matrix2 = I_macro
-        self.matrix3 = mask_II
+        semantic_history_norm = torch.zeros_like(mask_II)
+        if self.semantic_history is not None:
+            if self.semantic_history.max() > 1e-6:
+                semantic_history_norm = self.semantic_history / self.semantic_history.max()
+                
+        c_suppress = getattr(self.cfg, 'c_suppress', 1.0)
+        M_suppress = torch.max(mask_II, c_suppress * semantic_history_norm)
+        
+        I_macro = I_con1 * (1.0 - M_suppress)
         
         if self.optimizer.H_orig is not None and self.optimizer.W_orig is not None:
             # 保留兴趣压制：压低外围兴趣
@@ -880,6 +906,11 @@ class Controller:
                     if p['nid'] not in sem_node.peripheral_links:
                         gmem_ii.add_peripheral(sem_node, p['nid'], p['rho'], p['theta'])
         
+        if self.semantic_mask is not None:
+            # semantic_mask_norm = self.semantic_mask / self.semantic_mask.max()
+            semantic_mask_bin = self.semantic_mask > 0.0
+            self.semantic_history += semantic_mask_bin
+
         self.peripheral_buffer.clear()
         self.active_semantic_id = None
         self.anchor_position = None
@@ -903,18 +934,15 @@ class Controller:
         B, C, H, W = list(X_subspaces.values())[0].shape
         cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
 
-        if getattr(self, 'ior_map', None) is None:
+        if self.ior_map is None:
             self.ior_map = torch.zeros((1, 1, H, W), device=self.device)
             self.m_aversion = torch.zeros((1, 1, H, W), device=self.device)
+            self.semantic_history = torch.zeros((1, 1, H, W), device=self.device)
             self.peripheral_buffer = []
 
         local_nodes = self._extract_and_match_local_features(X_subspaces, gmem_i, cx, cy)
         print('local_nodes: ', len(local_nodes))
         
-        if not hasattr(self, 'E_input_gmem_i_acc'):
-            self.E_input_gmem_i_acc = defaultdict(float)
-            self.E_input_gmem_ii_acc = defaultdict(float)
-            
         for n in local_nodes:
             self.E_input_gmem_i_acc[n.node_id] += 1.0
 
@@ -929,7 +957,7 @@ class Controller:
         S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, req_nodes)
 
         # Cross-layer energy aggregation for semantic nodes (GmemII)
-        if self.state == MainPhase.LEARN_MICRO and getattr(self, 'active_semantic_id', None) is not None:
+        if self.state == MainPhase.LEARN_MICRO and self.active_semantic_id is not None:
             self.E_input_gmem_ii_acc[self.active_semantic_id] += 1.0
             
         for sem_node in gmem_ii.semantic_nodes.values():
@@ -973,6 +1001,7 @@ class Controller:
                      self.active_semantic_id = new_sem_node.node_id
                      self.anchor_position = (cx, cy)
                      self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
+                     print("_generate_semantic_mask1")
                  else:
                      self._transition_to_macro(gmem_i, gmem_ii)
                      
@@ -998,6 +1027,7 @@ class Controller:
                 new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
                 self.active_semantic_id = new_sem_node.node_id
                 self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
+                print("_generate_semantic_mask2")
                 self.state = MainPhase.LEARN_MICRO
 
         # Execute decision logic based on current state
