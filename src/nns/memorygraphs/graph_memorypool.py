@@ -36,10 +36,18 @@ class MemoryConfig:
         4: 0.3,
     }
     
+    feature_types = {
+        0: {'intensity': [0], 'property': {1: 2.0}},
+        1: {'intensity': [], 'property': {0: 1.0}},
+        2: {'intensity': [0, 1, 2], 'property': {}},
+        3: {'intensity': [], 'property': {0: 1.0, 1: 1.0, 2: 1.0}},
+        4: {'intensity': [], 'property': {0: 2.0, 1: 2.0, 2: 2.0}}
+    }
+    
     # [修改] 通道属性划分 (STRENGTH vs CONTINUITY_SURFACE vs CONTINUITY_TRACE vs IGNORE)
     feature_attributes = {
         0: {0: 'STRENGTH', 1: 'CONTINUITY_TRACE'},   # grad: 0=intensity, 1=orientation
-        1: {0: 'CONTINUITY_SURFACE', 1: 'CONTINUITY_SURFACE'}, # hue, etc.
+        1: {0: 'CONTINUITY_SURFACE'}, # hue, etc.
         2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},     # curvature components
         3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # aspect
         4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # orientation
@@ -233,6 +241,103 @@ class GmemoryII:
 
 
 # =============================
+# Similarity Engine
+# =============================
+class SimilarityEngine:
+    @staticmethod
+    def sim_conv1x1(X: torch.Tensor, W: torch.Tensor) -> torch.Tensor:
+        """
+        方案 A: 经典 1x1 卷积点积相似度检索
+        X: (B, C, H, W) or (B, C)
+        W: (1, C, 1, 1) or (1, C)
+        """
+        if X.dim() == 4:
+            return torch.sum(X * W, dim=1, keepdim=True)
+        else:
+            return torch.sum(X * W, dim=1, keepdim=True)
+
+    @staticmethod
+    def sim_property(X: torch.Tensor, W: torch.Tensor, periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
+        """
+        方案 B: 连续欧几里得展开与高阶三角内积相似度检索 (Trigonometric Embedding)
+        """
+        sum_sim = 0
+        count = 0
+        for c, k in periods.items():
+            print("c", c, "k", k, "X", X.shape, "W", W.shape)
+            if X.dim() == 4:
+                Xc = X[:, c:c+1, :, :]
+                Wc = W[:, c:c+1, :, :]
+            else:
+                Xc = X[:, c:c+1]
+                Wc = W[:, c:c+1]
+            S_raw = torch.cos(k * (Xc - Wc))
+            S_prop = torch.pow(torch.clamp(S_raw, min=0.0), gamma)
+            print("Xc", Xc.shape, "Wc", Wc.shape, "S_raw", S_raw.shape, "S_prop", S_prop.shape)
+            sum_sim += S_prop
+            count += 1
+        if count == 0:
+            if X.dim() == 4:
+                return torch.ones((X.shape[0], 1, X.shape[2], X.shape[3]), device=X.device)
+            else:
+                return torch.ones((X.shape[0], 1), device=X.device)
+        return sum_sim / count
+
+    @staticmethod
+    def sim_mixed(X: torch.Tensor, W: torch.Tensor, intensity_channels: List[int], property_periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
+        """
+        方案 C: 混合属性相似度检索 (即主强门控与特征解耦双规并行)
+        """
+        if len(intensity_channels) > 0:
+            if X.dim() == 4:
+                X_int = X[:, intensity_channels, :, :]
+                W_int = W[:, intensity_channels, :, :]
+            else:
+                X_int = X[:, intensity_channels]
+                W_int = W[:, intensity_channels]
+            S_int = torch.sum(X_int * W_int, dim=1, keepdim=True)
+        else:
+            if X.dim() == 4:
+                S_int = torch.ones((X.shape[0], 1, X.shape[2], X.shape[3]), device=X.device)
+            else:
+                S_int = torch.ones((X.shape[0], 1), device=X.device)
+
+        if len(property_periods) > 0:
+            S_prop = SimilarityEngine.sim_property(X, W, property_periods, gamma)
+        else:
+            if X.dim() == 4:
+                S_prop = torch.ones((X.shape[0], 1, X.shape[2], X.shape[3]), device=X.device)
+            else:
+                S_prop = torch.ones((X.shape[0], 1), device=X.device)
+
+        return S_int * S_prop
+
+    @staticmethod
+    def calculate_similarity(X: torch.Tensor, W: torch.Tensor, cfg: 'MemoryConfig', mod_id: int) -> torch.Tensor:
+        """
+        多参量联合统一求解方法
+        """
+        finfo = getattr(cfg, 'feature_types', {}).get(mod_id, {})
+        i_chans = finfo.get('intensity', [])
+        p_chans = finfo.get('property', {})
+        
+        if len(i_chans) > 0 and len(p_chans) > 0:
+            return SimilarityEngine.sim_mixed(X, W, i_chans, p_chans)
+        elif len(p_chans) > 0:
+            return SimilarityEngine.sim_property(X, W, p_chans)
+        else:
+            if X.dim() == 4:
+                X_norm = F.normalize(X, p=2, dim=1)
+                W_norm = F.normalize(W, p=2, dim=1)
+                return SimilarityEngine.sim_conv1x1(X_norm, W_norm)
+            else:
+                # dim == 2
+                X_norm = F.normalize(X, p=2, dim=1)
+                W_norm = F.normalize(W, p=2, dim=1)
+                return SimilarityEngine.sim_conv1x1(X_norm, W_norm)
+
+
+# =============================
 # Gposition: Dynamic Projection Retrieval Network
 # =============================
 class Gposition:
@@ -258,7 +363,7 @@ class Gposition:
             w_m = node.prototype.to(self.device).view(1, -1, 1, 1)
             B, C_m, H, W = X_m.shape
             
-            S_m = torch.sum(X_m * w_m, dim=1, keepdim=True)
+            S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id)
             
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
             S_maps[node.node_id] = S_m * weight
@@ -279,7 +384,7 @@ class Gposition:
                 continue
                 
             w_m = node.prototype.to(self.device).view(1, -1, 1, 1)
-            S_m = torch.sum(X_m * w_m, dim=1, keepdim=True)
+            S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id)
             
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
             S_maps[node.node_id] = S_m * weight
@@ -659,15 +764,14 @@ class Controller:
                 continue
 
             local_vec = X_m[0, :, y, x].unsqueeze(0) * valid_mask
-            local_norm = F.normalize(local_vec, p=2, dim=1)
             
             matched_node = None
             best_sim = -1.0
             
             for node in gmem_i.nodes.values():
                 if node.modality_id == mod_id:
-                    node_norm = F.normalize(node.prototype.unsqueeze(0), p=2, dim=1)
-                    sim = torch.sum(local_norm * node_norm).item()
+                    w_node = node.prototype.unsqueeze(0)
+                    sim = SimilarityEngine.calculate_similarity(local_vec, w_node, self.cfg, mod_id).item()
                     if sim > best_sim:
                         best_sim = sim
                         matched_node = node

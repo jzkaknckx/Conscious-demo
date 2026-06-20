@@ -546,6 +546,7 @@ class RGB2H(nn.Module):
         
         h_channel = h_channel / 6.0
         h_channel = torch.clamp(h_channel, 0.0, 1.0)
+        h_channel = h_channel * torch.pi * 2
         
         return h_channel.unsqueeze(1)
 
