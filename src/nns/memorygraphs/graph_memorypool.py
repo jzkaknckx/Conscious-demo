@@ -74,6 +74,13 @@ class MemoryConfig:
     tau_refractory_II = 30
     decay_rate_II = 0.95
     
+    # Neuron Dynamics GmemIII
+    T_excite_III = 3.0
+    T_inject_III = 0.5
+    tau_active_III = 20000
+    tau_refractory_III = 50
+    decay_rate_III = 0.98
+    
     # Interest Map New Params
     interest_margin_radius = 24
     alpha_local = 0.5
@@ -175,6 +182,11 @@ class SemanticNode:
         self.activation_level = 0.0
         self.state_flag = NeuronState.CALM
         self.timer = 0
+        
+        # 内生标度
+        self.explore_time = 0.0
+        self.max_span = 0.0
+        self.is_completed = False
 
     def tick_update(self, E_input: float, cfg: MemoryConfig):
         if self.state_flag == NeuronState.REFRACTORY:
@@ -196,6 +208,38 @@ class SemanticNode:
                 self.state_flag = NeuronState.ACTIVE
                 self.activation_level = 1.0
                 self.timer = cfg.tau_active_II
+
+
+class EntityNode:
+    """宏观空间实体层节点 (GIII，格式塔实体)"""
+    def __init__(self, node_id: int):
+        self.node_id = node_id
+        self.components: Dict[int, Dict[str, float]] = {} # sid -> { 'dx': float, 'dy': float }
+        
+        self.activation_level = 0.0
+        self.state_flag = NeuronState.CALM
+        self.timer = 0
+
+    def tick_update(self, E_input: float, cfg: MemoryConfig):
+        if self.state_flag == NeuronState.REFRACTORY:
+            self.timer -= 1
+            if self.timer <= 0:
+                self.state_flag = NeuronState.CALM
+                self.activation_level = 0.0
+            else:
+                self.activation_level = -1.0
+        elif self.state_flag == NeuronState.ACTIVE and self.timer > 0:
+            self.timer -= 1
+            if self.timer <= 0:
+                self.state_flag = NeuronState.REFRACTORY
+                self.timer = cfg.tau_refractory_III
+                self.activation_level = -1.0
+        else:
+            self.activation_level = self.activation_level * cfg.decay_rate_III + E_input
+            if self.activation_level > cfg.T_excite_III:
+                self.state_flag = NeuronState.ACTIVE
+                self.activation_level = 1.0
+                self.timer = cfg.tau_active_III
 
 
 class GmemoryI:
@@ -240,31 +284,50 @@ class GmemoryII:
         }
 
 
+class GmemoryIII:
+    """Gmemory III 层：宏观实体拓扑层"""
+    def __init__(self, cfg: MemoryConfig):
+        self.cfg = cfg
+        self.entity_nodes: Dict[int, EntityNode] = {}
+        self.next_node_id = 0
+        
+    def add_entity_node(self) -> EntityNode:
+        nid = self.next_node_id
+        self.next_node_id += 1
+        node = EntityNode(nid)
+        self.entity_nodes[nid] = node
+        return node
+        
+    def add_component(self, entity_node: EntityNode, sem_id: int, dx: float, dy: float):
+        entity_node.components[sem_id] = {'dx': dx, 'dy': dy}
+
+
 # =============================
 # Similarity Engine
 # =============================
 class SimilarityEngine:
     @staticmethod
-    def sim_conv1x1(X: torch.Tensor, W: torch.Tensor) -> torch.Tensor:
+    def sim_conv1x1(X: torch.Tensor, W: torch.Tensor, k: float = 3.0) -> torch.Tensor:
         """
-        方案 A: 经典 1x1 卷积点积相似度检索
+        方案 A: 经典 1x1 卷积点积相似度检索，带非线性高阶幂响应
         X: (B, C, H, W) or (B, C)
         W: (1, C, 1, 1) or (1, C)
         """
         if X.dim() == 4:
-            return torch.sum(X * W, dim=1, keepdim=True)
+            S_raw = torch.sum(X * W, dim=1, keepdim=True)
+            return torch.pow(torch.clamp(S_raw, min=0.0), k)
         else:
-            return torch.sum(X * W, dim=1, keepdim=True)
+            S_raw = torch.sum(X * W, dim=1, keepdim=True)
+            return torch.pow(torch.clamp(S_raw, min=0.0), k)
 
     @staticmethod
-    def sim_property(X: torch.Tensor, W: torch.Tensor, periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
+    def sim_property(X: torch.Tensor, W: torch.Tensor, periods: Dict[int, float], gamma: float = 30.0) -> torch.Tensor:
         """
         方案 B: 连续欧几里得展开与高阶三角内积相似度检索 (Trigonometric Embedding)
         """
         sum_sim = 0
         count = 0
         for c, k in periods.items():
-            print("c", c, "k", k, "X", X.shape, "W", W.shape)
             if X.dim() == 4:
                 Xc = X[:, c:c+1, :, :]
                 Wc = W[:, c:c+1, :, :]
@@ -273,7 +336,6 @@ class SimilarityEngine:
                 Wc = W[:, c:c+1]
             S_raw = torch.cos(k * (Xc - Wc))
             S_prop = torch.pow(torch.clamp(S_raw, min=0.0), gamma)
-            print("Xc", Xc.shape, "Wc", Wc.shape, "S_raw", S_raw.shape, "S_prop", S_prop.shape)
             sum_sim += S_prop
             count += 1
         if count == 0:
@@ -284,7 +346,7 @@ class SimilarityEngine:
         return sum_sim / count
 
     @staticmethod
-    def sim_mixed(X: torch.Tensor, W: torch.Tensor, intensity_channels: List[int], property_periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
+    def sim_mixed(X: torch.Tensor, W: torch.Tensor, intensity_channels: List[int], property_periods: Dict[int, float], gamma: float = 30.0) -> torch.Tensor:
         """
         方案 C: 混合属性相似度检索 (即主强门控与特征解耦双规并行)
         """
@@ -374,10 +436,10 @@ class Gposition:
                                 target_nodes: List[ModalityNode]) -> Dict[int, torch.Tensor]:
         """
         生成足迹专用投影：不论是否处于不应期，只要脱离了平静态 (A!=0)，均提供整图响应投射以制造区域脚印。
+        (过滤逻辑由 Controller 传递 target_nodes 时负责)
         """
         S_maps = {}
-        active_nodes = [n for n in target_nodes if n.state_flag != NeuronState.CALM]
-        for node in active_nodes:
+        for node in target_nodes:
             mod_id = node.modality_id
             X_m = X_subspaces.get(mod_id)
             if X_m is None:
@@ -698,7 +760,10 @@ class Controller:
         self.prev_fixation_point = self.fixation_point
         
         self.active_semantic_id: Optional[int] = None 
+        self.active_entity_id: Optional[int] = None
         self.anchor_position: Optional[Tuple[int, int]] = None
+        self.micro_explore_time: float = 0.0
+        self.micro_max_span: float = 0.0
         self.current_step = 0
 
         self.current_interest_map = None
@@ -712,8 +777,10 @@ class Controller:
         self.ior_map: Optional[torch.Tensor] = None
         self.m_aversion: Optional[torch.Tensor] = None
         self.peripheral_buffer: List[Dict] = []
+        self.suspend_stack: List[Dict] = []
         self.E_input_gmem_i_acc = defaultdict(float)
         self.E_input_gmem_ii_acc = defaultdict(float)
+        self.E_input_gmem_iii_acc = defaultdict(float)
 
         # trail
         self.matrix1 = None
@@ -826,43 +893,18 @@ class Controller:
         count = 0
         
         for node in anchor_nodes:
-            mod_id = node.modality_id
-            attrs = self.cfg.feature_attributes.get(mod_id, {})
-            has_continuity_surface = any(attr == 'CONTINUITY_SURFACE' for attr in attrs.values())
-            
-            if has_continuity_surface and node.node_id in S_maps:
+            if node.node_id in S_maps:
                 M_resp_con += S_maps[node.node_id]
                 count += 1
                 
         if count > 0:
             M_resp_con /= count
 
-        # 1. Permeability Map
-        I_str = self.optimizer.I_str
-        I_con1 = self.optimizer.I_con1
-        I_con2 = self.optimizer.I_con2
-        # P_map = M_resp_con * torch.sigmoid(1.0 - self.cfg.lambda_str * I_str)
-        # P_map = self.optimizer.I_con1 * torch.sigmoid((1.0 - self.cfg.lambda_str * I_str))
-        I_con1_norm = I_con1 / (I_con1.max() + 1e-6)
-        I_con2_norm = I_con2 / (I_con2.max() + 1e-6)
-        I_str_norm = I_str / (I_str.max() + 1e-6)
-        I_con1_clamp = torch.clamp(1.0 - self.cfg.lambda_con1 * I_con1, 0.0, 1.0)
-        I_con2_clamp = torch.clamp(1.0 - self.cfg.lambda_con2 * I_con2, 0.0, 1.0)
-        I_str_clamp = torch.clamp(1.0 - self.cfg.lambda_str * I_str, 0.0, 1.0)
-
-        P_surf_map = I_con1_norm * I_str_clamp
-        # P_surf_map = I_str_clamp
-
-        P_edge_map = I_str_norm * I_con1_clamp
-        P_trace_map = I_con2_norm * I_con1_clamp * I_str_clamp
-
-        P_surf_map[P_surf_map < 0.01] = 0
-        P_surf_map[P_surf_map > 0.98] = 1
-
-        self.matrix1 = P_surf_map
-        self.matrix2 = I_con1_norm
-        self.matrix3 = I_str_clamp
-        # self.matrix1 = I_con1_norm
+        # 1. Permeability Map (Conductivity)
+        M_GposI = M_resp_con
+        if M_GposI.max() > 1e-6:
+            M_GposI = M_GposI / M_GposI.max()
+        M_GposI[M_GposI < 0.1] = 0.0
 
         # 2. Seed Initialization
         cx, cy = p_macro
@@ -872,28 +914,21 @@ class Controller:
         # 3. Iterative Matrix Dilation
         pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
         for _ in range(self.cfg.mask_dilation_steps):
-            V_next = pool(V) * P_surf_map
+            V_next = pool(V) * M_GposI
             A_V = torch.sum(V).item()
             A_Vn = torch.sum(V_next).item()
             if (A_Vn - A_V) / (A_V + 1e-6) < 1e-3:
                 break
             V = V_next
-            # V = pool(V) * P_surf_map
-
+            
         edge_pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
         for _ in range(5):
             V = edge_pool(V)
-        '''
-        for _ in range(20):
-            self.matrix2.append(V)
-            V = V + edge_pool(V) * P_trace_map
-        '''
-        # 4. Final Mask Output
-        alpha = self.cfg.alpha_mask
-        beta = self.cfg.beta_mask
-        M_semantic = torch.sigmoid(alpha * V - beta)
-        M_semantic[M_semantic < 0.05] = 0
-        return M_semantic
+
+        # 4. Final dynamic energy output
+        E_dynamic = V
+        E_dynamic[E_dynamic < 0.05] = 0
+        return E_dynamic
 
     def _decide_next_saccade_review(self, I_map: torch.Tensor) -> Tuple[int, int]:
         H, W = I_map.shape[-2], I_map.shape[-1]
@@ -962,77 +997,133 @@ class Controller:
         padding = kernel_size // 2
         K_lowpass = F.avg_pool2d(I_macro, kernel_size, stride=1, padding=padding)
         
-        drive = I_macro * K_lowpass
+        # Distance penalty for jump
+        cx, cy = self.fixation_point
+        y_grid = torch.arange(H, device=self.device).view(H, 1)
+        x_grid = torch.arange(W, device=self.device).view(1, W)
+        dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
+        gamma_dist = getattr(self.cfg, 'gamma_macro_dist', 0.001)
+
+        drive = I_macro * K_lowpass - gamma_dist * torch.sqrt(dist_sq).view(1, 1, H, W)
         idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W)), drive
 
     def _decide_next_saccade_micro(self, base_interest: torch.Tensor, semantic_mask: torch.Tensor) -> Tuple[int, int]:
-        H, W = base_interest.shape[-2], base_interest.shape[-1]
+        if semantic_mask is None:
+            return self.fixation_point
+            
+        H, W = semantic_mask.shape[-2], semantic_mask.shape[-1]
         cx, cy = self.fixation_point
         
-        A_semantic = torch.sum(semantic_mask).item()
-        eta = self.cfg.eta_foveal
-        eps = self.cfg.epsilon_foveal
-        sigma_foveal = eta * math.sqrt(A_semantic) + eps
-        # print("sigma_foveal", sigma_foveal, "A_semantic", A_semantic, "A_semantic_sqrt", math.sqrt(A_semantic))
+        sigma_consume = getattr(self.cfg, 'sigma_consume', 10.0)
+        alpha = getattr(self.cfg, 'alpha_consume', 0.8)
         
         y_grid = torch.arange(H, device=self.device).view(H, 1)
         x_grid = torch.arange(W, device=self.device).view(1, W)
         dist_sq = (x_grid - cx)**2 + (y_grid - cy)**2
 
-        aversion_pt = torch.exp(-dist_sq / (2 * sigma_foveal**2)).view(1, 1, H, W)
-        self.m_aversion = torch.max(self.m_aversion, aversion_pt)
+        # Deplete the dynamic energy matrix around the current fixation point
+        depletion = alpha * torch.exp(-dist_sq / (2 * sigma_consume**2)).view(1, 1, H, W)
+        self.semantic_mask = torch.max(torch.zeros_like(self.semantic_mask), self.semantic_mask - depletion)
+        # We also keep m_aversion up-to-date just for visuals or other modules overlapping
+        self.m_aversion = torch.max(self.m_aversion, torch.exp(-dist_sq / (2 * sigma_consume**2)).view(1, 1, H, W))
         
-        drive = base_interest * semantic_mask * (1.0 - self.m_aversion)
+        # Next saccade point is the max of remaining dynamic energy
+        drive = self.semantic_mask
         if drive.max() < 1e-6:
             idx = torch.randint(0, H*W, (1,)).item()
         else:
             idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W))
 
-    def _check_micro_exit(self, semantic_mask: torch.Tensor) -> bool:
+    def _check_micro_exit(self, semantic_mask: torch.Tensor, local_nodes: List[ModalityNode] = None, gmem_ii: 'GmemoryII' = None, gmem_i: 'GmemoryI' = None) -> str:
         if semantic_mask is None:
-            return True
-        sum_mask = torch.sum(semantic_mask).item()
-        if sum_mask < 1e-5:
-            return True
-        covered = torch.sum(self.m_aversion * semantic_mask).item()
-        rho = covered / sum_mask
-        theta_exit = 0.85
-        # print("rho", rho, "covered", covered, "sum_mask", sum_mask, "self.m_aversion", torch.sum(self.m_aversion).item())
-        return rho > theta_exit
+            return 'empty'
+        sum_energy = torch.sum(semantic_mask).item()
+        # Exit if energy drops below a small threshold
+        if sum_energy < 1.0:
+            return 'depleted'
+            
+        if local_nodes and gmem_ii and gmem_i and self.active_semantic_id is not None:
+            sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
+            if sem_node:
+                anchor_mod_id = gmem_i.nodes[sem_node.anchor_id].modality_id
+                if local_nodes[0].modality_id != anchor_mod_id:
+                    return 'mutation'
+        return 'continue'
 
-    def _transition_to_macro(self, gmem_i: GmemoryI, gmem_ii: GmemoryII):
+    def _transition_to_macro(self, gmem_i: GmemoryI, gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII', exit_type: str = 'depleted'):
+        if getattr(self, 'active_entity_id', None) is None:
+            new_ent = gmem_iii.add_entity_node()
+            self.active_entity_id = new_ent.node_id
+            
         if self.active_semantic_id is not None:
             sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
             if sem_node:
+                anchor_mod_id = gmem_i.nodes[sem_node.anchor_id].modality_id
+                # 1. Batch processing with Homologous Modality Filter
                 for p in self.peripheral_buffer:
                     if p['nid'] not in sem_node.peripheral_links:
-                        gmem_ii.add_peripheral(sem_node, p['nid'], p['rho'], p['theta'])
-        
+                        if p['nid'] in gmem_i.nodes and gmem_i.nodes[p['nid']].modality_id == anchor_mod_id:
+                            gmem_ii.add_peripheral(sem_node, p['nid'], p['rho'], p['theta'])
+                        
+                # 记录 GmemIII 组件关系 (dx, dy 相对于某种空间锚点或单纯记录位量向量)
+                if self.anchor_position is not None:
+                    ent_node = gmem_iii.entity_nodes[self.active_entity_id]
+                    ax, ay = self.anchor_position
+                    gmem_iii.add_component(ent_node, self.active_semantic_id, ax, ay)
+                    
+                # 更新自身内在模态属性
+                sem_node.explore_time = getattr(self, 'micro_explore_time', 0.0)
+                sem_node.max_span = getattr(self, 'micro_max_span', 0.0)
+                
+                # 2. Suspend check & status update
+                if exit_type == 'mutation':
+                    sem_node.is_completed = False
+                    self.suspend_stack.append({
+                        'sid': self.active_semantic_id,
+                        'anchor': self.anchor_position,
+                        'mask': self.semantic_mask,
+                        'explore_time': sem_node.explore_time,
+                        'max_span': sem_node.max_span
+                    })
+                else:
+                    sem_node.is_completed = True
+
         if self.semantic_mask is not None:
             # semantic_mask_norm = self.semantic_mask / self.semantic_mask.max()
-            semantic_mask_bin = self.semantic_mask > 0.0
+            semantic_mask_bin = (self.semantic_mask > 0.0).float()
             self.semantic_history += semantic_mask_bin
 
         self.peripheral_buffer.clear()
+        
+        # 3. Resume & Complete
+        if exit_type == 'depleted' and len(self.suspend_stack) > 0:
+            resume_ctx = self.suspend_stack.pop()
+            resume_id = resume_ctx['sid']
+            resume_node = gmem_ii.semantic_nodes.get(resume_id)
+            if resume_node and not resume_node.is_completed:
+                self.active_semantic_id = resume_id
+                self.anchor_position = resume_ctx['anchor']
+                self.semantic_mask = resume_ctx['mask']
+                self.micro_explore_time = resume_ctx['explore_time']
+                self.micro_max_span = resume_ctx['max_span']
+                
+                # Assume we resume and the state is immediately LEARN_MICRO
+                self.state = MainPhase.LEARN_MICRO
+                return
+                
         self.active_semantic_id = None
         self.anchor_position = None
         self.semantic_mask = None
         self.state = MainPhase.LEARN_MACRO
+        self.micro_explore_time = 0.0
+        self.micro_max_span = 0.0
         B, C, H, W = self.m_aversion.shape
         self.m_aversion = torch.zeros((B, C, H, W), device=self.device)
 
-    def _trigger_macro_tick_update(self, gmem_i: GmemoryI, gmem_ii: GmemoryII):
-        for n in gmem_i.nodes.values():
-            n.tick_update(self.E_input_gmem_i_acc[n.node_id], self.cfg)
-        for n in gmem_ii.semantic_nodes.values():
-            n.tick_update(self.E_input_gmem_ii_acc[n.node_id], self.cfg)
-        self.E_input_gmem_i_acc.clear()
-        self.E_input_gmem_ii_acc.clear()
-
     def run_step(self, X_subspaces: Dict[int, torch.Tensor], 
-                 gmem_i: GmemoryI, gmem_ii: GmemoryII, gpos: Gposition):
+                 gmem_i: GmemoryI, gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII', gpos: Gposition):
         self.current_step += 1
         cx, cy = self.fixation_point
         B, C, H, W = list(X_subspaces.values())[0].shape
@@ -1050,15 +1141,12 @@ class Controller:
         for n in local_nodes:
             self.E_input_gmem_i_acc[n.node_id] += 1.0
 
-        active_gmem_i = [n for n in gmem_i.nodes.values() if n.state_flag != NeuronState.CALM]
-        active_gmem_ii = [n for n in gmem_ii.semantic_nodes.values() if n.state_flag != NeuronState.CALM]
-
-        # Generate routing map for query retrieval
-        req_nodes = list(gmem_i.nodes.values())
-        S_maps_retrieval = gpos.l1_modality_routing_projection(X_subspaces, req_nodes)
+        # Generate routing map for query retrieval (only active/stimulated nodes)
+        active_gmem_i = [n for n in gmem_i.nodes.values() if n.state_flag != NeuronState.CALM or self.E_input_gmem_i_acc[n.node_id] > 0]
+        S_maps_retrieval = gpos.l1_modality_routing_projection(X_subspaces, active_gmem_i)
         
         # Generate spatial footprint projection mapping 
-        S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, req_nodes)
+        S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, active_gmem_i)
 
         # Cross-layer energy aggregation for semantic nodes (GmemII)
         if self.state == MainPhase.LEARN_MICRO and self.active_semantic_id is not None:
@@ -1079,9 +1167,12 @@ class Controller:
             if recognized_sem_id is not None:
                  if gmem_ii.semantic_nodes[recognized_sem_id].state_flag != NeuronState.ACTIVE:
                      gmem_ii.semantic_nodes[recognized_sem_id].activation_level += 2.0
+                     # E_input could just be applied, or forcefully set:
                      gmem_ii.semantic_nodes[recognized_sem_id].state_flag = NeuronState.ACTIVE
                      gmem_ii.semantic_nodes[recognized_sem_id].timer = self.cfg.tau_active_II
                      
+        if self.state == MainPhase.REVIEW:
+            if recognized_sem_id is not None:
                  sem_node = gmem_ii.semantic_nodes[recognized_sem_id]
                  if self.anchor_position is None:
                      self.anchor_position = (cx, cy)
@@ -1107,7 +1198,7 @@ class Controller:
                      self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
                      print("_generate_semantic_mask1")
                  else:
-                     self._transition_to_macro(gmem_i, gmem_ii)
+                     self._transition_to_macro(gmem_i, gmem_ii, gmem_iii)
                      
         elif self.state == MainPhase.LEARN_MICRO:
             sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
@@ -1123,7 +1214,7 @@ class Controller:
                         if n.node_id not in buffered_nids:
                             self.peripheral_buffer.append({'nid': n.node_id, 'rho': rho, 'theta': theta})
             else:
-                self._transition_to_macro(gmem_i, gmem_ii)
+                self._transition_to_macro(gmem_i, gmem_ii, gmem_iii)
 
         elif self.state == MainPhase.LEARN_MACRO:
             self.anchor_position = (cx, cy)
@@ -1146,15 +1237,38 @@ class Controller:
             self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
             self.current_interest_map = I_macro
         elif self.state == MainPhase.LEARN_MICRO:
-            if self._check_micro_exit(self.semantic_mask):
-                self._transition_to_macro(gmem_i, gmem_ii)
-                self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
-                self.current_interest_map = I_macro
+            exit_type = self._check_micro_exit(self.semantic_mask, local_nodes, gmem_ii, gmem_i)
+            if exit_type != 'continue':
+                self._transition_to_macro(gmem_i, gmem_ii, gmem_iii, exit_type)
+                if self.state == MainPhase.LEARN_MACRO:
+                    self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
+                    self.current_interest_map = I_macro
+                else:
+                    # We resumed a suspended LEARN_MICRO
+                    self.fixation_point = self._decide_next_saccade_micro(base_interest, self.semantic_mask)
+                    self.current_interest_map = base_interest
             else:
                 self.fixation_point = self._decide_next_saccade_micro(base_interest, self.semantic_mask)
                 self.current_interest_map = base_interest * self.semantic_mask
+                
+                # accumulate span and time
+                self.micro_explore_time = getattr(self, 'micro_explore_time', 0.0) + 1.0
+                if self.anchor_position is not None:
+                    ax, ay = self.anchor_position
+                    dist = math.sqrt((self.fixation_point[0] - ax)**2 + (self.fixation_point[1] - ay)**2)
+                    self.micro_max_span = max(getattr(self, 'micro_max_span', 0.0), dist)
 
-        self._trigger_macro_tick_update(gmem_i, gmem_ii)
+        # Unified End-of-Frame Node Energy & State Updates
+        for n in gmem_i.nodes.values():
+            n.tick_update(self.E_input_gmem_i_acc[n.node_id], self.cfg)
+        for n in gmem_ii.semantic_nodes.values():
+            n.tick_update(self.E_input_gmem_ii_acc[n.node_id], self.cfg)
+        for n in gmem_iii.entity_nodes.values():
+            n.tick_update(self.E_input_gmem_iii_acc[n.node_id], self.cfg)
+            
+        self.E_input_gmem_i_acc.clear()
+        self.E_input_gmem_ii_acc.clear()
+        self.E_input_gmem_iii_acc.clear()
 
 
 # =============================
@@ -1165,6 +1279,7 @@ class MultilevelCoordinator:
         self.cfg = cfg
         self.gmem_i = GmemoryI()
         self.gmem_ii = GmemoryII(cfg)
+        self.gmem_iii = GmemoryIII(cfg)
         self.gpos = Gposition(cfg)
         self.controller = Controller(cfg)
         self.current_view = self.controller.fixation_point
@@ -1192,6 +1307,6 @@ class MultilevelCoordinator:
             W_o = W_orig if W_orig is not None else W
             self.controller.optimizer.initialize_base_interest(X_subspaces, H_o, W_o)
             
-        self.controller.run_step(X_subspaces, self.gmem_i, self.gmem_ii, self.gpos)
+        self.controller.run_step(X_subspaces, self.gmem_i, self.gmem_ii, self.gmem_iii, self.gpos)
         self.current_view = self.controller.fixation_point
         self.viewroute.append(self.current_view)

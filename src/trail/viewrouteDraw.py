@@ -431,7 +431,7 @@ def debug_show(image, A):
     # 转换张量 A（确保是单通道灰度）
     if isinstance(A, torch.Tensor):
         A_np = A.squeeze().cpu().numpy()   # (W, H)
-        A_np = A_np.T                      # (H, W)
+        # A_np = A_np.T                      # (H, W)
     elif isinstance(A, Image.Image):
         A_np = np.array(A.convert('L'))    # (H, W)
     else:
