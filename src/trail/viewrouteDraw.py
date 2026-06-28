@@ -10,6 +10,9 @@ import numpy as np
 from typing import List, Tuple, Optional, Union
 import matplotlib.pyplot as plt
 from PIL import Image
+import imageio
+import argparse
+import os
 
 try:
     import torch
@@ -310,6 +313,155 @@ def debug_mark_advanced(
     return None
 
 
+def debug_mark_advanced_gif(
+    image_input: Union[str, np.ndarray, 'torch.Tensor'],
+    points: Union[str, List[int], List[Tuple[int, int]], 'torch.Tensor'],
+    point_size: int = 1,
+    line_thickness: int = 1,
+    draw_points: bool = True,
+    draw_lines: bool = True,
+    point_color: Tuple[int, int, int] = (0, 0, 255),
+    line_color: Optional[Tuple[int, int, int]] = None,
+    gradient_lines: bool = True,
+    start_hue: float = 0.0,
+    background_color: Tuple[int, int, int] = (255, 255, 255),
+    output_path: Optional[str] = None,
+    display_in_notebook: bool = True,
+    return_images: bool = False,
+    # 新增：GIF 输出参数
+    gif_output: Optional[str] = None,   # GIF 保存路径，例如 "animation.gif"
+    gif_fps: int = 10,
+    gif_loop: int = 0
+) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """
+    原有功能不变，新增 GIF 动图生成：
+    - 总帧数 = len(points) // 2
+    - 每帧逐步添加两个点（一条线段），最后一帧包含全部点/线
+    - 渐变颜色沿已绘制的路径实时更新
+    """
+    point_size = int(point_size)
+    line_thickness = int(line_thickness)
+
+    # ---------- 1. 读取/转换原图 ----------
+    if isinstance(image_input, str):
+        original = cv2.imread(image_input)
+        if original is None:
+            raise FileNotFoundError(f"无法读取图像: {image_input}")
+    elif HAS_TORCH and torch.is_tensor(image_input):
+        original = _to_numpy(image_input)
+        if original.ndim == 4:
+            original = original[0]
+        if original.ndim == 3 and original.shape[0] == 3:
+            original = original.transpose(1, 2, 0)
+        if original.max() <= 1.0:
+            original = (original * 255).astype(np.uint8)
+        else:
+            original = original.astype(np.uint8)
+    elif isinstance(image_input, np.ndarray):
+        original = image_input.copy()
+    else:
+        raise ValueError(f"不支持的图像输入类型: {type(image_input)}")
+    original = np.ascontiguousarray(original)
+
+    # ---------- 2. 解析点坐标 ----------
+    point_list = parse_points(points)
+    if not point_list:
+        raise ValueError("点坐标列表不能为空")
+
+    # ---------- 3. 生成三张静态图（原图、纯图、融合图）----------
+    if gradient_lines and draw_lines:
+        path_lengths = _compute_path_lengths(point_list)
+    else:
+        path_lengths = None
+
+    original_img = original.copy()
+
+    blended = original.copy()
+    if not gradient_lines and line_color is None:
+        line_color = (0, 255, 0)  # 绿色
+    _draw_on_canvas(
+        blended, point_list, point_size, line_thickness,
+        draw_points, draw_lines, point_color, line_color,
+        gradient_lines, start_hue, path_lengths
+    )
+
+    height, width = original.shape[:2]
+    transformed_points, _ = _transform_points_to_fit(point_list, width, height)
+    pure_graph = np.full((height, width, 3), background_color, dtype=np.uint8)
+    _draw_on_canvas(
+        pure_graph, transformed_points, point_size, line_thickness,
+        draw_points, draw_lines, point_color, line_color,
+        gradient_lines, start_hue, path_lengths
+    )
+
+    # ---------- 4. Notebook 显示 ----------
+    if display_in_notebook:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        titles = ['Original', 'Points & Lines (Zoomed)', 'Blended']
+        images = [original_img, pure_graph, blended]
+        for ax, img, title in zip(axes, images, titles):
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            ax.imshow(img_rgb)
+            ax.set_title(title)
+            ax.axis('on')
+        plt.tight_layout()
+        plt.show()
+
+    # ---------- 5. 保存静态融合图 ----------
+    if output_path:
+        cv2.imwrite(output_path, blended)
+        print(f"融合图已保存至: {output_path}")
+
+    # ==================== 新增：生成动图 GIF ====================
+    if gif_output is not None:
+        total_points = len(point_list)
+        # 总帧数 = 点数 // 2 （每帧添加两个新点）
+        n_frames = max(1, total_points // 2)
+
+        frames = []
+        for i in range(1, n_frames + 1):
+            # 当前帧应包含的点数：前 i*2 个点，但不能超过总点数
+            num_points = min(i * 2, total_points)
+            sub_points = point_list[:num_points]
+
+            # 为当前子路径重新计算长度（保证渐变颜色随绘制进度延伸）
+            if gradient_lines and draw_lines:
+                sub_lengths = _compute_path_lengths(sub_points)
+            else:
+                sub_lengths = None
+
+            # 在原图副本上绘制当前帧
+            frame = original.copy()
+            _draw_on_canvas(
+                frame, sub_points, point_size, line_thickness,
+                draw_points, draw_lines, point_color, line_color,
+                gradient_lines, start_hue, sub_lengths
+            )
+            # OpenCV 使用 BGR，imageio 期望 RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(frame_rgb)
+
+        # 如果点数不能被 2 整除，最后一帧可能尚未包含全部点，再补一帧完整图
+        if total_points % 2 != 0 and n_frames * 2 < total_points:
+            frame = original.copy()
+            _draw_on_canvas(
+                frame, point_list, point_size, line_thickness,
+                draw_points, draw_lines, point_color, line_color,
+                gradient_lines, start_hue, path_lengths
+            )
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(frame_rgb)
+
+        # 保存 GIF
+        duration = 1.0 / gif_fps
+        imageio.mimsave(gif_output, frames, duration=duration, loop=gif_loop)
+        print(f"动画 GIF 已保存至: {gif_output} （共 {len(frames)} 帧）")
+
+    # ---------- 6. 返回 ----------
+    if return_images:
+        return original_img, pure_graph, blended
+    return None
+
 def mark_points_on_image(
     image_input: Union[str, np.ndarray, 'torch.Tensor'],
     points: Union[str, List[int], List[Tuple[int, int]], 'torch.Tensor'],
@@ -471,3 +623,90 @@ def debug_show(image, A):
     
     plt.tight_layout()
     plt.show()
+
+
+
+def tensor_to_pil(tensor):
+    """
+    将形状为 [1, C, H, W] 或 [C, H, W] 的张量转换为 PIL Image。
+    C=1 视为灰度图，C=3 视为 RGB 图。
+    自动处理 0~1 浮点 或 0~255 整型的数值范围。
+    """
+    # 去除 batch 维度（如果存在）
+    if tensor.ndim == 4:
+        tensor = tensor.squeeze(0)
+    if tensor.ndim != 3:
+        raise ValueError(f"张量形状需为 [C, H, W] 或 [1, C, H, W]，当前形状: {tensor.shape}")
+
+    # 将 GPU 张量复制到 CPU
+    tensor = tensor.detach().cpu()
+
+    # 数值范围检测与转换到 uint8
+    if tensor.dtype == torch.uint8:
+        array = tensor.numpy()
+    elif tensor.max() <= 1.0:
+        # 假定是 0~1 浮点
+        array = (tensor.numpy() * 255).astype(np.uint8)
+    else:
+        # 假定是其他范围（如 0~255 浮点）
+        array = tensor.numpy().astype(np.uint8)
+
+    # 转换为 HWC 格式并创建 PIL 图像
+    if array.shape[0] == 1:
+        # 灰度图
+        array = array.squeeze(0)
+        return Image.fromarray(array, mode='L')
+    elif array.shape[0] == 3:
+        # RGB 图
+        array = np.transpose(array, (1, 2, 0))
+        return Image.fromarray(array, mode='RGB')
+    else:
+        raise ValueError(f"不支持的通道数: {array.shape[0]}")
+
+
+def tensor_sequence_to_gif(tensors, output_path, fps=10, loop=0):
+    """
+    将张量序列转为 GIF 动图。
+
+    Args:
+        tensors:  可以是以下之一:
+                  - list of torch.Tensor，每个形状 [1,C,H,W] 或 [C,H,W]
+                  - torch.Tensor，形状 [N, C, H, W] 或 [N, 1, C, H, W]
+        output_path: 输出 GIF 文件路径
+        fps: 帧率（每秒帧数）
+        loop: 循环次数（0 表示无限循环）
+    """
+    # ---- 统一处理为张量列表 ----
+    if isinstance(tensors, torch.Tensor):
+        if tensors.ndim == 5:        # [N, 1, C, H, W]
+            tensors = [tensors[i] for i in range(tensors.shape[0])]
+        elif tensors.ndim == 4:      # [N, C, H, W]
+            tensors = [tensors[i] for i in range(tensors.shape[0])]
+        else:
+            raise ValueError(f"批量张量形状需为 [N,C,H,W] 或 [N,1,C,H,W]，当前: {tensors.shape}")
+    elif isinstance(tensors, (list, tuple)):
+        pass
+    else:
+        raise TypeError("tensors 必须是 list/tuple 或 torch.Tensor")
+
+    # ---- 转换为 PIL Image 列表 ----
+    pil_images = []
+    for i, t in enumerate(tensors):
+        try:
+            img = tensor_to_pil(t)
+            pil_images.append(img)
+        except Exception as e:
+            raise RuntimeError(f"处理第 {i} 个张量时出错: {e}")
+
+    if not pil_images:
+        raise ValueError("没有可用于生成 GIF 的图像。")
+
+    # ---- 保存为 GIF ----
+    duration = 1.0 / fps  # 每帧持续时间，单位秒
+    imageio.mimsave(
+        output_path,
+        pil_images,
+        duration=duration,
+        loop=loop
+    )
+    print(f"GIF 已保存至: {output_path} （共 {len(pil_images)} 帧，{fps} fps）")

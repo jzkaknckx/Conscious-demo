@@ -63,21 +63,21 @@ class MemoryConfig:
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
     T_inject_I = 0.5
-    tau_active_I = 50000
+    tau_active_I = 5
     tau_refractory_I = 10
     decay_rate_I = 0.6
     
     # Neuron Dynamics GmemII
     T_excite_II = 2
     T_inject_II = 0.5
-    tau_active_II = 15000
+    tau_active_II = 15
     tau_refractory_II = 30
     decay_rate_II = 0.95
     
     # Neuron Dynamics GmemIII
     T_excite_III = 3.0
     T_inject_III = 0.5
-    tau_active_III = 20000
+    tau_active_III = 20
     tau_refractory_III = 50
     decay_rate_III = 0.98
     
@@ -88,8 +88,8 @@ class MemoryConfig:
     gamma_remote = 0.2
     saccade_sigma = 50
     foveal_sigma = 25
-    eta_foveal = 0.25
-    epsilon_foveal = 0.75
+    eta_foveal = 0.15
+    epsilon_foveal = 0.65
     
     # Optimizer weights
     w_base = 1.0
@@ -321,7 +321,7 @@ class SimilarityEngine:
             return torch.pow(torch.clamp(S_raw, min=0.0), k)
 
     @staticmethod
-    def sim_property(X: torch.Tensor, W: torch.Tensor, periods: Dict[int, float], gamma: float = 30.0) -> torch.Tensor:
+    def sim_property(X: torch.Tensor, W: torch.Tensor, periods: Dict[int, float], gamma: float = 50.0) -> torch.Tensor:
         """
         方案 B: 连续欧几里得展开与高阶三角内积相似度检索 (Trigonometric Embedding)
         """
@@ -346,7 +346,7 @@ class SimilarityEngine:
         return sum_sim / count
 
     @staticmethod
-    def sim_mixed(X: torch.Tensor, W: torch.Tensor, intensity_channels: List[int], property_periods: Dict[int, float], gamma: float = 30.0) -> torch.Tensor:
+    def sim_mixed(X: torch.Tensor, W: torch.Tensor, intensity_channels: List[int], property_periods: Dict[int, float], gamma: float = 50.0) -> torch.Tensor:
         """
         方案 C: 混合属性相似度检索 (即主强门控与特征解耦双规并行)
         """
@@ -928,6 +928,7 @@ class Controller:
         # 4. Final dynamic energy output
         E_dynamic = V
         E_dynamic[E_dynamic < 0.05] = 0
+        self.matrix1 = E_dynamic
         return E_dynamic
 
     def _decide_next_saccade_review(self, I_map: torch.Tensor) -> Tuple[int, int]:
@@ -1030,6 +1031,14 @@ class Controller:
         
         # Next saccade point is the max of remaining dynamic energy
         drive = self.semantic_mask
+        
+        if self.optimizer.H_orig is not None and self.optimizer.W_orig is not None:
+            # 保留兴趣压制：压低外围兴趣
+            h1, h2 = max(0, H//2-(self.optimizer.H_orig-self.optimizer.r)//2), min(H, H//2+(self.optimizer.H_orig-self.optimizer.r)//2)
+            w1, w2 = max(0, W//2-(self.optimizer.W_orig-self.optimizer.r)//2), min(W, W//2+(self.optimizer.W_orig-self.optimizer.r)//2)
+            drive[:, :, :w1, :] = 0; drive[:, :, w2:, :] = 0
+            drive[:, :, :, :h1] = 0; drive[:, :, :, h2:] = 0
+
         if drive.max() < 1e-6:
             idx = torch.randint(0, H*W, (1,)).item()
         else:
@@ -1041,7 +1050,7 @@ class Controller:
             return 'empty'
         sum_energy = torch.sum(semantic_mask).item()
         # Exit if energy drops below a small threshold
-        if sum_energy < 1.0:
+        if sum_energy < 5.0:
             return 'depleted'
             
         if local_nodes and gmem_ii and gmem_i and self.active_semantic_id is not None:
