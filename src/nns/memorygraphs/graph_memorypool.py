@@ -37,26 +37,26 @@ class MemoryConfig:
     }
     
     feature_types = {
-        0: {'intensity': [0], 'property': {1: 2.0}},
-        1: {'intensity': [], 'property': {0: 1.0}},
-        2: {'intensity': [0, 1, 2], 'property': {}},
-        3: {'intensity': [], 'property': {0: 1.0, 1: 1.0, 2: 1.0}},
-        4: {'intensity': [], 'property': {0: 2.0, 1: 2.0, 2: 2.0}}
+        0: {'metric': 'Vector_Magnitude', 'paradigm': 'A', 'dominant_channel': 0},
+        1: {'metric': 'Euclidean_Absolute', 'paradigm': 'A', 'dominant_metric': 'Isurf'},
+        2: {'metric': 'Euclidean_Absolute', 'paradigm': 'B'},
+        3: {'metric': 'Euclidean_Absolute', 'paradigm': 'C'},
+        4: {'metric': 'Periodic_Property', 'paradigm': 'C', 'periods': {0: 1.0, 1: 1.0, 2: 1.0}}
     }
     
     # [修改] 通道属性划分 (STRENGTH vs CONTINUITY_SURFACE vs CONTINUITY_TRACE vs IGNORE)
     feature_attributes = {
-        0: {0: 'STRENGTH', 1: 'CONTINUITY_TRACE'},   # grad: 0=intensity, 1=orientation
-        1: {0: 'CONTINUITY_SURFACE'}, # hue, etc.
-        2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},     # curvature components
-        3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # aspect
-        4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  # orientation
+        0: {0: 'STRENGTH', 1: 'CONTINUITY_TRACE'},   
+        1: {0: 'CONTINUITY_SURFACE', 1: 'CONTINUITY_SURFACE', 2: 'CONTINUITY_SURFACE'}, 
+        2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},     
+        3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  
+        4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  
     }
     sigma_surf = 0.5
     sigma_trace = 0.5
     
     # [新增] 动态写入门限
-    tau_str_gate = 0.6
+    tau_str_gate = 0.8
     tau_surf_gate = 0.99
     tau_trace_gate = 0.8
 
@@ -88,8 +88,8 @@ class MemoryConfig:
     gamma_remote = 0.2
     saccade_sigma = 50
     foveal_sigma = 25
-    eta_foveal = 0.15
-    epsilon_foveal = 0.65
+    eta_foveal = 0.25
+    epsilon_foveal = 0.75
     
     # Optimizer weights
     w_base = 1.0
@@ -115,6 +115,13 @@ class MemoryConfig:
     lambda_con2 = 2.0   
     lambda_str = 0.7
     mask_dilation_steps = 20000
+    mask_edge_dilation = 0
+    sigma_micro = 50.0
+    alpha_ior = 0.5
+    gamma_dist = 0.001
+    gamma_macro_dist = 0.001
+    sigma_consume = 10.0
+    alpha_consume = 0.8
 
 
 # =============================
@@ -136,10 +143,11 @@ class MainPhase(Enum):
 # =============================
 class ModalityNode:
     """模态孤立特征层节点 (GI)"""
-    def __init__(self, node_id: int, modality_id: int, prototype: torch.Tensor):
+    def __init__(self, node_id: int, modality_id: int, prototype: torch.Tensor, mask: Optional[torch.Tensor] = None):
         self.node_id = node_id
         self.modality_id = modality_id
         self.prototype = prototype
+        self.mask = mask if mask is not None else torch.ones_like(prototype)
         
         self.count = 1
         self.last_seen = 0
@@ -248,10 +256,10 @@ class GmemoryI:
         self.nodes: Dict[int, ModalityNode] = {}
         self.next_node_id = 0
         
-    def add_node(self, modality_id: int, prototype: torch.Tensor) -> ModalityNode:
+    def add_node(self, modality_id: int, prototype: torch.Tensor, mask: Optional[torch.Tensor] = None) -> ModalityNode:
         nid = self.next_node_id
         self.next_node_id += 1
-        node = ModalityNode(nid, modality_id, prototype)
+        node = ModalityNode(nid, modality_id, prototype, mask)
         self.nodes[nid] = node
         return node
 
@@ -307,96 +315,77 @@ class GmemoryIII:
 # =============================
 class SimilarityEngine:
     @staticmethod
-    def sim_conv1x1(X: torch.Tensor, W: torch.Tensor, k: float = 3.0) -> torch.Tensor:
-        """
-        方案 A: 经典 1x1 卷积点积相似度检索，带非线性高阶幂响应
-        X: (B, C, H, W) or (B, C)
-        W: (1, C, 1, 1) or (1, C)
-        """
+    def sim_euclidean(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor, sigma: float = 0.5) -> torch.Tensor:
+        """欧氏绝对坐标: 高斯RBF核"""
+        M = mask_X * mask_W
         if X.dim() == 4:
-            S_raw = torch.sum(X * W, dim=1, keepdim=True)
-            return torch.pow(torch.clamp(S_raw, min=0.0), k)
-        else:
-            S_raw = torch.sum(X * W, dim=1, keepdim=True)
-            return torch.pow(torch.clamp(S_raw, min=0.0), k)
+            M = M.view(1, -1, 1, 1)
+        
+        diff_sq = torch.sum(((X - W) ** 2) * M, dim=1, keepdim=True)
+        valid_channels = torch.sum(M, dim=1, keepdim=True).clamp(min=1e-6)
+        dist_sq = diff_sq / valid_channels
+        return torch.exp(-dist_sq / (2 * sigma**2))
 
     @staticmethod
-    def sim_property(X: torch.Tensor, W: torch.Tensor, periods: Dict[int, float], gamma: float = 50.0) -> torch.Tensor:
-        """
-        方案 B: 连续欧几里得展开与高阶三角内积相似度检索 (Trigonometric Embedding)
-        """
+    def sim_vector(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor) -> torch.Tensor:
+        """矢量占有度: 点积"""
+        M = mask_X * mask_W
+        if X.dim() == 4:
+            M = M.view(1, -1, 1, 1)
+        
+        return torch.sum(X * W * M, dim=1, keepdim=True)
+
+    @staticmethod
+    def sim_periodic(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor, periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
+        """周期属性: 高阶余弦"""
+        M = mask_X * mask_W
+        if X.dim() == 4:
+            M = M.view(1, -1, 1, 1)
+        
         sum_sim = 0
         count = 0
         for c, k in periods.items():
-            if X.dim() == 4:
-                Xc = X[:, c:c+1, :, :]
-                Wc = W[:, c:c+1, :, :]
-            else:
-                Xc = X[:, c:c+1]
-                Wc = W[:, c:c+1]
+            if c >= M.shape[1]:
+                continue
+            Mc = M[:, c:c+1]
+            Xc = X[:, c:c+1]
+            Wc = W[:, c:c+1]
+            
             S_raw = torch.cos(k * (Xc - Wc))
             S_prop = torch.pow(torch.clamp(S_raw, min=0.0), gamma)
-            sum_sim += S_prop
-            count += 1
-        if count == 0:
-            if X.dim() == 4:
-                return torch.ones((X.shape[0], 1, X.shape[2], X.shape[3]), device=X.device)
-            else:
-                return torch.ones((X.shape[0], 1), device=X.device)
+            sum_sim = sum_sim + S_prop * Mc
+            count = count + Mc
+            
+        count = count.clamp(min=1e-6)
         return sum_sim / count
 
     @staticmethod
-    def sim_mixed(X: torch.Tensor, W: torch.Tensor, intensity_channels: List[int], property_periods: Dict[int, float], gamma: float = 50.0) -> torch.Tensor:
-        """
-        方案 C: 混合属性相似度检索 (即主强门控与特征解耦双规并行)
-        """
-        if len(intensity_channels) > 0:
-            if X.dim() == 4:
-                X_int = X[:, intensity_channels, :, :]
-                W_int = W[:, intensity_channels, :, :]
-            else:
-                X_int = X[:, intensity_channels]
-                W_int = W[:, intensity_channels]
-            S_int = torch.sum(X_int * W_int, dim=1, keepdim=True)
-        else:
-            if X.dim() == 4:
-                S_int = torch.ones((X.shape[0], 1, X.shape[2], X.shape[3]), device=X.device)
-            else:
-                S_int = torch.ones((X.shape[0], 1), device=X.device)
-
-        if len(property_periods) > 0:
-            S_prop = SimilarityEngine.sim_property(X, W, property_periods, gamma)
-        else:
-            if X.dim() == 4:
-                S_prop = torch.ones((X.shape[0], 1, X.shape[2], X.shape[3]), device=X.device)
-            else:
-                S_prop = torch.ones((X.shape[0], 1), device=X.device)
-
-        return S_int * S_prop
-
-    @staticmethod
-    def calculate_similarity(X: torch.Tensor, W: torch.Tensor, cfg: 'MemoryConfig', mod_id: int) -> torch.Tensor:
-        """
-        多参量联合统一求解方法
-        """
+    def calculate_similarity(X: torch.Tensor, W: torch.Tensor, cfg: 'MemoryConfig', mod_id: int, mask_X: Optional[torch.Tensor] = None, mask_W: Optional[torch.Tensor] = None) -> torch.Tensor:
         finfo = getattr(cfg, 'feature_types', {}).get(mod_id, {})
-        i_chans = finfo.get('intensity', [])
-        p_chans = finfo.get('property', {})
+        metric = finfo.get('metric', 'Vector_Magnitude')
         
-        if len(i_chans) > 0 and len(p_chans) > 0:
-            return SimilarityEngine.sim_mixed(X, W, i_chans, p_chans)
-        elif len(p_chans) > 0:
-            return SimilarityEngine.sim_property(X, W, p_chans)
+        if mask_X is None:
+            mask_X = torch.ones(1, X.shape[1], device=X.device)
+        if mask_W is None:
+            mask_W = torch.ones(1, W.shape[1], device=W.device)
+            
+        # Ensure dimensions match
+        if mask_X.shape[1] > X.shape[1]:
+            mask_X = mask_X[:, :X.shape[1]]
+        if mask_W.shape[1] > W.shape[1]:
+            mask_W = mask_W[:, :W.shape[1]]
+            
+        if metric == 'Euclidean_Absolute':
+            sigma = finfo.get('sigma', 0.05)
+            return SimilarityEngine.sim_euclidean(X, W, mask_X, mask_W, sigma)
+        elif metric == 'Vector_Magnitude':
+            return SimilarityEngine.sim_vector(X, W, mask_X, mask_W)
+        elif metric == 'Periodic_Property':
+            periods = finfo.get('periods', {0: 1.0})
+            gamma = finfo.get('gamma', 2.0)
+            return SimilarityEngine.sim_periodic(X, W, mask_X, mask_W, periods, gamma)
         else:
-            if X.dim() == 4:
-                X_norm = F.normalize(X, p=2, dim=1)
-                W_norm = F.normalize(W, p=2, dim=1)
-                return SimilarityEngine.sim_conv1x1(X_norm, W_norm)
-            else:
-                # dim == 2
-                X_norm = F.normalize(X, p=2, dim=1)
-                W_norm = F.normalize(W, p=2, dim=1)
-                return SimilarityEngine.sim_conv1x1(X_norm, W_norm)
+            return SimilarityEngine.sim_vector(X, W, mask_X, mask_W)
 
 
 # =============================
@@ -423,9 +412,10 @@ class Gposition:
                 continue
                 
             w_m = node.prototype.to(self.device).view(1, -1, 1, 1)
+            mask_W = node.mask.to(self.device).view(1, -1)
             B, C_m, H, W = X_m.shape
             
-            S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id)
+            S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id, mask_W=mask_W)
             
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
             S_maps[node.node_id] = S_m * weight
@@ -446,7 +436,8 @@ class Gposition:
                 continue
                 
             w_m = node.prototype.to(self.device).view(1, -1, 1, 1)
-            S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id)
+            mask_W = node.mask.to(self.device).view(1, -1)
+            S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id, mask_W=mask_W)
             
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
             S_maps[node.node_id] = S_m * weight
@@ -771,7 +762,7 @@ class Controller:
         # Semantic Mask / Macro-Micro Saccade
         self.semantic_mask: Optional[torch.Tensor] = None
         self.semantic_history: Optional[torch.Tensor] = None
-        self.sigma_micro: float = 50.0
+        self.sigma_micro: float = getattr(self.cfg, 'sigma_micro', 50.0)
 
         # Run-step specific maps and buffers
         self.ior_map: Optional[torch.Tensor] = None
@@ -796,8 +787,12 @@ class Controller:
             C_m = X_m.shape[1]
             H, W = X_m.shape[-2], X_m.shape[-1]
             mod_attrs = self.cfg.feature_attributes.get(mod_id, {})
+            finfo = self.cfg.feature_types.get(mod_id, {})
+            paradigm = finfo.get('paradigm', 'C')
             
             valid_mask = torch.zeros((1, C_m), device=self.device)
+            sc_values = []
+            
             # Evaluate Write Gating Threshold
             for c in range(C_m):
                 attr = mod_attrs.get(c, 'STRENGTH')
@@ -805,14 +800,13 @@ class Controller:
                     continue
                 vc = X_m[0, c, y, x].item()
                 if attr == 'STRENGTH':
-                    print("vc", vc)
                     if abs(vc) > self.cfg.tau_str_gate:
                         valid_mask[0, c] = 1.0
                 elif attr == 'CONTINUITY_SURFACE':
                     dx = X_m[0, c, y, min(x+1, W-1)].item() - vc
                     dy = X_m[0, c, min(y+1, H-1), x].item() - vc
                     sc = math.exp(-(dx**2 + dy**2) / (2 * self.cfg.sigma_surf**2))
-                    print("sc", sc)
+                    sc_values.append(sc)
                     if sc > self.cfg.tau_surf_gate:
                         valid_mask[0, c] = 1.0
                 elif attr == 'CONTINUITY_TRACE':
@@ -823,14 +817,30 @@ class Controller:
                     v_x = torch.cos(local_window)
                     v_y = torch.sin(local_window)
                     coherence = torch.sqrt(torch.sum(v_x)**2 + torch.sum(v_y)**2) / (local_window.numel() + 1e-6)
-                    print("coherence", coherence)
                     if coherence.item() > self.cfg.tau_trace_gate:
                         valid_mask[0, c] = 1.0
                         
+            if paradigm == 'A':
+                if finfo.get('dominant_metric') == 'Isurf':
+                    if len(sc_values) > 0:
+                        isurf = sum(sc_values) / len(sc_values)
+                        if isurf > self.cfg.tau_surf_gate:
+                            valid_mask = torch.ones((1, C_m), device=self.device)
+                        else:
+                            continue
+                    else:
+                        continue
+                else:
+                    dom_c = finfo.get('dominant_channel', 0)
+                    if dom_c < C_m and valid_mask[0, dom_c].item() == 0:
+                        continue
+                    else:
+                        valid_mask = torch.ones((1, C_m), device=self.device)
+                    
             if torch.sum(valid_mask) == 0:
                 continue
 
-            local_vec = X_m[0, :, y, x].unsqueeze(0) * valid_mask
+            local_vec = X_m[0, :, y, x].unsqueeze(0)
             
             matched_node = None
             best_sim = -1.0
@@ -838,18 +848,17 @@ class Controller:
             for node in gmem_i.nodes.values():
                 if node.modality_id == mod_id:
                     w_node = node.prototype.unsqueeze(0)
-                    sim = SimilarityEngine.calculate_similarity(local_vec, w_node, self.cfg, mod_id).item()
+                    sim = SimilarityEngine.calculate_similarity(local_vec, w_node, self.cfg, mod_id, mask_X=valid_mask, mask_W=node.mask.unsqueeze(0)).item()
                     if sim > best_sim:
                         best_sim = sim
                         matched_node = node
                         
-            print("best_sim", best_sim, "0.85")
             if matched_node and best_sim >= similarity_threshold:
                 matched_node.count += 1
                 matched_node.last_seen = time.time()
                 active_nodes.append(matched_node)
             else:
-                new_node = gmem_i.add_node(mod_id, local_vec.squeeze(0).detach().clone())
+                new_node = gmem_i.add_node(mod_id, local_vec.squeeze(0).detach().clone(), mask=valid_mask.squeeze(0).detach().clone())
                 active_nodes.append(new_node)
                 
         return active_nodes
@@ -922,13 +931,12 @@ class Controller:
             V = V_next
             
         edge_pool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-        for _ in range(5):
+        for _ in range(getattr(self.cfg, 'mask_edge_dilation', 5)):
             V = edge_pool(V)
 
         # 4. Final dynamic energy output
         E_dynamic = V
         E_dynamic[E_dynamic < 0.05] = 0
-        self.matrix1 = E_dynamic
         return E_dynamic
 
     def _decide_next_saccade_review(self, I_map: torch.Tensor) -> Tuple[int, int]:
@@ -943,8 +951,8 @@ class Controller:
         self.ior_map = self.ior_map * 0.9  # Decay
         self.ior_map += torch.exp(-dist_sq / (2 * ior_sigma**2)).view(1, 1, H, W)
         
-        alpha_ior = 0.5
-        gamma_dist = 0.001
+        alpha_ior = getattr(self.cfg, 'alpha_ior', 0.5)
+        gamma_dist = getattr(self.cfg, 'gamma_dist', 0.001)
         
         drive = I_map - alpha_ior * self.ior_map - gamma_dist * torch.sqrt(dist_sq).view(1, 1, H, W)
         if drive.max() < -1e3:
@@ -1031,14 +1039,6 @@ class Controller:
         
         # Next saccade point is the max of remaining dynamic energy
         drive = self.semantic_mask
-        
-        if self.optimizer.H_orig is not None and self.optimizer.W_orig is not None:
-            # 保留兴趣压制：压低外围兴趣
-            h1, h2 = max(0, H//2-(self.optimizer.H_orig-self.optimizer.r)//2), min(H, H//2+(self.optimizer.H_orig-self.optimizer.r)//2)
-            w1, w2 = max(0, W//2-(self.optimizer.W_orig-self.optimizer.r)//2), min(W, W//2+(self.optimizer.W_orig-self.optimizer.r)//2)
-            drive[:, :, :w1, :] = 0; drive[:, :, w2:, :] = 0
-            drive[:, :, :, :h1] = 0; drive[:, :, :, h2:] = 0
-
         if drive.max() < 1e-6:
             idx = torch.randint(0, H*W, (1,)).item()
         else:
@@ -1050,7 +1050,7 @@ class Controller:
             return 'empty'
         sum_energy = torch.sum(semantic_mask).item()
         # Exit if energy drops below a small threshold
-        if sum_energy < 5.0:
+        if sum_energy < 1.0:
             return 'depleted'
             
         if local_nodes and gmem_ii and gmem_i and self.active_semantic_id is not None:
