@@ -4,7 +4,7 @@
 
 ---
 
-## 探讨一：色彩特征原型的替换 (Hue $\to$ RGB)
+## 探讨一：色彩特征原型的替换 (Hue $\to$ RGB) **已完成，等待指令移入Algorithm_gmp.md**
 
 ### 1. 现有方案缺陷分析
 在以往的代码中，系统使用单一通道的 `hue`（色相）特征作为大面积二维连续面（如天空、桌面）的特征原型并寻找相似区域。这一设计在真实图像环境下暴露出严重不足：
@@ -21,7 +21,7 @@
 
 ---
 
-## 探讨二：多模态特征的规范化抽取与写入工作流 (Universal Extraction Pipeline)
+## 探讨二：多模态特征的规范化抽取与写入工作流 (Universal Extraction Pipeline) **已完成，等待指令移入Algorithm_gmp.md**
 
 ### 1. 导致 GposI 响应失效的病理诊断
 针对调试中发现的问题：“对于 `grad` 模态传来的双通道特征，若第一个通道不满足 `tau_str_gate`，第二个通道满足 `tau_trace_gate`，导致写入的原型呈现 `tensor([0.0, anyvalidfloat])`，进而致使 GposI 余弦相似度计算失效”。
@@ -121,103 +121,158 @@
 
 ---
 
-## 探讨四：眼动引导机制的重构与图结构中自指边的引入 (Saccade Guidance & Self-Referential Edges)
+## 探讨：眼动引导机制与图结构边关系的重构 (Saccade Guidance & Hyperedge Relations)
 
-### 1. 现有眼动引导机制的局限性 (Limitations of Distance Inhibition)
+### 一、现有机制的局限与解决方法
+
+#### 1. 现有眼动引导机制的局限性
 当前的视线引导策略在面临大块“二维连续特征”（如大面积纯色桌面、天空）时存在严重缺陷。由于全局采用了单一的距离惩罚机制（倾向于选择距离当前注视点近的特征），导致视线被困在平坦的同质化区域内“打转”。
-在人类视觉认知中，当视网膜中央凹识别到当前区域是一个巨大的重复/连续面时，眼球绝不会在内部盲目游走，而是会迅速产生一个**“边界逃逸（Boundary Escape）”**眼跳，直接跃向该形状的边缘或端点，以获取物体的几何轮廓（Gestalt 完形）。显然，我们需要在 MICRO / MACRO 状态机中引入随特征拓扑属性动态变化的目标引导场。
 
-### 2. 基于人类眼动规律的注视点引导策略重构
-我们需要根据当前所处的特征拓扑轴（`feature_attributes`）动态调整视线引导目标和距离惩罚项：
+在人类视觉认知中，当视网膜中央凹识别到当前区域是一个巨大的重复/连续面时，眼球不会在内部盲目游走，而是会迅速产生**边界逃逸（Boundary Escape）**眼跳，转向形状边缘、端点、角点或交点，以获取物体的几何轮廓（Gestalt 完形）。因此，MICRO / MACRO 状态机必须引入随特征拓扑属性动态变化的目标引导场。
 
-*   **针对二维面域 (Surface_2D) 的边界逃逸**：
-    当视线连续命中相同的面域特征节点（如 `Modality.COLOR` 命中缓存）时，触发“面域厌倦”。此时，当前节点的 GposI 响应图在局部应被反转或强力抑制，引导场 $I_{map}$ 的峰值应被强制推向该连续面与**突变边界 (Boundary_Edge)**特征（如 `Modality.GRAD` 响应剧烈处）的交界线。**距离惩罚在此刻应被暂时削弱或转为“最小安全跨度”**，迫使眼球进行大跨度扫视以抵达边缘。
-*   **针对一维线域 (Trace_1D) 的端点牵引**：
-    当视线跟踪一条连续线段时，引导力场不应只是无序地在周围发散，而应当沿着当前线段的切线方向（可通过历史眼跳向量平滑获得）向前投射。最高期望点应落在预测的**端点 (Terminators)**或**角点/交点 (Junctions)**上。
-*   **动态距离调节机制 (Dynamic Distance Penalty)**：
-    距离衰减系数 $\gamma$ 不能是常数。在 MACRO 状态（寻找新物体）时，$\gamma$ 应极低以允许大范围格式塔跳跃；在 MICRO 状态的初期特征确认阶段，$\gamma$ 保持中等；而在探明一维/二维连续性后触发“探索边界”时，$\gamma$ 甚至可以为负（鼓励远离中心），直至撞击到新的高频突变特征。
+#### 2. 基于拓扑属性的眼动修正原则
+视线目标和距离项应由当前特征拓扑决定：
 
-### 3. 图结构中引入“自指边”表征一维/二维重复特征 (Self-Referential Edges)
-在解决了眼球如何走向边缘后，我们要解决图结构如何“经济地”记忆这些大面积连续特征。如果桌面上有 100 个点，生成 100 个互相连接的相同 RGB 节点是极度冗余的，这就需要引入**自指边 (Self-Edge, $node \to node$)**。
+*   **二维面域 (Surface_2D)**：当视线连续命中相同面域特征节点（如 `Modality.COLOR` 命中缓存）时，触发面域厌倦。此时 GposI 面域响应不应继续把视线困在内部，而应与 Boundary/Grad 响应共同形成边界候选，引导视线向连续面与突变边界的交界线跳跃。
+*   **一维线域 (Trace_1D)**：当视线跟踪连续线段时，目标场应沿当前线段切线方向前推，并优先选择端点（Terminators）、角点、交点（Junctions）和高曲率片段。
+*   **动态距离调节**：距离衰减系数 $\gamma$ 不能是常数。MACRO 状态应弱化距离项以允许格式塔式大跳；MICRO 初期确认阶段可保留局部约束；当系统进入边界逃逸或轮廓跟随时，距离项应转化为最小跨度、环带或切向带通约束，而不是单纯近距离偏置。
 
-*   **表征机制构建**：
-    在微观扫视 (MICRO) 过程中，如果发生连续的眼跳 $p_{t-1} \to p_t$，并且在这两个位置提取的特征在 Step 2 的缓存检索中**命中了同一个 GmemI 历史原型节点**，且该原型的拓扑属性为 `Surface_2D` 或 `Trace_1D`，系统将**不再创建新的拓扑相邻节点**。
-    取而代之的是，我们在当前所在的 GmemII (或 GmemI 集合) 节点上，添加一条**指向自身的有向边**。这条自指边的权重/属性记录了这次眼跳的空间跨度向量 $\Delta \mathbf{v} = p_t - p_{t-1}$ 以及该次跨越的像素面积/长度积分。
-*   **对复杂连续特征的表征有效性分析**：
-    **这种机制极为有效。** 
-    1.  **极度压缩 (Sparsity)**：一个庞大且形状复杂的纯色桌面，在图结构中被坍缩为**仅仅一个** `GmemII`（挂载着核心颜色的 `GmemI`），其内部包含多条记录了不同方向空间跨度的自指边。这些自指边的向量集合，在数学上等价于描绘了该平面的多边形凸包（Convex Hull）或边界极坐标系。
-    2.  **尺度与形态解耦**：自指边将“特征是什么（节点内容）”和“特征有多大/延伸多远（自指边跨度积分）”完美解耦。在 L2/L3 检索时，即便看到一个两倍大的相似桌面，图匹配也能瞬间判定结构同构（节点一样，只是自指边的积分标量放大），极大增强了系统对复杂二维面和一维线的尺度/形变不变性，高度契合人类对同质连续体的认知直觉。
-
-### 4. 方案修正：从单一 semantic 耗竭改为拓扑意图场 (Topological Intention Field)
-上述“边界逃逸 + 自指边”只能解决视线离开同质面域的问题，但仍不足以完整学习**复杂边缘的大块二维连续特征**。原因在于：
-*   复杂面域至少包含两类互补信息：内部颜色/材质原型 $\mathbf{w}_{surf}$ 与外部轮廓函数 $\partial \Omega$。若仅在面域内部耗竭 `semantic_mask`，系统会重复确认颜色，却无法高效编码轮廓；若仅跃向边界，又会丢失内部颜色统计。
-*   自指边的跨度向量集合更接近凸包或径向外延统计。对于凹形边界、孔洞、多段折线轮廓，仅依靠自指边会损失形状细节。因此自指边应记录“面域延展尺度”，而复杂边界必须额外写入有序轮廓链或边界锚点集合。
+#### 3. 从单一 semantic 耗竭改为拓扑意图场
+单纯“边界逃逸”只能解决视线离开同质面域的问题，但不足以完整学习**复杂边缘的大块二维连续特征**。复杂面域至少包含两类互补信息：内部颜色/材质原型 $\mathbf{w}_{surf}$ 与外部轮廓函数 $\partial \Omega$。若仅在面域内部耗竭 `semantic_mask`，系统会重复确认颜色，却无法高效编码轮廓；若仅跃向边界，又会丢失内部颜色统计。
 
 因此，`LEARN_MICRO` 不应被视为一个均质扫描状态，而应拆解为由同一状态机内部调度的若干**拓扑意图 (Intention)**。每个意图只改变眼跳目标场，不改变 Gmem/Gpos 的总体架构：
+
 1.  `SURFACE_CONFIRM`：确认当前面域原型，估计内部颜色均值、方差与稳定性。
 2.  `INTERIOR_SAMPLE`：用少量代表点采样内部，避免把大面积同质区域逐点扫完。
 3.  `BOUNDARY_SEEK`：从面域内部发起大跨度边界逃逸。
 4.  `CONTOUR_TRACE`：沿边界切线方向采样端点、角点、交点与高曲率片段。
 5.  `RESUME_OR_EXIT`：根据内部置信度与边界覆盖度决定恢复、挂起或退出到 `LEARN_MACRO`。
 
-### 5. 面域 MICRO 的目标场定义
-设当前二维连续面域的软掩码为 $M_{\Omega}(\mathbf{q})$，边缘强度场为 $I_{edge}(\mathbf{q})$，当前注视点为 $\mathbf{p}_t$，宏观锚点为 $\mathbf{p}_0$。
+#### 4. 面域 MICRO 的 Gpos 响应目标场定义
+经过 Gpos 位置相似度审查后，`LEARN_MICRO` 中各意图的候选场不应再写成脱离 Gpos 的抽象兴趣项，而应明确由 Gpos 响应构成。设：
 
-#### 5.1 内部代表点采样场
-内部学习不应依赖近距离随机游走，而应近似人类对均质表面的少量代表性取样。定义已采样内部点集合为 $\mathcal{P}_{in}$，则内部候选场为：
+*   $S^{I}_{surf}(\mathbf{q}; n_s)$：Surface/Color 类 GmemI 节点 $n_s$ 的 GposI 响应。
+*   $S^{I}_{color}(\mathbf{q}; n_c)$：当前面域颜色原型 $n_c$ 的 GposI 响应；若 $n_s$ 本身即为颜色面节点，可令 $n_c=n_s$。
+*   $S^{I}_{edge}(\mathbf{q})$：Boundary/Grad 类边界节点或边缘基场的 GposI 响应。
+*   $S^{I}_{corner}(\mathbf{q})$、$S^{I}_{junction}(\mathbf{q})$、$S^{I}_{term}(\mathbf{q})$：由曲率、方向突变、端点等 GmemI 节点投影得到的 GposI 响应。若对应节点尚未稳定形成，可由局部几何算子临时近似，但语义上仍视为待注册的 GposI 候选响应。
+*   $S^{II}_{sem}(\mathbf{q})$：同类已学习 GmemII 的结构响应。当前代码尚未可靠实现完整 GposII，因此新对象学习时该项可置零；在 REVIEW 或熟悉对象复现时，该项作为结构先验接入。
+
+当前面域掩码不再是独立经验场，而由 GposI Surface 响应经过连通扩散得到：
 $$
-U_{in}(\mathbf{q}) =
-M_{\Omega}(\mathbf{q}) \cdot
+M_{\Omega}(\mathbf{q})
+=
+\operatorname{ConnDiffuse}_{\mathbf{p}_0}
+\left(
+\operatorname{Norm}\left(S^{I}_{surf}(\mathbf{q};n_s)\right),
+\tau_{\Omega}
+\right)
+$$
+其中 $\mathbf{p}_0$ 是宏观落点或当前 GmemII 锚点，$\operatorname{ConnDiffuse}$ 表示以 $\mathbf{p}_0$ 为种子的连通域扩散，仅允许在同源 Surface 响应足够高的区域内传播。
+
+##### 4.1 `SURFACE_CONFIRM` 与 `INTERIOR_SAMPLE`
+`SURFACE_CONFIRM` 的目标是确认当前注视仍在同一面域原型中，因此其确认场为：
+$$
+U_{confirm}(\mathbf{q})
+=
+M_{\Omega}(\mathbf{q})
+\odot
+S^{I}_{surf}(\mathbf{q};n_s)
+$$
+
+`INTERIOR_SAMPLE` 的目标是用少量代表点学习内部颜色统计。内部候选应同时考虑同源颜色响应、未被现有颜色原型解释的残差响应，以及代表点间隔：
+$$
+R^{I}_{color}(\mathbf{q})
+=
+1 -
+\max_{n_c \in \mathcal{C}_{\Omega}}
+S^{I}_{color}(\mathbf{q};n_c)
+$$
+$$
+U_{in}(\mathbf{q})
+=
+M_{\Omega}(\mathbf{q})
+\odot
 \left[
-w_c C_{color}(\mathbf{q}) +
-w_v V_{res}(\mathbf{q}) +
-w_d D_{blue}(\mathbf{q}, \mathcal{P}_{in})
+w_c S^{I}_{color}(\mathbf{q};n_c)
++ w_r R^{I}_{color}(\mathbf{q})
++ w_d D_{blue}(\mathbf{q}, \mathcal{P}_{in})
 \right]
 $$
-其中：
-*   $C_{color}$ 表示颜色原型响应，优先选择与当前面域同源的点。
-*   $V_{res}$ 表示局部颜色残差或方差不确定性。若面域确实均质，该项很快趋近于低值。
-*   $D_{blue}$ 是蓝噪声/最远点式间隔项，鼓励少量代表点覆盖面域，而不是在局部打转。
+其中 $\mathcal{C}_{\Omega}$ 是当前面域已注册或正在统计的颜色原型集合，$R^{I}_{color}$ 表示当前 GposI 颜色节点集合解释不了的内部残差。若 $R^{I}_{color}$ 持续形成连通高值区域，则不应继续把它并入同一颜色统计，而应触发子区域分裂或新颜色节点注册。
 
-内部采样停止条件：
+内部采样停止条件为：
 $$
 N_{in} \ge N_{min}
 \quad \land \quad
 \operatorname{Tr}(\Sigma_{color}) < \theta_{color\_var}
+\quad \land \quad
+\sum M_{\Omega} \odot R^{I}_{color} < \theta_{res}
 $$
-或当残差区域面积低于阈值时停止。这样可将“大面积纯色”压缩为颜色均值、协方差、样本数与置信度，而不是大量重复 GmemI 节点。
+这保证“大面积纯色”被压缩为颜色均值、协方差、样本数与置信度；同时保留对内部异色斑块或纹理残差的发现能力。
 
-#### 5.2 边界候选场
-二维面域的边界不是当前点附近的最高响应，而是 $M_{\Omega}$ 与强突变场的交界。可用形态学梯度近似：
+##### 4.2 `BOUNDARY_SEEK`
+二维面域的边界候选必须来自 Surface GposI 与 Boundary GposI 的交界，而不是来自纯空间距离项。定义：
 $$
-B_{\Omega}(\mathbf{q}) =
+B_{\Omega}^{I}(\mathbf{q})
+=
 \operatorname{Norm}\left(
 \left|\nabla M_{\Omega}(\mathbf{q})\right|
 \right)
 \odot
-\operatorname{Norm}\left(I_{edge}(\mathbf{q}) + \lambda_k I_{corner}(\mathbf{q})\right)
+\operatorname{Norm}\left(
+w_e S^{I}_{edge}(\mathbf{q})
++ w_k S^{I}_{corner}(\mathbf{q})
+\right)
 $$
-其中 $I_{corner}$ 可由边缘方向变化率、曲率响应或局部结构张量不稳定性近似。边界逃逸阶段的目标场为：
+若已有同类 GmemII 被识别或处于 REVIEW 复现阶段，可加入结构先验：
 $$
-U_{bd}(\mathbf{q}) =
-w_b B_{\Omega}(\mathbf{q})
-+ w_u U_{unseen}^{bd}(\mathbf{q})
-+ w_r R_{span}(\mathbf{q}; \mathbf{p}_0)
-- \gamma_{safe} O_{visited}(\mathbf{q})
+B_{\Omega}^{Gpos}(\mathbf{q})
+=
+B_{\Omega}^{I}(\mathbf{q})
++ w_{II} S^{II}_{sem}(\mathbf{q})
 $$
-其中 $R_{span}$ 鼓励从锚点向外达到足够径向跨度，$U_{unseen}^{bd}$ 鼓励未采样边界，$O_{visited}$ 是边界已访问抑制。此时**不使用近距离偏置**；若需要距离项，也应是最小跨度或环带约束：
-$$
-D_{seek}(\mathbf{q}) =
--\gamma_{ann}\left(\|\mathbf{q}-\mathbf{p}_t\| - s_{seek}\right)^2
-$$
-这使眼跳倾向于落在“合理远”的边界候选，而不是落在近邻同质像素。
+其中 $S^{II}_{sem}$ 只能在 GposII 结构位置相似度实现可靠后作为正式项；当前实现阶段可令 $w_{II}=0$。
 
-#### 5.3 轮廓跟随场
-当注视点已经进入边界带，系统进入 `CONTOUR_TRACE`。设上一段眼跳平滑出的边界切向量为 $\hat{\mathbf{t}}_t$，期望边界步长为 $s_{edge}$，则：
+边界逃逸目标场为：
 $$
-U_{trace}(\mathbf{q}) =
-B_{\Omega}(\mathbf{q})
-\cdot
+U_{bd}(\mathbf{q})
+=
+\left[
+w_b B_{\Omega}^{Gpos}(\mathbf{q})
++ w_u U_{unseen}^{bd}(\mathbf{q})
+\right]
+\odot R_{span}(\mathbf{q};\mathbf{p}_0)
+\odot
+\left(1-O_{visited}^{bd}(\mathbf{q})\right)
+$$
+其中 $U_{unseen}^{bd}$ 与 $O_{visited}^{bd}$ 分别表示边界未访问增益和边界已访问抑制；它们作用于 Gpos 边界候选，不再单独制造候选。若需要空间约束，应作为眼跳带通约束叠加到目标场上：
+$$
+G_{seek}(\mathbf{q})
+=
+\exp\left(
+-\frac{(\|\mathbf{q}-\mathbf{p}_t\|-s_{seek})^2}{2\sigma_{seek}^2}
+\right),
+\quad
+\tilde{U}_{bd}=U_{bd}\odot G_{seek}
+$$
+
+##### 4.3 `CONTOUR_TRACE`
+当注视点已经进入边界带，系统进入 `CONTOUR_TRACE`。轮廓候选来自边缘、角点、交点、端点等 GposI 响应；若对象已被结构识别，可再叠加 GposII 的边界链预测响应：
+$$
+S^{Gpos}_{contour}(\mathbf{q})
+=
+w_e S^{I}_{edge}(\mathbf{q})
++ w_k S^{I}_{corner}(\mathbf{q})
++ w_j S^{I}_{junction}(\mathbf{q})
++ w_t S^{I}_{term}(\mathbf{q})
++ w_{II} S^{II}_{boundary}(\mathbf{q})
+$$
+其中 $S^{II}_{boundary}$ 表示已学习 GmemII 边界链对当前视野的结构预测；新对象学习或 GposII 尚未可靠实现时令其为零。
+
+设上一段眼跳平滑出的边界切向量为 $\hat{\mathbf{t}}_t$，期望边界步长为 $s_{edge}$，则切向和步长只作为空间约束项：
+$$
+G_{tan}(\mathbf{q})
+=
 \exp\left(
 -\frac{\angle(\mathbf{q}-\mathbf{p}_t,\hat{\mathbf{t}}_t)^2}{2\sigma_\theta^2}
 \right)
@@ -225,47 +280,67 @@ B_{\Omega}(\mathbf{q})
 \exp\left(
 -\frac{(\|\mathbf{q}-\mathbf{p}_t\|-s_{edge})^2}{2\sigma_s^2}
 \right)
-\cdot
-(1 - O_{bd}(\mathbf{q}))
 $$
-该式把“距离抑制”改成“带通步长约束”：既不原地打转，也不无约束远跳。若候选点存在高曲率、端点、T/Y 交点，则加入额外增益：
+最终轮廓跟随目标场为：
 $$
-U_{trace}^{+} = U_{trace} + w_k I_{corner} + w_j I_{junction} + w_e I_{terminator}
+U_{trace}(\mathbf{q})
+=
+B_{\Omega}^{Gpos}(\mathbf{q})
+\odot
+S^{Gpos}_{contour}(\mathbf{q})
+\odot
+G_{tan}(\mathbf{q})
+\odot
+\left(1-O_{bd}(\mathbf{q})\right)
 $$
-这符合人类眼动中对轮廓端点、角点、交点和信息量突变位置的优先注视。
+该式将原先独立的角点、端点和交点增益全部改写为 Gpos 响应项；距离相关项仅限定眼跳步长和切向，不再作为候选来源。
 
-### 6. MICRO / MACRO 切换逻辑修正
+##### 4.4 `RESUME_OR_EXIT`
+退出与恢复判定也应使用 Gpos 生成的内部残差和边界覆盖，而不是使用独立经验场。定义边界覆盖率：
+$$
+C_{bd}
+=
+\frac{
+\sum O_{bd}(\mathbf{q}) \odot B_{\Omega}^{Gpos}(\mathbf{q})
+}{
+\sum B_{\Omega}^{Gpos}(\mathbf{q}) + \epsilon
+}
+$$
+内部残差率为：
+$$
+C_{res}
+=
+\frac{
+\sum M_{\Omega}(\mathbf{q}) \odot R^{I}_{color}(\mathbf{q})
+}{
+\sum M_{\Omega}(\mathbf{q})+\epsilon
+}
+$$
+当 $C_{bd}>\theta_{bd\_cover}$、$C_{res}<\theta_{res}$ 且颜色统计稳定时，当前面域可退出；若 $B_{\Omega}^{Gpos}$ 指向未访问强边界或 $R^{I}_{color}$ 指向未解释内部子区，则进入 `BOUNDARY_SEEK` 或 `INTERIOR_SAMPLE`。
+
+#### 5. MICRO / MACRO 切换逻辑修正
 原有 `LEARN_MICRO -> LEARN_MACRO` 的“模态突变退出”需要细分。对于二维面域，触碰边界不应立即视为离开当前语义对象，而应首先视为该对象的**预期边界发现**。
 
 推荐状态转移：
+
 1.  `LEARN_MACRO -> LEARN_MICRO`：落点位于未探索连续面域中心，创建以 Surface_2D 节点为锚的 GmemII。
-2.  `SURFACE_CONFIRM -> INTERIOR_SAMPLE`：连续命中同一 Surface_2D 原型，且 $A_{\Omega}$ 或 $S_{span}$ 超过小物体阈值。
+2.  `SURFACE_CONFIRM -> INTERIOR_SAMPLE`：连续命中同一 Surface_2D 原型，且 $A_{\Omega}=\sum M_{\Omega}$ 或 $S_{span}$ 超过小物体阈值。
 3.  `INTERIOR_SAMPLE -> BOUNDARY_SEEK`：内部颜色统计稳定，或重复命中同一原型次数超过 $\theta_{repeat}$。
-4.  `BOUNDARY_SEEK -> CONTOUR_TRACE`：下一注视点满足 $B_{\Omega}(\mathbf{p}_{t+1}) > \theta_{bd}$。
+4.  `BOUNDARY_SEEK -> CONTOUR_TRACE`：下一注视点满足 $B_{\Omega}^{Gpos}(\mathbf{p}_{t+1}) > \theta_{bd}$。
 5.  `CONTOUR_TRACE -> BOUNDARY_SEEK`：当前边界段到达局部终点但边界覆盖率不足，重新选择未访问边界候选。
-6.  `CONTOUR_TRACE -> INTERIOR_SAMPLE`：边界提示内部存在多颜色/纹理残差，回到内部做子区域分裂。
+6.  `CONTOUR_TRACE -> INTERIOR_SAMPLE`：边界或内部 GposI 残差提示存在多颜色/纹理子区，即 $C_{res}>\theta_{res}$，回到内部做子区域分裂。
 7.  `LEARN_MICRO -> LEARN_MACRO`：同时满足内部稳定度与边界覆盖度：
 $$
 C_{done} =
 \left[\operatorname{Tr}(\Sigma_{color}) < \theta_{color\_var}\right]
 \land
-\left[
-\frac{\sum O_{bd} \odot B_{\Omega}}{\sum B_{\Omega} + \epsilon}
-> \theta_{bd\_cover}
-\right]
+\left[C_{bd} > \theta_{bd\_cover}\right]
+\land
+\left[C_{res} < \theta_{res}\right]
 $$
 8.  `挂起/恢复`：若边界外侧出现强异质特征或另一个对象，当前面域 GmemII 标记为 `is_completed = false` 并挂起；学习完外侧子结构后恢复该面域的未访问边界段。
 
-### 7. GmemII 对二维连续特征的写入规范
-复杂连续面域应被写成一个“面域主体 + 轮廓约束”的语义节点，而不是大量同质点的无序集合：
-*   **面域主体**：挂载 Surface_2D 的 GmemI 原型，保存内部颜色均值 $\mu_{color}$、协方差 $\Sigma_{color}$、样本数 $N_{in}$、面域面积估计 $A_{\Omega}$。
-*   **自指延展边**：当连续眼跳命中同一 Surface_2D 原型时，记录 $\Delta\mathbf{v}$、跨度长度、方向、置信度，用于表达该面域的尺度与方向性延展。
-*   **边界链**：对 `CONTOUR_TRACE` 中采样到的边缘/角点/端点节点，按访问顺序或局部切线方向建立 `boundary_links`。每条边界链接记录相对锚点极坐标 $(\Delta\rho,\Delta\theta)$、局部切线 $\hat{\mathbf{t}}$、曲率 $\kappa$、边界类型 `edge/corner/junction/terminator`。
-*   **闭合与覆盖属性**：保存 `boundary_coverage`、`is_closed_contour`、`has_hole_candidate`。对于凹形或带孔面域，允许多个边界环；自指边只负责尺度先验，不能替代边界链。
-
-该写法保持底层逻辑简洁：节点表示“是什么”，自指边表示“延展多远”，边界链表示“形状如何闭合”。对大块连续二维特征，模型因此可以同时学到内部颜色和复杂边缘形状。
-
-### 8. 距离项的普适调度原则
+#### 6. 距离项的普适调度原则
 距离项 $\gamma$ 不应作为全局常数，而应由当前拓扑意图决定：
 
 | 状态/意图 | 距离项形式 | 行为含义 |

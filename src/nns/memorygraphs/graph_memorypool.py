@@ -1,7 +1,8 @@
 import math
 import time
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from collections import defaultdict
 
 import numpy as np
@@ -17,12 +18,12 @@ class MemoryConfig:
     H = 256
     W = 256
     device = torch.device('cpu')
-    
+
     # 极坐标采样配置 (Log-Polar Config)
     lp_rho_bins = 64
     lp_theta_bins = 64
     lp_base_radius = 2.0
-    
+
     # 广义距离变换形变约束 (GDT Constraints)
     default_lambda_rho = 1.5
     default_gamma_theta = 2.0
@@ -123,6 +124,36 @@ class MemoryConfig:
     sigma_consume = 10.0
     alpha_consume = 0.8
 
+    # Hyperedge / relation graph params
+    relation_merge_threshold = 0.45
+    relation_confidence_decay = 0.98
+    self_edge_min_span = 1.0
+
+    # LEARN_MICRO topological intention params
+    micro_min_interior_samples = 3
+    micro_repeat_to_boundary = 3
+    micro_min_area_for_boundary = 128.0
+    theta_color_var = 0.02
+    theta_res = 0.18
+    theta_bd_cover = 0.65
+    theta_boundary = 0.05
+    micro_w_color = 1.0
+    micro_w_residual = 0.8
+    micro_w_blue = 0.6
+    micro_w_boundary = 1.2
+    micro_w_unseen_boundary = 0.9
+    micro_w_edge = 1.0
+    micro_w_corner = 0.5
+    micro_w_junction = 0.4
+    micro_w_terminator = 0.4
+    micro_w_semantic_prior = 0.0
+    sigma_seek = 28.0
+    seek_step = 60.0
+    sigma_trace_step = 18.0
+    trace_step = 24.0
+    sigma_trace_angle = 0.9
+    sigma_boundary_visit = 8.0
+
 
 # =============================
 # Controller State Machine
@@ -136,6 +167,58 @@ class MainPhase(Enum):
     REVIEW = 1
     LEARN_MACRO = 2
     LEARN_MICRO = 3
+
+class MicroIntention(Enum):
+    SURFACE_CONFIRM = 1
+    INTERIOR_SAMPLE = 2
+    BOUNDARY_SEEK = 3
+    CONTOUR_TRACE = 4
+    RESUME_OR_EXIT = 5
+
+
+def _angle_delta(a: float, b: float) -> float:
+    return math.atan2(math.sin(a - b), math.cos(a - b))
+
+
+@dataclass
+class RelationEdge:
+    """A multigraph relation edge stored inside a semantic/entity hyperedge."""
+    edge_id: int
+    src_id: int
+    dst_id: int
+    rho_offset: float
+    theta_offset: float
+    lambda_rho: float
+    gamma_theta: float
+    role: str = 'peripheral'
+    count: int = 1
+    confidence: float = 1.0
+    span: float = 0.0
+    area: float = 0.0
+
+    def distance_to(self, rho_offset: float, theta_offset: float) -> float:
+        dr = rho_offset - self.rho_offset
+        dt = _angle_delta(theta_offset, self.theta_offset)
+        return math.sqrt((self.lambda_rho * dr) ** 2 + (self.gamma_theta * dt) ** 2)
+
+    def update(self, rho_offset: float, theta_offset: float, span: float = 0.0, area: float = 0.0):
+        new_count = self.count + 1
+        alpha = 1.0 / new_count
+        dtheta = _angle_delta(theta_offset, self.theta_offset)
+        self.rho_offset = (1.0 - alpha) * self.rho_offset + alpha * rho_offset
+        self.theta_offset = self.theta_offset + alpha * dtheta
+        self.span = (1.0 - alpha) * self.span + alpha * span
+        self.area = (1.0 - alpha) * self.area + alpha * area
+        self.count = new_count
+        self.confidence = min(1.0, self.confidence + alpha * (1.0 - self.confidence))
+
+    def as_legacy_link(self) -> Dict[str, float]:
+        return {
+            'rho_offset': self.rho_offset,
+            'theta_offset': self.theta_offset,
+            'lambda_rho': self.lambda_rho,
+            'gamma_theta': self.gamma_theta,
+        }
 
 
 # =============================
@@ -185,7 +268,14 @@ class SemanticNode:
     def __init__(self, node_id: int, anchor_id: int):
         self.node_id = node_id
         self.anchor_id = anchor_id
+        # Legacy first-edge view kept for older callers. Full topology is in relation_edges.
         self.peripheral_links: Dict[int, Dict[str, float]] = {}
+        self.child_node_ids: Set[int] = {anchor_id}
+        self.relation_edges: Dict[int, RelationEdge] = {}
+        self.relation_edges_by_pair: Dict[Tuple[int, int], List[int]] = defaultdict(list)
+        self.relation_edge_ids: List[int] = []
+        self.self_edge_ids: List[int] = []
+        self.boundary_edge_ids: List[int] = []
         
         self.activation_level = 0.0
         self.state_flag = NeuronState.CALM
@@ -195,6 +285,26 @@ class SemanticNode:
         self.explore_time = 0.0
         self.max_span = 0.0
         self.is_completed = False
+        self.color_mean: Optional[torch.Tensor] = None
+        self.color_m2: Optional[torch.Tensor] = None
+        self.color_samples = 0
+        self.boundary_coverage = 0.0
+        self.color_residual = 1.0
+        self.is_closed_contour = False
+        self.has_hole_candidate = False
+
+    def related_node_ids(self) -> Set[int]:
+        ids = set(self.child_node_ids)
+        ids.add(self.anchor_id)
+        for edge in self.relation_edges.values():
+            ids.add(edge.src_id)
+            ids.add(edge.dst_id)
+        return ids
+
+    def iter_relation_edges(self, role: Optional[str] = None):
+        for edge in self.relation_edges.values():
+            if role is None or edge.role == role:
+                yield edge
 
     def tick_update(self, E_input: float, cfg: MemoryConfig):
         if self.state_flag == NeuronState.REFRACTORY:
@@ -223,6 +333,9 @@ class EntityNode:
     def __init__(self, node_id: int):
         self.node_id = node_id
         self.components: Dict[int, Dict[str, float]] = {} # sid -> { 'dx': float, 'dy': float }
+        self.component_edges: Dict[int, Dict[str, float]] = {}
+        self.component_edges_by_semantic: Dict[int, List[int]] = defaultdict(list)
+        self.next_component_edge_id = 0
         
         self.activation_level = 0.0
         self.state_flag = NeuronState.CALM
@@ -270,6 +383,7 @@ class GmemoryII:
         self.cfg = cfg
         self.semantic_nodes: Dict[int, SemanticNode] = {}
         self.next_node_id = 0
+        self.next_relation_edge_id = 0
 
     def add_semantic_node(self, anchor_id: int) -> SemanticNode:
         nid = self.next_node_id
@@ -278,18 +392,63 @@ class GmemoryII:
         self.semantic_nodes[nid] = node
         return node
 
-    def add_peripheral(self, semantic_node: SemanticNode, peri_id: int, 
-                       rho_offset: float, theta_offset: float,
-                       lambda_rho: Optional[float] = None, gamma_theta: Optional[float] = None):
-        """添加外围特征拓扑"""
+    def add_relation_edge(self, semantic_node: SemanticNode, src_id: int, dst_id: int,
+                          rho_offset: float, theta_offset: float,
+                          lambda_rho: Optional[float] = None, gamma_theta: Optional[float] = None,
+                          role: str = 'peripheral', span: float = 0.0, area: float = 0.0) -> RelationEdge:
+        """Add or merge a relation edge in the semantic multigraph."""
         l_rho = lambda_rho if lambda_rho is not None else self.cfg.default_lambda_rho
         g_theta = gamma_theta if gamma_theta is not None else self.cfg.default_gamma_theta
-        semantic_node.peripheral_links[peri_id] = {
-            'rho_offset': rho_offset,
-            'theta_offset': theta_offset,
-            'lambda_rho': l_rho,
-            'gamma_theta': g_theta
-        }
+        pair = (src_id, dst_id)
+        for edge_id in semantic_node.relation_edges_by_pair.get(pair, []):
+            edge = semantic_node.relation_edges[edge_id]
+            if edge.role == role and edge.distance_to(rho_offset, theta_offset) < self.cfg.relation_merge_threshold:
+                edge.update(rho_offset, theta_offset, span=span, area=area)
+                return edge
+
+        edge_id = self.next_relation_edge_id
+        self.next_relation_edge_id += 1
+        edge = RelationEdge(
+            edge_id=edge_id,
+            src_id=src_id,
+            dst_id=dst_id,
+            rho_offset=rho_offset,
+            theta_offset=theta_offset,
+            lambda_rho=l_rho,
+            gamma_theta=g_theta,
+            role=role,
+            span=span,
+            area=area,
+        )
+        semantic_node.relation_edges[edge_id] = edge
+        semantic_node.relation_edges_by_pair[pair].append(edge_id)
+        semantic_node.relation_edge_ids.append(edge_id)
+        semantic_node.child_node_ids.update([src_id, dst_id])
+        if role == 'self_extent':
+            semantic_node.self_edge_ids.append(edge_id)
+        if role in {'boundary', 'contour', 'terminator', 'junction'}:
+            semantic_node.boundary_edge_ids.append(edge_id)
+        if dst_id not in semantic_node.peripheral_links and src_id != dst_id:
+            semantic_node.peripheral_links[dst_id] = edge.as_legacy_link()
+        return edge
+
+    def add_peripheral(self, semantic_node: SemanticNode, peri_id: int,
+                       rho_offset: float, theta_offset: float,
+                       lambda_rho: Optional[float] = None, gamma_theta: Optional[float] = None,
+                       role: str = 'peripheral', span: float = 0.0, area: float = 0.0):
+        """添加外围特征拓扑。保留旧接口，并委托给多重关系边。"""
+        return self.add_relation_edge(
+            semantic_node,
+            semantic_node.anchor_id,
+            peri_id,
+            rho_offset,
+            theta_offset,
+            lambda_rho=lambda_rho,
+            gamma_theta=gamma_theta,
+            role=role,
+            span=span,
+            area=area,
+        )
 
 
 class GmemoryIII:
@@ -307,7 +466,14 @@ class GmemoryIII:
         return node
         
     def add_component(self, entity_node: EntityNode, sem_id: int, dx: float, dy: float):
-        entity_node.components[sem_id] = {'dx': dx, 'dy': dy}
+        edge_id = entity_node.next_component_edge_id
+        entity_node.next_component_edge_id += 1
+        component = {'sem_id': sem_id, 'dx': dx, 'dy': dy, 'count': 1}
+        entity_node.component_edges[edge_id] = component
+        entity_node.component_edges_by_semantic[sem_id].append(edge_id)
+        # Legacy representative component for older consumers.
+        entity_node.components.setdefault(sem_id, {'dx': dx, 'dy': dy})
+        return component
 
 
 # =============================
@@ -492,13 +658,15 @@ class Gposition:
         grid = self._create_log_polar_grid(H, W, xc, yc)
         D_maps_sum = torch.zeros((1, 1, self.cfg.lp_theta_bins, self.cfg.lp_rho_bins), device=self.device)
         
-        for peri_id, link in semantic_node.peripheral_links.items():
-            S_peri = S_maps.get(peri_id)
+        for edge in semantic_node.iter_relation_edges():
+            if edge.src_id == edge.dst_id:
+                continue
+            S_peri = S_maps.get(edge.dst_id)
             if S_peri is not None:
                 S_LP_peri = F.grid_sample(S_peri, grid, mode='bilinear', padding_mode='zeros', align_corners=True)
                 D_n = self._generalized_distance_transform(
-                    S_LP_peri, link['rho_offset'], link['theta_offset'], 
-                    link['lambda_rho'], link['gamma_theta']
+                    S_LP_peri, edge.rho_offset, edge.theta_offset,
+                    edge.lambda_rho, edge.gamma_theta
                 )
                 D_maps_sum += D_n
 
@@ -677,7 +845,9 @@ class InterestOptimizer:
                 if node.anchor_id in S_maps_I:
                     M_resp_sum += S_maps_I[node.anchor_id]
                     count += 1
-                for pid in node.peripheral_links:
+                for pid in node.related_node_ids():
+                    if pid == node.anchor_id:
+                        continue
                     if pid in S_maps_I:
                         M_resp_sum += S_maps_I[pid]
                         count += 1
@@ -763,6 +933,16 @@ class Controller:
         self.semantic_mask: Optional[torch.Tensor] = None
         self.semantic_history: Optional[torch.Tensor] = None
         self.sigma_micro: float = getattr(self.cfg, 'sigma_micro', 50.0)
+        self.micro_intention = MicroIntention.SURFACE_CONFIRM
+        self.micro_repeat_count = 0
+        self.interior_sample_count = 0
+        self.color_mean: Optional[torch.Tensor] = None
+        self.color_m2: Optional[torch.Tensor] = None
+        self.color_residual = 1.0
+        self.boundary_coverage = 0.0
+        self.boundary_visited: Optional[torch.Tensor] = None
+        self.last_boundary_tangent: Optional[Tuple[float, float]] = None
+        self.boundary_start_point: Optional[Tuple[int, int]] = None
 
         # Run-step specific maps and buffers
         self.ior_map: Optional[torch.Tensor] = None
@@ -863,6 +1043,89 @@ class Controller:
                 
         return active_nodes
 
+    def _modality_topology(self, modality_id: int) -> str:
+        attrs = self.cfg.feature_attributes.get(modality_id, {})
+        values = set(attrs.values())
+        if 'CONTINUITY_SURFACE' in values:
+            return 'Surface_2D'
+        if 'STRENGTH' in values:
+            return 'Boundary_Edge'
+        if 'CONTINUITY_TRACE' in values:
+            return 'Trace_1D'
+        return 'Unknown'
+
+    def _node_topology(self, node: ModalityNode) -> str:
+        return self._modality_topology(node.modality_id)
+
+    def _normalize_map(self, value: Optional[torch.Tensor], ref: Optional[torch.Tensor] = None) -> torch.Tensor:
+        if value is None:
+            if ref is None:
+                return torch.zeros((1, 1, 1, 1), device=self.device)
+            return torch.zeros_like(ref)
+        out = torch.nan_to_num(value.clone(), nan=0.0, posinf=0.0, neginf=0.0).clamp(min=0.0)
+        vmax = out.max()
+        if vmax > 1e-6:
+            out = out / vmax
+        return out
+
+    def _first_map_shape(self, X_subspaces: Dict[int, torch.Tensor]) -> Tuple[int, int, int, int]:
+        sample = list(X_subspaces.values())[0]
+        return sample.shape
+
+    def _ensure_runtime_maps(self, H: int, W: int):
+        if self.ior_map is None:
+            self.ior_map = torch.zeros((1, 1, H, W), device=self.device)
+        if self.m_aversion is None:
+            self.m_aversion = torch.zeros((1, 1, H, W), device=self.device)
+        if self.semantic_history is None:
+            self.semantic_history = torch.zeros((1, 1, H, W), device=self.device)
+        if self.boundary_visited is None:
+            self.boundary_visited = torch.zeros((1, 1, H, W), device=self.device)
+
+    def _xy_grids(self, H: int, W: int):
+        y_grid = torch.arange(H, device=self.device).view(H, 1)
+        x_grid = torch.arange(W, device=self.device).view(1, W)
+        return x_grid, y_grid
+
+    def _distance_sq_from(self, pt: Tuple[int, int], H: int, W: int) -> torch.Tensor:
+        cx, cy = pt
+        x_grid, y_grid = self._xy_grids(H, W)
+        return (x_grid - cx) ** 2 + (y_grid - cy) ** 2
+
+    def _argmax_point(self, drive: torch.Tensor) -> Tuple[int, int]:
+        H, W = drive.shape[-2], drive.shape[-1]
+        if drive.max() < 1e-6:
+            idx = torch.randint(0, H * W, (1,), device=self.device).item()
+        else:
+            idx = torch.argmax(drive).item()
+        return int(idx % W), int(idx // W)
+
+    def _mark_map_visited(self, target: torch.Tensor, pt: Tuple[int, int], sigma: float, weight: float = 1.0) -> torch.Tensor:
+        H, W = target.shape[-2], target.shape[-1]
+        dist_sq = self._distance_sq_from(pt, H, W)
+        mark = weight * torch.exp(-dist_sq / (2 * sigma ** 2)).view(1, 1, H, W)
+        return torch.max(target, mark.clamp(max=1.0))
+
+    def _reset_micro_context(self, H: int, W: int, intention: MicroIntention = MicroIntention.SURFACE_CONFIRM):
+        self.micro_intention = intention
+        self.micro_repeat_count = 0
+        self.interior_sample_count = 0
+        self.color_mean = None
+        self.color_m2 = None
+        self.color_residual = 1.0
+        self.boundary_coverage = 0.0
+        self.boundary_visited = torch.zeros((1, 1, H, W), device=self.device)
+        self.last_boundary_tangent = None
+        self.boundary_start_point = None
+        self.micro_explore_time = 0.0
+        self.micro_max_span = 0.0
+        self.m_aversion = torch.zeros((1, 1, H, W), device=self.device)
+
+    def _color_variance(self) -> float:
+        if self.color_m2 is None or self.interior_sample_count < 2:
+            return float('inf')
+        return float(torch.mean(self.color_m2 / max(self.interior_sample_count - 1, 1)).item())
+
     def _bfs_recognize(self, local_nodes, gmem_ii: GmemoryII, k_depth: int = 2):
         from collections import deque
         queue = deque([(n.node_id, 0) for n in local_nodes])
@@ -871,7 +1134,9 @@ class Controller:
         modality_to_semantics = defaultdict(list)
         for sid, sem in gmem_ii.semantic_nodes.items():
             modality_to_semantics[sem.anchor_id].append(sid)
-            for pid in sem.peripheral_links.keys():
+            for pid in sem.related_node_ids():
+                if pid == sem.anchor_id:
+                    continue
                 modality_to_semantics[pid].append(sid)
                 
         recognized_semantics = set()
@@ -883,7 +1148,7 @@ class Controller:
                 recognized_semantics.add(sid)
                 if depth < k_depth:
                     sem = gmem_ii.semantic_nodes[sid]
-                    neighbors = [sem.anchor_id] + list(sem.peripheral_links.keys())
+                    neighbors = list(sem.related_node_ids())
                     for neighbor_mid in neighbors:
                         if neighbor_mid not in visited_modality:
                             visited_modality.add(neighbor_mid)
@@ -939,6 +1204,250 @@ class Controller:
         E_dynamic[E_dynamic < 0.05] = 0
         return E_dynamic
 
+    def _current_semantic_node(self, gmem_ii: GmemoryII) -> Optional[SemanticNode]:
+        if self.active_semantic_id is None:
+            return None
+        return gmem_ii.semantic_nodes.get(self.active_semantic_id)
+
+    def _gradient_magnitude(self, value: torch.Tensor) -> torch.Tensor:
+        dx = value[:, :, :, 1:] - value[:, :, :, :-1]
+        dy = value[:, :, 1:, :] - value[:, :, :-1, :]
+        dx = F.pad(dx, (0, 1, 0, 0))
+        dy = F.pad(dy, (0, 0, 0, 1))
+        return torch.sqrt(dx ** 2 + dy ** 2 + 1e-6)
+
+    def _combine_node_maps_by_topology(self, S_maps: Dict[int, torch.Tensor], gmem_i: GmemoryI,
+                                       topologies: Set[str], ref: torch.Tensor) -> torch.Tensor:
+        out = torch.zeros_like(ref)
+        count = 0
+        for nid, resp in S_maps.items():
+            node = gmem_i.nodes.get(nid)
+            if node is None:
+                continue
+            if self._node_topology(node) in topologies:
+                out += self._normalize_map(resp, ref)
+                count += 1
+        if count > 0:
+            out /= count
+        return out
+
+    def _build_micro_gpos_fields(self, S_maps: Dict[int, torch.Tensor], gmem_i: GmemoryI,
+                                 gmem_ii: GmemoryII) -> Dict[str, torch.Tensor]:
+        sem_node = self._current_semantic_node(gmem_ii)
+        ref = self.semantic_mask
+        if ref is None:
+            if S_maps:
+                ref = next(iter(S_maps.values()))
+            elif self.optimizer.base_interest is not None:
+                ref = self.optimizer.base_interest
+            else:
+                return {}
+
+        mask = self._normalize_map(self.semantic_mask, ref)
+        if sem_node and sem_node.anchor_id in S_maps:
+            surface_resp = self._normalize_map(S_maps[sem_node.anchor_id], ref)
+        else:
+            surface_resp = mask
+
+        color_resp = surface_resp
+        if sem_node:
+            color_maps = []
+            for nid in sem_node.related_node_ids():
+                node = gmem_i.nodes.get(nid)
+                if node is not None and self._node_topology(node) == 'Surface_2D' and nid in S_maps:
+                    color_maps.append(self._normalize_map(S_maps[nid], ref))
+            if color_maps:
+                color_resp = torch.stack(color_maps, dim=0).max(dim=0).values
+
+        edge_resp = self._combine_node_maps_by_topology(S_maps, gmem_i, {'Boundary_Edge', 'Trace_1D'}, ref)
+        if edge_resp.max() <= 1e-6 and self.optimizer.I_str is not None:
+            edge_resp = self._normalize_map(self.optimizer.I_str, ref)
+        corner_resp = self._normalize_map(self._gradient_magnitude(edge_resp), ref)
+        boundary_from_mask = self._normalize_map(self._gradient_magnitude(mask), ref)
+        boundary_i = boundary_from_mask * self._normalize_map(
+            self.cfg.micro_w_edge * edge_resp + self.cfg.micro_w_corner * corner_resp, ref
+        )
+        boundary_gpos = self._normalize_map(boundary_i, ref)
+        color_residual = ((1.0 - color_resp).clamp(0.0, 1.0)) * mask
+        residual_den = torch.sum(mask).item() + 1e-6
+        self.color_residual = float(torch.sum(color_residual).item() / residual_den)
+
+        if self.boundary_visited is None:
+            self.boundary_visited = torch.zeros_like(ref)
+        coverage_den = torch.sum(boundary_gpos).item() + 1e-6
+        self.boundary_coverage = float(torch.sum(self.boundary_visited * boundary_gpos).item() / coverage_den)
+
+        return {
+            'mask': mask,
+            'surface': surface_resp,
+            'color': color_resp,
+            'color_residual': color_residual,
+            'edge': edge_resp,
+            'corner': corner_resp,
+            'boundary': boundary_gpos,
+            'semantic_prior': torch.zeros_like(ref),
+        }
+
+    def _update_color_stats_from_nodes(self, local_nodes: List[ModalityNode]):
+        surface_nodes = [n for n in local_nodes if self._node_topology(n) == 'Surface_2D']
+        if not surface_nodes:
+            return
+        sample = surface_nodes[0].prototype.detach().float().view(-1)
+        if self.color_mean is None:
+            self.color_mean = sample.clone()
+            self.color_m2 = torch.zeros_like(sample)
+            self.interior_sample_count = 1
+            return
+        self.interior_sample_count += 1
+        delta = sample - self.color_mean
+        self.color_mean = self.color_mean + delta / self.interior_sample_count
+        delta2 = sample - self.color_mean
+        self.color_m2 = self.color_m2 + delta * delta2
+
+    def _mark_micro_fixation(self):
+        if self.semantic_mask is None:
+            return
+        self.m_aversion = self._mark_map_visited(
+            self.m_aversion,
+            self.fixation_point,
+            getattr(self.cfg, 'sigma_consume', 10.0),
+            getattr(self.cfg, 'alpha_consume', 0.8),
+        )
+
+    def _micro_surface_confirm_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
+        mask = fields['mask']
+        drive = mask * fields['surface'] * (1.0 - self.m_aversion)
+        area = torch.sum(mask).item()
+        if self.micro_repeat_count >= 1 or area >= self.cfg.micro_min_area_for_boundary:
+            self.micro_intention = MicroIntention.INTERIOR_SAMPLE
+        return drive
+
+    def _micro_interior_sample_target(self, fields: Dict[str, torch.Tensor], local_nodes: List[ModalityNode]) -> torch.Tensor:
+        self._update_color_stats_from_nodes(local_nodes)
+        mask = fields['mask']
+        blue = (1.0 - self.m_aversion).clamp(0.0, 1.0)
+        drive = mask * (
+            self.cfg.micro_w_color * fields['color']
+            + self.cfg.micro_w_residual * fields['color_residual']
+            + self.cfg.micro_w_blue * blue
+        )
+        color_var = self._color_variance()
+        if (
+            self.interior_sample_count >= self.cfg.micro_min_interior_samples
+            and (color_var < self.cfg.theta_color_var or self.color_residual < self.cfg.theta_res)
+        ) or self.micro_repeat_count >= self.cfg.micro_repeat_to_boundary:
+            self.micro_intention = MicroIntention.BOUNDARY_SEEK
+        return drive * blue
+
+    def _micro_seek_gate(self, ref: torch.Tensor) -> torch.Tensor:
+        H, W = ref.shape[-2], ref.shape[-1]
+        dist_sq = self._distance_sq_from(self.fixation_point, H, W)
+        dist = torch.sqrt(dist_sq + 1e-6).view(1, 1, H, W)
+        return torch.exp(-((dist - self.cfg.seek_step) ** 2) / (2 * self.cfg.sigma_seek ** 2))
+
+    def _micro_span_gate(self, ref: torch.Tensor) -> torch.Tensor:
+        if self.anchor_position is None:
+            return torch.ones_like(ref)
+        H, W = ref.shape[-2], ref.shape[-1]
+        dist = torch.sqrt(self._distance_sq_from(self.anchor_position, H, W) + 1e-6).view(1, 1, H, W)
+        max_dist = dist.max().clamp(min=1e-6)
+        return (dist / max_dist).clamp(0.0, 1.0)
+
+    def _micro_boundary_seek_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
+        boundary = fields['boundary']
+        unseen = (1.0 - self.boundary_visited).clamp(0.0, 1.0)
+        drive = (
+            self.cfg.micro_w_boundary * boundary
+            + self.cfg.micro_w_unseen_boundary * boundary * unseen
+        )
+        drive = drive * self._micro_span_gate(boundary) * unseen * self._micro_seek_gate(boundary)
+        if drive.max() > self.cfg.theta_boundary:
+            self.micro_intention = MicroIntention.CONTOUR_TRACE
+            if self.boundary_start_point is None:
+                self.boundary_start_point = self.fixation_point
+        return drive
+
+    def _micro_tangent_gate(self, ref: torch.Tensor) -> torch.Tensor:
+        if self.last_boundary_tangent is None:
+            return torch.ones_like(ref)
+        tx, ty = self.last_boundary_tangent
+        H, W = ref.shape[-2], ref.shape[-1]
+        cx, cy = self.fixation_point
+        x_grid, y_grid = self._xy_grids(H, W)
+        vx = (x_grid - cx).float()
+        vy = (y_grid - cy).float()
+        norm = torch.sqrt(vx ** 2 + vy ** 2 + 1e-6)
+        cosang = ((vx * tx + vy * ty) / norm).clamp(-1.0, 1.0)
+        angle = torch.acos(cosang)
+        dist_gate = torch.exp(-((norm - self.cfg.trace_step) ** 2) / (2 * self.cfg.sigma_trace_step ** 2))
+        angle_gate = torch.exp(-(angle ** 2) / (2 * self.cfg.sigma_trace_angle ** 2))
+        return (dist_gate * angle_gate).view(1, 1, H, W)
+
+    def _micro_contour_trace_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
+        boundary = fields['boundary']
+        self.boundary_visited = self._mark_map_visited(
+            self.boundary_visited,
+            self.fixation_point,
+            self.cfg.sigma_boundary_visit,
+            1.0,
+        )
+        contour = (
+            self.cfg.micro_w_edge * fields['edge']
+            + self.cfg.micro_w_corner * fields['corner']
+        )
+        drive = boundary * contour * self._micro_tangent_gate(boundary) * (1.0 - self.boundary_visited)
+        if self.boundary_coverage >= self.cfg.theta_bd_cover and self.color_residual < self.cfg.theta_res:
+            self.micro_intention = MicroIntention.RESUME_OR_EXIT
+        elif drive.max() < self.cfg.theta_boundary:
+            self.micro_intention = MicroIntention.BOUNDARY_SEEK
+        return drive
+
+    def _micro_resume_or_exit_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
+        if self.boundary_coverage >= self.cfg.theta_bd_cover and self.color_residual < self.cfg.theta_res:
+            return torch.zeros_like(fields['mask'])
+        if self.color_residual >= self.cfg.theta_res:
+            self.micro_intention = MicroIntention.INTERIOR_SAMPLE
+            return self._micro_interior_sample_target(fields, [])
+        self.micro_intention = MicroIntention.BOUNDARY_SEEK
+        return self._micro_boundary_seek_target(fields)
+
+    def _decide_next_saccade_micro_by_intention(self, S_maps: Dict[int, torch.Tensor],
+                                                local_nodes: List[ModalityNode],
+                                                gmem_i: GmemoryI,
+                                                gmem_ii: GmemoryII) -> Tuple[Tuple[int, int], torch.Tensor]:
+        if self.semantic_mask is None:
+            ref = self.optimizer.base_interest
+            if ref is None:
+                return self.fixation_point, torch.zeros((1, 1, 1, 1), device=self.device)
+            return self.fixation_point, ref
+
+        self._mark_micro_fixation()
+        fields = self._build_micro_gpos_fields(S_maps, gmem_i, gmem_ii)
+        if not fields:
+            return self.fixation_point, self.semantic_mask
+
+        if self.micro_intention == MicroIntention.SURFACE_CONFIRM:
+            drive = self._micro_surface_confirm_target(fields)
+        elif self.micro_intention == MicroIntention.INTERIOR_SAMPLE:
+            drive = self._micro_interior_sample_target(fields, local_nodes)
+        elif self.micro_intention == MicroIntention.BOUNDARY_SEEK:
+            drive = self._micro_boundary_seek_target(fields)
+        elif self.micro_intention == MicroIntention.CONTOUR_TRACE:
+            drive = self._micro_contour_trace_target(fields)
+        else:
+            drive = self._micro_resume_or_exit_target(fields)
+
+        next_pt = self._argmax_point(drive)
+        self.matrix1 = drive
+        print(drive.max())
+        if self.micro_intention == MicroIntention.CONTOUR_TRACE:
+            dx = float(next_pt[0] - self.fixation_point[0])
+            dy = float(next_pt[1] - self.fixation_point[1])
+            norm = math.sqrt(dx * dx + dy * dy)
+            if norm > 1e-6:
+                self.last_boundary_tangent = (dx / norm, dy / norm)
+        return next_pt, drive
+
     def _decide_next_saccade_review(self, I_map: torch.Tensor) -> Tuple[int, int]:
         H, W = I_map.shape[-2], I_map.shape[-1]
         cx, cy = self.fixation_point
@@ -970,7 +1479,9 @@ class Controller:
             M_resp_sum = torch.zeros((1, 1, H, W), device=self.device)
             if node.anchor_id in S_maps:
                 M_resp_sum += S_maps[node.anchor_id]
-            for pid in node.peripheral_links:
+            for pid in node.related_node_ids():
+                if pid == node.anchor_id:
+                    continue
                 if pid in S_maps:
                     M_resp_sum += S_maps[pid]
             sum_I_spatial_II += M_resp_sum * node.activation_level
@@ -978,8 +1489,6 @@ class Controller:
         self.matrix4 = sum_I_spatial_II
         sum_I_spatial_II = sum_I_spatial_II.clamp(min=0.0)
         sum_log = torch.log1p(sum_I_spatial_II)
-        print("sum_I_spatial_II", sum_I_spatial_II.max(), sum_I_spatial_II.min())
-        print("sum_log", sum_log.max(), sum_log.min())
         if sum_log.max() > 1e-6:
             mask_II = sum_log / sum_log.max()
         else:
@@ -1045,6 +1554,82 @@ class Controller:
             idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W))
 
+    def _start_micro_learning(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition,
+                              gmem_ii: GmemoryII, local_nodes: List[ModalityNode],
+                              start_pt: Tuple[int, int], source_label: str):
+        if not local_nodes:
+            return
+        B, C, H, W = self._first_map_shape(X_subspaces)
+        new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
+        self.active_semantic_id = new_sem_node.node_id
+        self.anchor_position = start_pt
+        self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, start_pt)
+        self._reset_micro_context(H, W, MicroIntention.SURFACE_CONFIRM)
+        self.peripheral_buffer = []
+        self.state = MainPhase.LEARN_MICRO
+
+    def _relation_role_for_node(self, node: ModalityNode) -> str:
+        topology = self._node_topology(node)
+        if topology == 'Boundary_Edge':
+            return 'boundary'
+        if topology == 'Trace_1D':
+            return 'contour'
+        return 'peripheral'
+
+    def _append_relation_observation(self, nid: int, rho: float, theta: float, role: str, span: float = 0.0, area: float = 0.0):
+        self.peripheral_buffer.append({
+            'nid': nid,
+            'rho': rho,
+            'theta': theta,
+            'role': role,
+            'span': span,
+            'area': area,
+        })
+
+    def _record_micro_observation(self, local_nodes: List[ModalityNode], sem_node: SemanticNode):
+        if self.anchor_position is None:
+            return
+        ax, ay = self.anchor_position
+        cx, cy = self.fixation_point
+        r = math.sqrt((cx - ax) ** 2 + (cy - ay) ** 2) + 1e-5
+        rho = math.log(r)
+        theta = math.atan2(cy - ay, cx - ax)
+        step_dx = cx - self.prev_fixation_point[0]
+        step_dy = cy - self.prev_fixation_point[1]
+        step_span = math.sqrt(step_dx ** 2 + step_dy ** 2)
+        saw_anchor = False
+
+        for node in local_nodes:
+            if node.node_id == sem_node.anchor_id:
+                saw_anchor = True
+                if step_span >= self.cfg.self_edge_min_span and self._node_topology(node) in {'Surface_2D', 'Trace_1D'}:
+                    step_theta = math.atan2(step_dy, step_dx)
+                    self._append_relation_observation(
+                        node.node_id,
+                        math.log(step_span + 1e-5),
+                        step_theta,
+                        'self_extent',
+                        span=step_span,
+                        area=max(step_span, 1.0),
+                    )
+                continue
+            self._append_relation_observation(
+                node.node_id,
+                rho,
+                theta,
+                self._relation_role_for_node(node),
+                span=r,
+                area=1.0,
+            )
+
+        self.micro_repeat_count = self.micro_repeat_count + 1 if saw_anchor else 0
+
+    def _active_semantic_nodes(self, gmem_ii: GmemoryII) -> List[SemanticNode]:
+        return [
+            n for n in gmem_ii.semantic_nodes.values()
+            if n.state_flag != NeuronState.CALM or self.E_input_gmem_ii_acc[n.node_id] > 0
+        ]
+
     def _check_micro_exit(self, semantic_mask: torch.Tensor, local_nodes: List[ModalityNode] = None, gmem_ii: 'GmemoryII' = None, gmem_i: 'GmemoryI' = None) -> str:
         if semantic_mask is None:
             return 'empty'
@@ -1052,12 +1637,22 @@ class Controller:
         # Exit if energy drops below a small threshold
         if sum_energy < 1.0:
             return 'depleted'
+        if (
+            self.micro_intention == MicroIntention.RESUME_OR_EXIT
+            and self.boundary_coverage >= self.cfg.theta_bd_cover
+            and self.color_residual < self.cfg.theta_res
+        ):
+            return 'completed'
             
         if local_nodes and gmem_ii and gmem_i and self.active_semantic_id is not None:
             sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
             if sem_node:
                 anchor_mod_id = gmem_i.nodes[sem_node.anchor_id].modality_id
-                if local_nodes[0].modality_id != anchor_mod_id:
+                if local_nodes[0].modality_id != anchor_mod_id and self.micro_intention not in {
+                    MicroIntention.BOUNDARY_SEEK,
+                    MicroIntention.CONTOUR_TRACE,
+                    MicroIntention.RESUME_OR_EXIT,
+                }:
                     return 'mutation'
         return 'continue'
 
@@ -1069,12 +1664,31 @@ class Controller:
         if self.active_semantic_id is not None:
             sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
             if sem_node:
-                anchor_mod_id = gmem_i.nodes[sem_node.anchor_id].modality_id
-                # 1. Batch processing with Homologous Modality Filter
+                # 1. Batch relation processing. Multiple spatial relations between the same
+                # endpoints are merged only when their relation metric is close enough.
                 for p in self.peripheral_buffer:
-                    if p['nid'] not in sem_node.peripheral_links:
-                        if p['nid'] in gmem_i.nodes and gmem_i.nodes[p['nid']].modality_id == anchor_mod_id:
-                            gmem_ii.add_peripheral(sem_node, p['nid'], p['rho'], p['theta'])
+                    if p['nid'] in gmem_i.nodes:
+                        if p.get('role') == 'self_extent':
+                            gmem_ii.add_relation_edge(
+                                sem_node,
+                                p['nid'],
+                                p['nid'],
+                                p['rho'],
+                                p['theta'],
+                                role='self_extent',
+                                span=p.get('span', 0.0),
+                                area=p.get('area', 0.0),
+                            )
+                        else:
+                            gmem_ii.add_peripheral(
+                                sem_node,
+                                p['nid'],
+                                p['rho'],
+                                p['theta'],
+                                role=p.get('role', 'peripheral'),
+                                span=p.get('span', 0.0),
+                                area=p.get('area', 0.0),
+                            )
                         
                 # 记录 GmemIII 组件关系 (dx, dy 相对于某种空间锚点或单纯记录位量向量)
                 if self.anchor_position is not None:
@@ -1085,6 +1699,11 @@ class Controller:
                 # 更新自身内在模态属性
                 sem_node.explore_time = getattr(self, 'micro_explore_time', 0.0)
                 sem_node.max_span = getattr(self, 'micro_max_span', 0.0)
+                sem_node.color_mean = self.color_mean.detach().clone() if self.color_mean is not None else sem_node.color_mean
+                sem_node.color_m2 = self.color_m2.detach().clone() if self.color_m2 is not None else sem_node.color_m2
+                sem_node.color_samples = self.interior_sample_count
+                sem_node.boundary_coverage = self.boundary_coverage
+                sem_node.color_residual = self.color_residual
                 
                 # 2. Suspend check & status update
                 if exit_type == 'mutation':
@@ -1120,6 +1739,9 @@ class Controller:
                 
                 # Assume we resume and the state is immediately LEARN_MICRO
                 self.state = MainPhase.LEARN_MICRO
+                if self.semantic_mask is not None:
+                    H, W = self.semantic_mask.shape[-2], self.semantic_mask.shape[-1]
+                    self._reset_micro_context(H, W, MicroIntention.BOUNDARY_SEEK)
                 return
                 
         self.active_semantic_id = None
@@ -1130,122 +1752,87 @@ class Controller:
         self.micro_max_span = 0.0
         B, C, H, W = self.m_aversion.shape
         self.m_aversion = torch.zeros((B, C, H, W), device=self.device)
+        self.micro_intention = MicroIntention.SURFACE_CONFIRM
+        self.boundary_visited = torch.zeros((B, C, H, W), device=self.device)
 
-    def run_step(self, X_subspaces: Dict[int, torch.Tensor], 
-                 gmem_i: GmemoryI, gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII', gpos: Gposition):
-        self.current_step += 1
-        cx, cy = self.fixation_point
-        B, C, H, W = list(X_subspaces.values())[0].shape
-        cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
+    def _process_review_observation(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition,
+                                    local_nodes: List[ModalityNode], gmem_i: GmemoryI,
+                                    gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII',
+                                    S_maps_footprint: Dict[int, torch.Tensor], H: int, W: int):
+        recognized_sem_id = self._bfs_recognize(local_nodes, gmem_ii, self.cfg.k_depth)
+        if recognized_sem_id is not None:
+            sem_node = gmem_ii.semantic_nodes[recognized_sem_id]
+            if sem_node.state_flag != NeuronState.ACTIVE:
+                sem_node.activation_level += 2.0
+                sem_node.state_flag = NeuronState.ACTIVE
+                sem_node.timer = self.cfg.tau_active_II
+            if self.anchor_position is None:
+                self.anchor_position = self.fixation_point
+            ax, ay = self.anchor_position
+            for edge in sem_node.iter_relation_edges():
+                if edge.src_id == edge.dst_id:
+                    continue
+                pred_r = math.exp(edge.rho_offset)
+                pred_theta = edge.theta_offset
+                pred_x = int(ax + pred_r * math.cos(pred_theta))
+                pred_y = int(ay + pred_r * math.sin(pred_theta))
+                pred_x, pred_y = max(0, min(pred_x, W - 1)), max(0, min(pred_y, H - 1))
+                self.optimizer.add_expectation(edge.dst_id, (pred_x, pred_y), H, W)
+            for n in local_nodes:
+                self.optimizer.I_exp.pop(n.node_id, None)
+            return
 
-        if self.ior_map is None:
-            self.ior_map = torch.zeros((1, 1, H, W), device=self.device)
-            self.m_aversion = torch.zeros((1, 1, H, W), device=self.device)
-            self.semantic_history = torch.zeros((1, 1, H, W), device=self.device)
-            self.peripheral_buffer = []
+        if local_nodes:
+            self._start_micro_learning(X_subspaces, gpos, gmem_ii, local_nodes, self.fixation_point, 'review')
+        else:
+            self._transition_to_macro(gmem_i, gmem_ii, gmem_iii)
 
-        local_nodes = self._extract_and_match_local_features(X_subspaces, gmem_i, cx, cy)
-        print('local_nodes: ', len(local_nodes))
-        
-        for n in local_nodes:
-            self.E_input_gmem_i_acc[n.node_id] += 1.0
+    def _process_micro_observation(self, local_nodes: List[ModalityNode], gmem_ii: GmemoryII,
+                                   gmem_i: GmemoryI, gmem_iii: 'GmemoryIII'):
+        sem_node = self._current_semantic_node(gmem_ii)
+        if sem_node is None or self.anchor_position is None:
+            self._transition_to_macro(gmem_i, gmem_ii, gmem_iii)
+            return
+        self._record_micro_observation(local_nodes, sem_node)
 
-        # Generate routing map for query retrieval (only active/stimulated nodes)
-        active_gmem_i = [n for n in gmem_i.nodes.values() if n.state_flag != NeuronState.CALM or self.E_input_gmem_i_acc[n.node_id] > 0]
-        S_maps_retrieval = gpos.l1_modality_routing_projection(X_subspaces, active_gmem_i)
-        
-        # Generate spatial footprint projection mapping 
-        S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, active_gmem_i)
+    def _process_macro_observation(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition,
+                                   local_nodes: List[ModalityNode], gmem_ii: GmemoryII):
+        self.anchor_position = self.fixation_point
+        if local_nodes:
+            self._start_micro_learning(X_subspaces, gpos, gmem_ii, local_nodes, self.fixation_point, 'macro')
 
-        # Cross-layer energy aggregation for semantic nodes (GmemII)
-        if self.state == MainPhase.LEARN_MICRO and self.active_semantic_id is not None:
-            self.E_input_gmem_ii_acc[self.active_semantic_id] += 1.0
-            
-        for sem_node in gmem_ii.semantic_nodes.values():
-            overlap_val = 0.0
-            if sem_node.anchor_id in S_maps_footprint:
-                overlap_val += S_maps_footprint[sem_node.anchor_id][0, 0, cy, cx].item()
-            for pid in sem_node.peripheral_links:
-                if pid in S_maps_footprint:
-                    overlap_val += S_maps_footprint[pid][0, 0, cy, cx].item()
-            if overlap_val > 0.0:
-                self.E_input_gmem_ii_acc[sem_node.node_id] += overlap_val
-
+    def _process_phase_observation(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition,
+                                   local_nodes: List[ModalityNode], gmem_i: GmemoryI,
+                                   gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII',
+                                   S_maps_footprint: Dict[int, torch.Tensor], H: int, W: int):
         if self.state == MainPhase.REVIEW:
-            recognized_sem_id = self._bfs_recognize(local_nodes, gmem_ii, self.cfg.k_depth)
-            if recognized_sem_id is not None:
-                 if gmem_ii.semantic_nodes[recognized_sem_id].state_flag != NeuronState.ACTIVE:
-                     gmem_ii.semantic_nodes[recognized_sem_id].activation_level += 2.0
-                     # E_input could just be applied, or forcefully set:
-                     gmem_ii.semantic_nodes[recognized_sem_id].state_flag = NeuronState.ACTIVE
-                     gmem_ii.semantic_nodes[recognized_sem_id].timer = self.cfg.tau_active_II
-                     
-        if self.state == MainPhase.REVIEW:
-            if recognized_sem_id is not None:
-                 sem_node = gmem_ii.semantic_nodes[recognized_sem_id]
-                 if self.anchor_position is None:
-                     self.anchor_position = (cx, cy)
-                 ax, ay = self.anchor_position
-                 
-                 for pid, link in sem_node.peripheral_links.items():
-                     pred_r = math.exp(link['rho_offset'])
-                     pred_theta = link['theta_offset']
-                     pred_x = int(ax + pred_r * math.cos(pred_theta))
-                     pred_y = int(ay + pred_r * math.sin(pred_theta))
-                     pred_x, pred_y = max(0, min(pred_x, W-1)), max(0, min(pred_y, H-1))
-                     self.optimizer.add_expectation(pid, (pred_x, pred_y), H, W)
-                     
-                 for n in local_nodes:
-                     if n.node_id in self.optimizer.I_exp:
-                         self.optimizer.I_exp.pop(n.node_id, None)
-            else:
-                 if local_nodes:
-                     self.state = MainPhase.LEARN_MICRO
-                     new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
-                     self.active_semantic_id = new_sem_node.node_id
-                     self.anchor_position = (cx, cy)
-                     self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
-                     print("_generate_semantic_mask1")
-                 else:
-                     self._transition_to_macro(gmem_i, gmem_ii, gmem_iii)
-                     
+            self._process_review_observation(
+                X_subspaces, gpos, local_nodes, gmem_i, gmem_ii, gmem_iii, S_maps_footprint, H, W
+            )
         elif self.state == MainPhase.LEARN_MICRO:
-            sem_node = gmem_ii.semantic_nodes.get(self.active_semantic_id)
-            if sem_node and self.anchor_position is not None:
-                ax, ay = self.anchor_position
-                r = math.sqrt((cx - ax)**2 + (cy - ay)**2) + 1e-5
-                rho = math.log(r)
-                theta = math.atan2(cy - ay, cx - ax)
-                
-                for n in local_nodes:
-                    if n.node_id != sem_node.anchor_id:
-                        buffered_nids = [p['nid'] for p in self.peripheral_buffer]
-                        if n.node_id not in buffered_nids:
-                            self.peripheral_buffer.append({'nid': n.node_id, 'rho': rho, 'theta': theta})
-            else:
-                self._transition_to_macro(gmem_i, gmem_ii, gmem_iii)
-
+            self._process_micro_observation(local_nodes, gmem_ii, gmem_i, gmem_iii)
         elif self.state == MainPhase.LEARN_MACRO:
-            self.anchor_position = (cx, cy)
-            if local_nodes:
-                new_sem_node = gmem_ii.add_semantic_node(local_nodes[0].node_id)
-                self.active_semantic_id = new_sem_node.node_id
-                self.semantic_mask = self._generate_semantic_mask(X_subspaces, gpos, local_nodes, (cx, cy))
-                print("_generate_semantic_mask2")
-                self.state = MainPhase.LEARN_MICRO
+            self._process_macro_observation(X_subspaces, gpos, local_nodes, gmem_ii)
 
-        # Execute decision logic based on current state
+    def _decide_next_by_phase(self, local_nodes: List[ModalityNode], gmem_i: GmemoryI,
+                              gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII',
+                              active_gmem_i: List[ModalityNode], active_gmem_ii: List[SemanticNode],
+                              S_maps_footprint: Dict[int, torch.Tensor]):
+        cx, cy = self.fixation_point
         self.prev_fixation_point = self.fixation_point
-        base_interest = self.optimizer.base_interest
 
         if self.state == MainPhase.REVIEW:
             I_map = self.optimizer.calculate_I_map(active_gmem_i, active_gmem_ii, S_maps_footprint, (cx, cy))
             self.fixation_point = self._decide_next_saccade_review(I_map)
             self.current_interest_map = I_map
-        elif self.state == MainPhase.LEARN_MACRO:
+            return
+
+        if self.state == MainPhase.LEARN_MACRO:
             self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
             self.current_interest_map = I_macro
-        elif self.state == MainPhase.LEARN_MICRO:
+            return
+
+        if self.state == MainPhase.LEARN_MICRO:
             exit_type = self._check_micro_exit(self.semantic_mask, local_nodes, gmem_ii, gmem_i)
             if exit_type != 'continue':
                 self._transition_to_macro(gmem_i, gmem_ii, gmem_iii, exit_type)
@@ -1253,31 +1840,78 @@ class Controller:
                     self.fixation_point, I_macro = self._decide_next_saccade_macro(gmem_ii, S_maps_footprint)
                     self.current_interest_map = I_macro
                 else:
-                    # We resumed a suspended LEARN_MICRO
-                    self.fixation_point = self._decide_next_saccade_micro(base_interest, self.semantic_mask)
-                    self.current_interest_map = base_interest
-            else:
-                self.fixation_point = self._decide_next_saccade_micro(base_interest, self.semantic_mask)
-                self.current_interest_map = base_interest * self.semantic_mask
-                
-                # accumulate span and time
-                self.micro_explore_time = getattr(self, 'micro_explore_time', 0.0) + 1.0
-                if self.anchor_position is not None:
-                    ax, ay = self.anchor_position
-                    dist = math.sqrt((self.fixation_point[0] - ax)**2 + (self.fixation_point[1] - ay)**2)
-                    self.micro_max_span = max(getattr(self, 'micro_max_span', 0.0), dist)
+                    self.fixation_point, drive = self._decide_next_saccade_micro_by_intention(
+                        S_maps_footprint, local_nodes, gmem_i, gmem_ii
+                    )
+                    self.current_interest_map = drive
+                return
 
-        # Unified End-of-Frame Node Energy & State Updates
+            self.fixation_point, drive = self._decide_next_saccade_micro_by_intention(
+                S_maps_footprint, local_nodes, gmem_i, gmem_ii
+            )
+            self.current_interest_map = drive
+            self.micro_explore_time = getattr(self, 'micro_explore_time', 0.0) + 1.0
+            if self.anchor_position is not None:
+                ax, ay = self.anchor_position
+                dist = math.sqrt((self.fixation_point[0] - ax) ** 2 + (self.fixation_point[1] - ay) ** 2)
+                self.micro_max_span = max(getattr(self, 'micro_max_span', 0.0), dist)
+
+    def _update_semantic_energy_from_overlap(self, gmem_ii: GmemoryII, S_maps_footprint: Dict[int, torch.Tensor],
+                                             cx: int, cy: int):
+        if self.state == MainPhase.LEARN_MICRO and self.active_semantic_id is not None:
+            self.E_input_gmem_ii_acc[self.active_semantic_id] += 1.0
+
+        for sem_node in gmem_ii.semantic_nodes.values():
+            overlap_val = 0.0
+            for nid in sem_node.related_node_ids():
+                if nid in S_maps_footprint:
+                    overlap_val += S_maps_footprint[nid][0, 0, cy, cx].item()
+            if overlap_val > 0.0:
+                self.E_input_gmem_ii_acc[sem_node.node_id] += overlap_val
+
+    def _tick_all_nodes(self, gmem_i: GmemoryI, gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII'):
         for n in gmem_i.nodes.values():
             n.tick_update(self.E_input_gmem_i_acc[n.node_id], self.cfg)
         for n in gmem_ii.semantic_nodes.values():
             n.tick_update(self.E_input_gmem_ii_acc[n.node_id], self.cfg)
         for n in gmem_iii.entity_nodes.values():
             n.tick_update(self.E_input_gmem_iii_acc[n.node_id], self.cfg)
-            
+
         self.E_input_gmem_i_acc.clear()
         self.E_input_gmem_ii_acc.clear()
         self.E_input_gmem_iii_acc.clear()
+
+    def run_step(self, X_subspaces: Dict[int, torch.Tensor],
+                 gmem_i: GmemoryI, gmem_ii: GmemoryII, gmem_iii: 'GmemoryIII', gpos: Gposition):
+        self.current_step += 1
+        cx, cy = self.fixation_point
+        B, C, H, W = self._first_map_shape(X_subspaces)
+        cx, cy = max(0, min(cx, W-1)), max(0, min(cy, H-1))
+        self.fixation_point = (cx, cy)
+        self._ensure_runtime_maps(H, W)
+
+        # 1. Local extraction and node stimulation
+        local_nodes = self._extract_and_match_local_features(X_subspaces, gmem_i, cx, cy)
+        for n in local_nodes:
+            self.E_input_gmem_i_acc[n.node_id] += 1.0
+
+        # 2. GposI response maps for currently active or stimulated GmemI nodes
+        active_gmem_i = [n for n in gmem_i.nodes.values() if n.state_flag != NeuronState.CALM or self.E_input_gmem_i_acc[n.node_id] > 0]
+        S_maps_footprint = gpos.l1_footprint_projection(X_subspaces, active_gmem_i)
+        active_gmem_ii = self._active_semantic_nodes(gmem_ii)
+
+        # 3. Cross-layer stimulation and current-state observation
+        self._update_semantic_energy_from_overlap(gmem_ii, S_maps_footprint, cx, cy)
+        self._process_phase_observation(
+            X_subspaces, gpos, local_nodes, gmem_i, gmem_ii, gmem_iii, S_maps_footprint, H, W
+        )
+        active_gmem_ii = self._active_semantic_nodes(gmem_ii)
+
+        # 4. Intention-specific decision and unified end-of-frame dynamics
+        self._decide_next_by_phase(
+            local_nodes, gmem_i, gmem_ii, gmem_iii, active_gmem_i, active_gmem_ii, S_maps_footprint
+        )
+        self._tick_all_nodes(gmem_i, gmem_ii, gmem_iii)
 
 
 # =============================
