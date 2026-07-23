@@ -2,6 +2,17 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-07-23_alg_optimizer_beta_dynamic_window_scale.md | 在 Alg_optimizer_beta 中新增动态视窗口尺度机制、固定注意力预算下的最低写入尺度和尺度竞争流程 | chatgpt | 2026-07-23 22:23:46 CST |
+| 2026-07-23_alg_optimizer_beta_local_vector_route.md | 新建 Alg_optimizer_beta，讨论 MICRO 从全局 drive 改为视窗口向量引导，并补充动态竞争状态机与窗口写入流程 | chatgpt | 2026-07-23 19:50:38 CST |
+| 2026-07-21_alg_beta_unified_micro_drive_review.md | 在 Alg_beta 过渡带统一图表征章末新增通用 MICRO drive 评判、支持维度归一化与工作关系边增强方案 | chatgpt | 2026-07-21 19:53:55 CST |
+| 2026-07-20_representation_graph_consciousness_feasibility.md | 追加 RepresentationLearn 中图结构视觉表征、再现与联想功能的可行性分析和验证标准 | chatgpt | 2026-07-20 22:34:04 CST |
+| 2026-07-20_alg_beta_transition_feature_graph_revision.md | 覆盖 Alg_beta 渐变边界章节，改为以 RGB_TRANSITION 低层特征族和统一 MICRO drive 表征过渡带 | chatgpt | 2026-07-20 22:07:32 CST |
+| 2026-07-20_alg_beta_gradient_boundary_frontier_learning.md | 追加 Alg_beta 渐变边界、语义前沿蚕食、动态漂移证据与 MICRO 意图扩展方案 | chatgpt | 2026-07-20 20:04:13 CST |
+| 2026-07-20_graph_memorypool_valid_view_drive_suppression.md | 修正 graph_memorypool 中黑边伪边缘对各阶段 drive 与兜底眼跳选点的干扰 | chatgpt | 2026-07-20 15:58:16 CST |
+| 2026-07-18_graph_memorypool_channel_contract_schema.md | 实现 graph_memorypool 通道契约、门控/相似度掩码分离、分组相似度与 Gpos 门控投影 | chatgpt | 2026-07-18 22:06:15 CST |
+| 2026-07-18_alg_beta_universal_extraction_revision.md | 续写 Alg_beta 探讨二修订版，统一五类输入的通道依赖、门控掩码与分组相似度检索规范 | chatgpt | 2026-07-18 21:43:20 CST |
+| 2026-07-17_graph_memorypool_boundary_trace_hysteresis.md | 修正 graph_memorypool 中 BOUNDARY_SEEK 落点确认、CONTOUR_TRACE 迟滞退出与边界访问延迟抑制 | chatgpt | 2026-07-17 22:14:01 CST |
+| 2026-07-17_alg_beta_micro_trace_debug_adjustment.md | 补充 Alg_beta 中 BOUNDARY_SEEK 死锁、CONTOUR_TRACE 早退与局部特征过度合并的算法修正建议 | chatgpt | 2026-07-17 16:08:15 CST |
 | 2026-07-16_graph_memorypool_micro_hyperedge_refactor.md | 重构 graph_memorypool：新增 MICRO 意图状态机、多重关系边与超边式 SemanticNode，并缩短 run_step | chatgpt | 2026-07-16 21:16:05 CST |
 | 2026-07-16_alg_beta_hyperedge_section_restructure.md | 重排 Alg_beta 眼动引导章节，并在自指边后补入多重边/超边规范 | chatgpt | 2026-07-16 20:45:06 CST |
 | 2026-07-16_learn_micro_gpos_target_fields.md | 将 Alg_beta 中 LEARN_MICRO 各拓扑意图目标场改写为基于 Gpos 响应的计算式 | chatgpt | 2026-07-16 20:20:20 CST |

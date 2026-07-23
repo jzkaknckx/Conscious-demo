@@ -38,20 +38,20 @@ class MemoryConfig:
     }
     
     feature_types = {
-        0: {'metric': 'Vector_Magnitude', 'paradigm': 'A', 'dominant_channel': 0},
+        0: {'metric': 'Vector_Occupancy', 'paradigm': 'A', 'dominant_channel': 0},
         1: {'metric': 'Euclidean_Absolute', 'paradigm': 'A', 'dominant_metric': 'Isurf'},
         2: {'metric': 'Euclidean_Absolute', 'paradigm': 'B'},
         3: {'metric': 'Euclidean_Absolute', 'paradigm': 'C'},
-        4: {'metric': 'Periodic_Property', 'paradigm': 'C', 'periods': {0: 1.0, 1: 1.0, 2: 1.0}}
+        4: {'metric': 'Periodic_Property', 'paradigm': 'C', 'periods': {0: 2.0, 1: 2.0, 2: 2.0}}
     }
     
     # [修改] 通道属性划分 (STRENGTH vs CONTINUITY_SURFACE vs CONTINUITY_TRACE vs IGNORE)
     feature_attributes = {
-        0: {0: 'STRENGTH', 1: 'CONTINUITY_TRACE'},   
-        1: {0: 'CONTINUITY_SURFACE', 1: 'CONTINUITY_SURFACE', 2: 'CONTINUITY_SURFACE'}, 
-        2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},     
-        3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  
-        4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},  
+        0: {0: 'STRENGTH', 1: 'CONTEXT', 2: 'CONTINUITY_TRACE', 3: 'CONTINUITY_TRACE'},
+        1: {0: 'CONTINUITY_SURFACE', 1: 'CONTINUITY_SURFACE', 2: 'CONTINUITY_SURFACE'},
+        2: {0: 'STRENGTH', 1: 'STRENGTH', 2: 'STRENGTH'},
+        3: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},
+        4: {0: 'CONTINUITY_TRACE', 1: 'CONTINUITY_TRACE', 2: 'CONTINUITY_TRACE'},
     }
     sigma_surf = 0.5
     sigma_trace = 0.5
@@ -60,6 +60,106 @@ class MemoryConfig:
     tau_str_gate = 0.8
     tau_surf_gate = 0.99
     tau_trace_gate = 0.8
+
+    # Channel-contract gates and grouped similarity params
+    min_valid_sim_channels = 1
+    tau_grad_str = 0.8
+    tau_grad_coh = 0.6
+    grad_coh_radius = 1
+    grad_axis_k = 2
+    gamma_grad = 2.0
+    tau_rgb_var = 0.02
+    rgb_gate_radius = 1
+    tau_curv = 0.05
+    tau_aps = 0.05
+    tau_ori_coh = 0.6
+    ori_coh_radius = 1
+    ori_axis_k = 2
+    gamma_ori = 2.0
+
+    feature_specs = {
+        0: {
+            'name': 'grad',
+            'topology': 'Boundary_Edge',
+            'channels': {
+                0: {'name': 'abs_strength', 'role': 'gate_only', 'gate': 'grad_strength'},
+                1: {'name': 'theta', 'role': 'context_only', 'gate': 'grad_coherence'},
+                2: {'name': 'gradx', 'role': 'sim_only', 'metric_group': 'grad_vec', 'parents': ['grad_strength', 'grad_coherence']},
+                3: {'name': 'grady', 'role': 'sim_only', 'metric_group': 'grad_vec', 'parents': ['grad_strength', 'grad_coherence']},
+            },
+            'metric_groups': {
+                'grad_vec': {
+                    'metric': 'Vector_Occupancy',
+                    'channels': [2, 3],
+                    'gamma': 2.0,
+                    'polarity': 'axis',
+                    'theta_match': 0.75,
+                    'min_valid_channels': 2,
+                }
+            },
+        },
+        1: {
+            'name': 'RGB',
+            'topology': 'Surface_2D',
+            'channels': {
+                0: {'name': 'R', 'role': 'gate_and_sim', 'metric_group': 'rgb', 'parents': ['rgb_surface']},
+                1: {'name': 'G', 'role': 'gate_and_sim', 'metric_group': 'rgb', 'parents': ['rgb_surface']},
+                2: {'name': 'B', 'role': 'gate_and_sim', 'metric_group': 'rgb', 'parents': ['rgb_surface']},
+            },
+            'metric_groups': {
+                'rgb': {
+                    'metric': 'Euclidean_Absolute',
+                    'channels': [0, 1, 2],
+                    'sigma': [0.06, 0.06, 0.06],
+                    'theta_match': 0.85,
+                    'min_valid_channels': 1,
+                }
+            },
+        },
+        2: {
+            'name': 'Curv',
+            'topology': 'Trace_1D',
+            'channels': {},
+            'metric_groups': {
+                'curv': {
+                    'metric': 'Euclidean_Absolute',
+                    'channels': 'all',
+                    'sigma': 0.08,
+                    'theta_match': 0.80,
+                    'min_valid_channels': 1,
+                }
+            },
+        },
+        3: {
+            'name': 'aps',
+            'topology': 'Surface_2D',
+            'channels': {},
+            'metric_groups': {
+                'aps': {
+                    'metric': 'Euclidean_Absolute',
+                    'channels': 'all',
+                    'sigma': 0.10,
+                    'theta_match': 0.80,
+                    'min_valid_channels': 1,
+                }
+            },
+        },
+        4: {
+            'name': 'ori',
+            'topology': 'Trace_1D',
+            'channels': {},
+            'metric_groups': {
+                'ori': {
+                    'metric': 'Periodic_Property',
+                    'channels': 'all',
+                    'gamma': 2.0,
+                    'k': 2.0,
+                    'theta_match': 0.75,
+                    'min_valid_channels': 1,
+                }
+            },
+        },
+    }
 
     # Neuron Dynamics GmemI
     T_excite_I = 0.8
@@ -153,6 +253,18 @@ class MemoryConfig:
     trace_step = 24.0
     sigma_trace_angle = 0.9
     sigma_boundary_visit = 8.0
+    theta_boundary_hit_enter = 0.04
+    theta_boundary_hit_exit = 0.015
+    theta_trace_fwd_enter = 0.03
+    theta_trace_fwd_exit = 0.01
+    theta_boundary_role = 0.04
+    boundary_hit_radius = 3
+    boundary_pending_radius = 4.0
+    trace_min_age = 3
+    sigma_boundary_reject = 10.0
+    boundary_reject_decay = 0.92
+    sigma_boundary_suppression = 4.0
+    boundary_coverage_suppression = 0.35
 
 
 # =============================
@@ -221,16 +333,35 @@ class RelationEdge:
         }
 
 
+@dataclass
+class FeatureDescriptor:
+    modality_id: int
+    values: torch.Tensor
+    sim_mask: torch.Tensor
+    gate_mask: torch.Tensor
+    context_mask: torch.Tensor
+    gate_context: Dict[str, float]
+    topology_context: Dict[str, Any]
+    match_threshold: float
+
+
 # =============================
 # Gmemory: Modality Nodes & Semantic Nodes
 # =============================
 class ModalityNode:
     """模态孤立特征层节点 (GI)"""
-    def __init__(self, node_id: int, modality_id: int, prototype: torch.Tensor, mask: Optional[torch.Tensor] = None):
+    def __init__(self, node_id: int, modality_id: int, prototype: torch.Tensor,
+                 mask: Optional[torch.Tensor] = None,
+                 gate_context: Optional[Dict[str, float]] = None,
+                 topology_context: Optional[Dict[str, Any]] = None,
+                 match_threshold: Optional[float] = None):
         self.node_id = node_id
         self.modality_id = modality_id
         self.prototype = prototype
         self.mask = mask if mask is not None else torch.ones_like(prototype)
+        self.gate_context = gate_context or {}
+        self.topology_context = topology_context or {}
+        self.match_threshold = match_threshold
         
         self.count = 1
         self.last_seen = 0
@@ -240,6 +371,21 @@ class ModalityNode:
         self.activation_level = 0.0
         self.state_flag = NeuronState.CALM
         self.timer = 0
+
+    def update_from_descriptor(self, descriptor: FeatureDescriptor):
+        sim_mask = descriptor.sim_mask.squeeze(0).to(self.prototype.device)
+        values = descriptor.values.squeeze(0).to(self.prototype.device)
+        if values.shape[0] == self.prototype.shape[0]:
+            alpha = 1.0 / (self.count + 1)
+            self.prototype = self.prototype * (1.0 - sim_mask) + (
+                (1.0 - alpha) * self.prototype + alpha * values
+            ) * sim_mask
+            self.mask = torch.max(self.mask, sim_mask)
+        for key, value in descriptor.gate_context.items():
+            prev = self.gate_context.get(key)
+            self.gate_context[key] = value if prev is None else 0.9 * prev + 0.1 * value
+        self.topology_context.update(descriptor.topology_context)
+        self.match_threshold = descriptor.match_threshold
 
     def tick_update(self, E_input: float, cfg: MemoryConfig):
         if self.state_flag == NeuronState.REFRACTORY:
@@ -368,11 +514,23 @@ class GmemoryI:
     def __init__(self):
         self.nodes: Dict[int, ModalityNode] = {}
         self.next_node_id = 0
-        
-    def add_node(self, modality_id: int, prototype: torch.Tensor, mask: Optional[torch.Tensor] = None) -> ModalityNode:
+
+    def add_node(self, modality_id: int, prototype: torch.Tensor,
+                 mask: Optional[torch.Tensor] = None,
+                 gate_context: Optional[Dict[str, float]] = None,
+                 topology_context: Optional[Dict[str, Any]] = None,
+                 match_threshold: Optional[float] = None) -> ModalityNode:
         nid = self.next_node_id
         self.next_node_id += 1
-        node = ModalityNode(nid, modality_id, prototype, mask)
+        node = ModalityNode(
+            nid,
+            modality_id,
+            prototype,
+            mask,
+            gate_context=gate_context,
+            topology_context=topology_context,
+            match_threshold=match_threshold,
+        )
         self.nodes[nid] = node
         return node
 
@@ -481,28 +639,89 @@ class GmemoryIII:
 # =============================
 class SimilarityEngine:
     @staticmethod
-    def sim_euclidean(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor, sigma: float = 0.5) -> torch.Tensor:
+    def _result_zeros(X: torch.Tensor) -> torch.Tensor:
+        if X.dim() == 4:
+            return torch.zeros((X.shape[0], 1, X.shape[-2], X.shape[-1]), device=X.device, dtype=X.dtype)
+        return torch.zeros((X.shape[0], 1), device=X.device, dtype=X.dtype)
+
+    @staticmethod
+    def _base_mask(mask: Optional[torch.Tensor], channels: int, device, dtype) -> torch.Tensor:
+        if mask is None:
+            return torch.ones((1, channels), device=device, dtype=dtype)
+        out = mask.to(device=device, dtype=dtype).view(1, -1)
+        if out.shape[1] < channels:
+            pad = torch.zeros((1, channels - out.shape[1]), device=device, dtype=dtype)
+            out = torch.cat([out, pad], dim=1)
+        return out[:, :channels]
+
+    @staticmethod
+    def _group_channels(channels_spec, channels: int) -> List[int]:
+        if channels_spec == 'all':
+            return list(range(channels))
+        return [int(c) for c in channels_spec if int(c) < channels]
+
+    @staticmethod
+    def _group_mask(mask_X: torch.Tensor, mask_W: torch.Tensor,
+                    group_channels: List[int], channels: int) -> torch.Tensor:
+        group = torch.zeros((1, channels), device=mask_X.device, dtype=mask_X.dtype)
+        for c in group_channels:
+            if c < channels:
+                group[0, c] = 1.0
+        return mask_X * mask_W * group
+
+    @staticmethod
+    def _expand_mask(mask: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
+        if X.dim() == 4:
+            return mask.view(1, -1, 1, 1)
+        return mask
+
+    @staticmethod
+    def _parameter_tensor(value, channels: int, device, dtype) -> torch.Tensor:
+        if isinstance(value, (list, tuple)):
+            data = list(value)[:channels]
+            if len(data) < channels:
+                data.extend([data[-1] if data else 1.0] * (channels - len(data)))
+            return torch.tensor(data, device=device, dtype=dtype).view(1, channels)
+        return torch.full((1, channels), float(value), device=device, dtype=dtype)
+
+    @staticmethod
+    def sim_euclidean(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor,
+                      sigma=0.5, weights=1.0) -> torch.Tensor:
         """欧氏绝对坐标: 高斯RBF核"""
         M = mask_X * mask_W
+        sigma_t = SimilarityEngine._parameter_tensor(sigma, X.shape[1], X.device, X.dtype).clamp(min=1e-6)
+        weight_t = SimilarityEngine._parameter_tensor(weights, X.shape[1], X.device, X.dtype)
         if X.dim() == 4:
             M = M.view(1, -1, 1, 1)
-        
-        diff_sq = torch.sum(((X - W) ** 2) * M, dim=1, keepdim=True)
-        valid_channels = torch.sum(M, dim=1, keepdim=True).clamp(min=1e-6)
+            sigma_t = sigma_t.view(1, -1, 1, 1)
+            weight_t = weight_t.view(1, -1, 1, 1)
+
+        diff_sq = torch.sum((((X - W) / sigma_t) ** 2) * M * weight_t, dim=1, keepdim=True)
+        valid_channels = torch.sum(M * weight_t, dim=1, keepdim=True).clamp(min=1e-6)
         dist_sq = diff_sq / valid_channels
-        return torch.exp(-dist_sq / (2 * sigma**2))
+        return torch.exp(-0.5 * dist_sq)
 
     @staticmethod
-    def sim_vector(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor) -> torch.Tensor:
-        """矢量占有度: 点积"""
+    def sim_vector(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor,
+                   gamma: float = 2.0, polarity: str = 'axis') -> torch.Tensor:
+        """矢量占有度: 归一化向量相似度，可选择轴向或极性敏感匹配。"""
         M = mask_X * mask_W
-        if X.dim() == 4:
-            M = M.view(1, -1, 1, 1)
-        
-        return torch.sum(X * W * M, dim=1, keepdim=True)
+        M_exp = SimilarityEngine._expand_mask(M, X)
+        Xv = X * M_exp
+        Wv = W * M_exp
+        dot = torch.sum(Xv * Wv, dim=1, keepdim=True)
+        norm_x = torch.sqrt(torch.sum(Xv * Xv, dim=1, keepdim=True) + 1e-6)
+        norm_w = torch.sqrt(torch.sum(Wv * Wv, dim=1, keepdim=True) + 1e-6)
+        cos_sim = dot / (norm_x * norm_w)
+        if polarity == 'axis':
+            cos_sim = torch.abs(cos_sim)
+        else:
+            cos_sim = torch.clamp(cos_sim, min=0.0)
+        return torch.pow(torch.clamp(cos_sim, min=0.0, max=1.0), gamma)
 
     @staticmethod
-    def sim_periodic(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor, periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
+    def sim_periodic(X: torch.Tensor, W: torch.Tensor, mask_X: torch.Tensor, mask_W: torch.Tensor,
+                     periods: Dict[int, float], gamma: float = 2.0) -> torch.Tensor:
         """周期属性: 高阶余弦"""
         M = mask_X * mask_W
         if X.dim() == 4:
@@ -517,8 +736,8 @@ class SimilarityEngine:
             Xc = X[:, c:c+1]
             Wc = W[:, c:c+1]
             
-            S_raw = torch.cos(k * (Xc - Wc))
-            S_prop = torch.pow(torch.clamp(S_raw, min=0.0), gamma)
+            S_raw = (1.0 + torch.cos(k * (Xc - Wc))) * 0.5
+            S_prop = torch.pow(torch.clamp(S_raw, min=0.0, max=1.0), gamma)
             sum_sim = sum_sim + S_prop * Mc
             count = count + Mc
             
@@ -527,24 +746,66 @@ class SimilarityEngine:
 
     @staticmethod
     def calculate_similarity(X: torch.Tensor, W: torch.Tensor, cfg: 'MemoryConfig', mod_id: int, mask_X: Optional[torch.Tensor] = None, mask_W: Optional[torch.Tensor] = None) -> torch.Tensor:
+        specs = getattr(cfg, 'feature_specs', {})
+        spec = specs.get(mod_id)
+        channels = min(X.shape[1], W.shape[1])
+        if channels <= 0:
+            return SimilarityEngine._result_zeros(X)
+
+        X = X[:, :channels]
+        W = W[:, :channels] if W.dim() != 4 else W[:, :channels, :, :]
+        mask_X = SimilarityEngine._base_mask(mask_X, channels, X.device, X.dtype)
+        mask_W = SimilarityEngine._base_mask(mask_W, channels, X.device, X.dtype)
+
+        if spec and spec.get('metric_groups'):
+            log_sum = None
+            alpha_sum = 0.0
+            for group in spec['metric_groups'].values():
+                group_channels = SimilarityEngine._group_channels(group.get('channels', 'all'), channels)
+                group_mask = SimilarityEngine._group_mask(mask_X, mask_W, group_channels, channels)
+                valid_count = int(torch.sum(group_mask).item())
+                min_valid = int(group.get('min_valid_channels', getattr(cfg, 'min_valid_sim_channels', 1)))
+                if valid_count < min_valid:
+                    continue
+
+                metric = group.get('metric', 'Vector_Occupancy')
+                if metric == 'Euclidean_Absolute':
+                    S_g = SimilarityEngine.sim_euclidean(
+                        X, W, group_mask, torch.ones_like(group_mask),
+                        sigma=group.get('sigma', 0.05),
+                        weights=group.get('weights', 1.0),
+                    )
+                elif metric == 'Periodic_Property':
+                    k = group.get('k', group.get('period', 2.0))
+                    periods = {c: k for c in group_channels}
+                    S_g = SimilarityEngine.sim_periodic(
+                        X, W, group_mask, torch.ones_like(group_mask),
+                        periods,
+                        gamma=group.get('gamma', 2.0),
+                    )
+                else:
+                    S_g = SimilarityEngine.sim_vector(
+                        X, W, group_mask, torch.ones_like(group_mask),
+                        gamma=group.get('gamma', 2.0),
+                        polarity=group.get('polarity', 'axis'),
+                    )
+
+                alpha = float(group.get('weight', 1.0))
+                term = alpha * torch.log(S_g.clamp(min=1e-6))
+                log_sum = term if log_sum is None else log_sum + term
+                alpha_sum += alpha
+
+            if log_sum is None or alpha_sum <= 0.0:
+                return SimilarityEngine._result_zeros(X)
+            return torch.exp(log_sum / alpha_sum)
+
         finfo = getattr(cfg, 'feature_types', {}).get(mod_id, {})
         metric = finfo.get('metric', 'Vector_Magnitude')
-        
-        if mask_X is None:
-            mask_X = torch.ones(1, X.shape[1], device=X.device)
-        if mask_W is None:
-            mask_W = torch.ones(1, W.shape[1], device=W.device)
-            
-        # Ensure dimensions match
-        if mask_X.shape[1] > X.shape[1]:
-            mask_X = mask_X[:, :X.shape[1]]
-        if mask_W.shape[1] > W.shape[1]:
-            mask_W = mask_W[:, :W.shape[1]]
-            
+
         if metric == 'Euclidean_Absolute':
             sigma = finfo.get('sigma', 0.05)
             return SimilarityEngine.sim_euclidean(X, W, mask_X, mask_W, sigma)
-        elif metric == 'Vector_Magnitude':
+        elif metric in {'Vector_Magnitude', 'Vector_Occupancy'}:
             return SimilarityEngine.sim_vector(X, W, mask_X, mask_W)
         elif metric == 'Periodic_Property':
             periods = finfo.get('periods', {0: 1.0})
@@ -552,6 +813,73 @@ class SimilarityEngine:
             return SimilarityEngine.sim_periodic(X, W, mask_X, mask_W, periods, gamma)
         else:
             return SimilarityEngine.sim_vector(X, W, mask_X, mask_W)
+
+    @staticmethod
+    def _mean_filter(value: torch.Tensor, radius: int) -> torch.Tensor:
+        kernel = max(1, 2 * int(radius) + 1)
+        return F.avg_pool2d(value, kernel_size=kernel, stride=1, padding=kernel // 2)
+
+    @staticmethod
+    def _circular_coherence_map(theta: torch.Tensor, weight: torch.Tensor,
+                                radius: int, k: float) -> torch.Tensor:
+        sin_v = torch.sin(k * theta) * weight
+        cos_v = torch.cos(k * theta) * weight
+        sum_sin = SimilarityEngine._mean_filter(sin_v, radius)
+        sum_cos = SimilarityEngine._mean_filter(cos_v, radius)
+        sum_w = SimilarityEngine._mean_filter(weight, radius).clamp(min=1e-6)
+        return torch.sqrt(sum_sin ** 2 + sum_cos ** 2) / sum_w
+
+    @staticmethod
+    def compute_gate_map(X: torch.Tensor, cfg: 'MemoryConfig', mod_id: int) -> torch.Tensor:
+        B, C, H, W = X.shape
+        if C <= 0:
+            return torch.zeros((B, 1, H, W), device=X.device, dtype=X.dtype)
+
+        if mod_id == 0:
+            if C >= 4:
+                strength = X[:, 0:1].abs()
+                theta = X[:, 1:2]
+            elif C >= 2:
+                gx, gy = X[:, 0:1], X[:, 1:2]
+                strength = torch.sqrt(gx ** 2 + gy ** 2 + 1e-6)
+                theta = torch.atan2(gy, gx)
+            else:
+                strength = X[:, 0:1].abs()
+                theta = torch.zeros_like(strength)
+            coh = SimilarityEngine._circular_coherence_map(
+                theta,
+                strength,
+                getattr(cfg, 'grad_coh_radius', 1),
+                getattr(cfg, 'grad_axis_k', 2),
+            )
+            return ((strength > cfg.tau_grad_str) & (coh > cfg.tau_grad_coh)).to(dtype=X.dtype)
+
+        if mod_id == 1:
+            radius = getattr(cfg, 'rgb_gate_radius', 1)
+            mean = SimilarityEngine._mean_filter(X, radius)
+            var = SimilarityEngine._mean_filter((X - mean) ** 2, radius).mean(dim=1, keepdim=True)
+            return (var < cfg.tau_rgb_var).to(dtype=X.dtype)
+
+        if mod_id == 2:
+            return (X.abs() > cfg.tau_curv).any(dim=1, keepdim=True).to(dtype=X.dtype)
+
+        if mod_id == 3:
+            return (X.abs() > cfg.tau_aps).any(dim=1, keepdim=True).to(dtype=X.dtype)
+
+        if mod_id == 4:
+            weight = torch.ones_like(X[:, 0:1])
+            gates = []
+            for c in range(C):
+                coh = SimilarityEngine._circular_coherence_map(
+                    X[:, c:c+1],
+                    weight,
+                    getattr(cfg, 'ori_coh_radius', 1),
+                    getattr(cfg, 'ori_axis_k', 2),
+                )
+                gates.append(coh > cfg.tau_ori_coh)
+            return torch.cat(gates, dim=1).any(dim=1, keepdim=True).to(dtype=X.dtype)
+
+        return torch.ones((B, 1, H, W), device=X.device, dtype=X.dtype)
 
 
 # =============================
@@ -582,9 +910,10 @@ class Gposition:
             B, C_m, H, W = X_m.shape
             
             S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id, mask_W=mask_W)
+            G_m = SimilarityEngine.compute_gate_map(X_m, self.cfg, mod_id)
             
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
-            S_maps[node.node_id] = S_m * weight
+            S_maps[node.node_id] = S_m * G_m * weight
             
         return S_maps
 
@@ -604,9 +933,10 @@ class Gposition:
             w_m = node.prototype.to(self.device).view(1, -1, 1, 1)
             mask_W = node.mask.to(self.device).view(1, -1)
             S_m = SimilarityEngine.calculate_similarity(X_m, w_m, self.cfg, mod_id, mask_W=mask_W)
+            G_m = SimilarityEngine.compute_gate_map(X_m, self.cfg, mod_id)
             
             weight = self.cfg.modality_weights.get(mod_id, 1.0)
-            S_maps[node.node_id] = S_m * weight
+            S_maps[node.node_id] = S_m * G_m * weight
             
         return S_maps
 
@@ -715,6 +1045,32 @@ class InterestOptimizer:
         self.I_str: Optional[torch.Tensor] = None
         self.I_con1: Optional[torch.Tensor] = None
         self.I_con2: Optional[torch.Tensor] = None
+
+    def valid_view_bounds(self, H: int, W: int) -> Tuple[int, int, int, int]:
+        if self.H_orig is None or self.W_orig is None:
+            return 0, H, 0, W
+        margin = int(self.r or 0)
+        valid_h = min(H, max(1, int(self.H_orig) - margin))
+        valid_w = min(W, max(1, int(self.W_orig) - margin))
+        y1 = max(0, (H - valid_h) // 2)
+        x1 = max(0, (W - valid_w) // 2)
+        y2 = min(H, y1 + valid_h)
+        x2 = min(W, x1 + valid_w)
+        return y1, y2, x1, x2
+
+    def valid_view_mask(self, ref: torch.Tensor) -> torch.Tensor:
+        H, W = ref.shape[-2], ref.shape[-1]
+        mask = torch.zeros_like(ref)
+        y1, y2, x1, x2 = self.valid_view_bounds(H, W)
+        mask[:, :, y1:y2, x1:x2] = 1.0
+        return mask
+
+    def suppress_invalid_view(self, drive: torch.Tensor, invalid_value: float = 0.0) -> torch.Tensor:
+        if self.H_orig is None or self.W_orig is None:
+            return drive
+        mask = self.valid_view_mask(drive)
+        fill = torch.full_like(drive, invalid_value)
+        return torch.where(mask > 0.0, drive, fill)
         
     def initialize_base_interest(self, X_subspaces: Dict[int, torch.Tensor], H_orig: int = None, W_orig: int = None):
         self.H_orig = H_orig
@@ -766,13 +1122,7 @@ class InterestOptimizer:
         self.I_con1 = I_con1
         self.I_con2 = I_con2
         self.base_interest = I_str + I_con1 + I_con2
-
-        if self.H_orig is not None and self.W_orig is not None:
-            # 保留兴趣压制：初始化时压低外围兴趣
-            h1, h2 = max(0, H//2-(self.H_orig-self.r)//2), min(H, H//2+(self.H_orig-self.r)//2)
-            w1, w2 = max(0, W//2-(self.W_orig-self.r)//2), min(W, W//2+(self.W_orig-self.r)//2)
-            self.base_interest[:, :, :w1, :] = 0; self.base_interest[:, :, w2:, :] = 0
-            self.base_interest[:, :, :, :h1] = 0; self.base_interest[:, :, :, h2:] = 0
+        self.base_interest = self.suppress_invalid_view(self.base_interest, invalid_value=0.0)
 
         b_max = self.base_interest.max() + 1e-5
         self.base_interest /= b_max
@@ -867,13 +1217,7 @@ class InterestOptimizer:
         self.I_guide = self.generate_I_guide(self.base_interest, pt)
         I_map += self.cfg.w_guide * self.I_guide
         
-        if self.H_orig is not None and self.W_orig is not None:
-            # 保留兴趣压制：初始化时压低外围兴趣
-            h1, h2 = max(0, H//2-(self.H_orig-self.r)//2), min(H, H//2+(self.H_orig-self.r)//2)
-            w1, w2 = max(0, W//2-(self.W_orig-self.r)//2), min(W, W//2+(self.W_orig-self.r)//2)
-            I_map[:, :, :w1, :] = 0; I_map[:, :, w2:, :] = 0
-            I_map[:, :, :, :h1] = 0; I_map[:, :, :, h2:] = 0
-
+        I_map = self.suppress_invalid_view(I_map, invalid_value=0.0)
         return F.relu(I_map)
 
     def add_expectation(self, node_id: int, pt: Tuple[int, int], H: int, W: int):
@@ -943,6 +1287,13 @@ class Controller:
         self.boundary_visited: Optional[torch.Tensor] = None
         self.last_boundary_tangent: Optional[Tuple[float, float]] = None
         self.boundary_start_point: Optional[Tuple[int, int]] = None
+        self.pending_boundary_target: Optional[Tuple[int, int]] = None
+        self.boundary_rejected: Optional[torch.Tensor] = None
+        self.boundary_suppression: Optional[torch.Tensor] = None
+        self.trace_age = 0
+        self.boundary_hit_confidence = 0.0
+        self.boundary_forward_support = 0.0
+        self.boundary_role_confidence = 0.0
 
         # Run-step specific maps and buffers
         self.ior_map: Optional[torch.Tensor] = None
@@ -959,91 +1310,212 @@ class Controller:
         self.matrix3 = None
         self.matrix4 = None
 
-    def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor], 
-                                          gmem_i: GmemoryI, x: int, y: int, 
-                                          similarity_threshold: float = 0.85) -> List[ModalityNode]:
+    def _feature_spec(self, mod_id: int) -> Dict[str, Any]:
+        return getattr(self.cfg, 'feature_specs', {}).get(mod_id, {})
+
+    def _sample_feature_scalar(self, X_m: torch.Tensor, channel: int, x: int, y: int) -> float:
+        if channel >= X_m.shape[1]:
+            return 0.0
+        return float(X_m[0, channel, y, x].item())
+
+    def _local_variance_value(self, X_m: torch.Tensor, x: int, y: int, radius: int) -> float:
+        H, W = X_m.shape[-2], X_m.shape[-1]
+        r = max(0, int(radius))
+        x1, x2 = max(0, x - r), min(W, x + r + 1)
+        y1, y2 = max(0, y - r), min(H, y + r + 1)
+        if x1 >= x2 or y1 >= y2:
+            return 0.0
+        window = X_m[:, :, y1:y2, x1:x2]
+        mean = window.mean(dim=(-2, -1), keepdim=True)
+        return float(((window - mean) ** 2).mean().item())
+
+    def _evaluate_gates(self, mod_id: int, X_m: torch.Tensor, x: int, y: int) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
+        gate_map = SimilarityEngine.compute_gate_map(X_m, self.cfg, mod_id)
+        gate_passed = bool(gate_map[0, 0, y, x].item() > 0.5)
+        gates = {'modality': gate_passed}
+        context = {'gate': float(gate_map[0, 0, y, x].item())}
+        C_m = X_m.shape[1]
+
+        if mod_id == 0:
+            if C_m >= 4:
+                strength = abs(self._sample_feature_scalar(X_m, 0, x, y))
+                theta = self._sample_feature_scalar(X_m, 1, x, y)
+                theta_map = X_m[:, 1:2]
+                strength_map = X_m[:, 0:1].abs()
+            elif C_m >= 2:
+                gx = X_m[:, 0:1]
+                gy = X_m[:, 1:2]
+                strength_map = torch.sqrt(gx ** 2 + gy ** 2 + 1e-6)
+                theta_map = torch.atan2(gy, gx)
+                strength = float(strength_map[0, 0, y, x].item())
+                theta = float(theta_map[0, 0, y, x].item())
+            else:
+                strength_map = X_m[:, 0:1].abs()
+                theta_map = torch.zeros_like(strength_map)
+                strength = float(strength_map[0, 0, y, x].item())
+                theta = 0.0
+            coh_map = SimilarityEngine._circular_coherence_map(
+                theta_map,
+                strength_map,
+                self.cfg.grad_coh_radius,
+                self.cfg.grad_axis_k,
+            )
+            coherence = float(coh_map[0, 0, y, x].item())
+            gates['grad_strength'] = strength > self.cfg.tau_grad_str
+            gates['grad_coherence'] = coherence > self.cfg.tau_grad_coh
+            context.update({'strength': strength, 'theta': theta, 'coherence': coherence})
+
+        elif mod_id == 1:
+            variance = self._local_variance_value(X_m, x, y, self.cfg.rgb_gate_radius)
+            gates['rgb_surface'] = gate_passed
+            context['local_variance'] = variance
+
+        elif mod_id == 2:
+            value = float(X_m[0, :, y, x].abs().max().item())
+            gates['curv_parent'] = gate_passed
+            context['max_abs_curv'] = value
+
+        elif mod_id == 3:
+            value = float(X_m[0, :, y, x].abs().max().item())
+            gates['aps_support'] = gate_passed
+            context['max_abs_aps'] = value
+
+        elif mod_id == 4:
+            gates['ori_coherence'] = gate_passed
+            context['orientation'] = float(X_m[0, 0, y, x].item())
+
+        return gate_passed, gates, context
+
+    def _descriptor_channel_spec(self, spec: Dict[str, Any], channel: int, mod_id: int) -> Dict[str, Any]:
+        channel_specs = spec.get('channels', {})
+        if channel in channel_specs:
+            return channel_specs[channel]
+        for name, group in spec.get('metric_groups', {}).items():
+            channels = group.get('channels', 'all')
+            if channels == 'all' or channel in channels:
+                parents = []
+                if mod_id == 2:
+                    parents = ['curv_parent']
+                elif mod_id == 3:
+                    parents = ['aps_support']
+                elif mod_id == 4:
+                    parents = ['ori_coherence']
+                return {'role': 'gate_and_sim', 'metric_group': name, 'parents': parents}
+        return {'role': 'gate_and_sim'}
+
+    def _parents_pass(self, parents: List[str], gates: Dict[str, bool]) -> bool:
+        return all(gates.get(parent, gates.get('modality', False)) for parent in parents)
+
+    def _build_descriptor(self, mod_id: int, X_m: torch.Tensor, x: int, y: int) -> Optional[FeatureDescriptor]:
+        C_m = X_m.shape[1]
+        if C_m <= 0:
+            return None
+        spec = self._feature_spec(mod_id)
+        gate_passed, gates, gate_context = self._evaluate_gates(mod_id, X_m, x, y)
+        if not gate_passed:
+            return None
+
+        sim_mask = torch.zeros((1, C_m), device=self.device)
+        gate_mask = torch.zeros((1, C_m), device=self.device)
+        context_mask = torch.zeros((1, C_m), device=self.device)
+
+        for c in range(C_m):
+            ch_spec = self._descriptor_channel_spec(spec, c, mod_id)
+            role = ch_spec.get('role', 'gate_and_sim')
+            parents = ch_spec.get('parents', [])
+            if role in {'gate_only', 'gate_and_sim'}:
+                gate_mask[0, c] = 1.0
+            if role in {'context_only', 'gate_only'}:
+                context_mask[0, c] = 1.0
+            if role in {'sim_only', 'gate_and_sim'} and self._parents_pass(parents, gates):
+                sim_mask[0, c] = 1.0
+
+        threshold = 0.85
+        valid_group = False
+        metric_groups = spec.get('metric_groups', {})
+        if metric_groups:
+            thresholds = []
+            for group in metric_groups.values():
+                channels = SimilarityEngine._group_channels(group.get('channels', 'all'), C_m)
+                if not channels:
+                    continue
+                count = int(sim_mask[:, channels].sum().item())
+                required = int(group.get('min_valid_channels', self.cfg.min_valid_sim_channels))
+                required = min(required, len(channels))
+                if count >= required:
+                    valid_group = True
+                    thresholds.append(float(group.get('theta_match', threshold)))
+            if not valid_group:
+                return None
+            threshold = min(thresholds) if thresholds else threshold
+        elif int(sim_mask.sum().item()) < self.cfg.min_valid_sim_channels:
+            return None
+
+        values = X_m[0, :, y, x].unsqueeze(0)
+        topology_context = {'topology': spec.get('topology', self._modality_topology(mod_id))}
+        return FeatureDescriptor(
+            modality_id=mod_id,
+            values=values,
+            sim_mask=sim_mask,
+            gate_mask=gate_mask,
+            context_mask=context_mask,
+            gate_context=gate_context,
+            topology_context=topology_context,
+            match_threshold=threshold,
+        )
+
+    def _extract_and_match_local_features(self, X_subspaces: Dict[int, torch.Tensor],
+                                          gmem_i: GmemoryI, x: int, y: int,
+                                          similarity_threshold: Optional[float] = None) -> List[ModalityNode]:
         active_nodes = []
         for mod_id, X_m in X_subspaces.items():
-            C_m = X_m.shape[1]
-            H, W = X_m.shape[-2], X_m.shape[-1]
-            mod_attrs = self.cfg.feature_attributes.get(mod_id, {})
-            finfo = self.cfg.feature_types.get(mod_id, {})
-            paradigm = finfo.get('paradigm', 'C')
-            
-            valid_mask = torch.zeros((1, C_m), device=self.device)
-            sc_values = []
-            
-            # Evaluate Write Gating Threshold
-            for c in range(C_m):
-                attr = mod_attrs.get(c, 'STRENGTH')
-                if attr == 'IGNORE':
-                    continue
-                vc = X_m[0, c, y, x].item()
-                if attr == 'STRENGTH':
-                    if abs(vc) > self.cfg.tau_str_gate:
-                        valid_mask[0, c] = 1.0
-                elif attr == 'CONTINUITY_SURFACE':
-                    dx = X_m[0, c, y, min(x+1, W-1)].item() - vc
-                    dy = X_m[0, c, min(y+1, H-1), x].item() - vc
-                    sc = math.exp(-(dx**2 + dy**2) / (2 * self.cfg.sigma_surf**2))
-                    sc_values.append(sc)
-                    if sc > self.cfg.tau_surf_gate:
-                        valid_mask[0, c] = 1.0
-                elif attr == 'CONTINUITY_TRACE':
-                    padding = 1
-                    y1, y2 = max(0, y-padding), min(H, y+padding+1)
-                    x1, x2 = max(0, x-padding), min(W, x+padding+1)
-                    local_window = X_m[0, c, y1:y2, x1:x2]
-                    v_x = torch.cos(local_window)
-                    v_y = torch.sin(local_window)
-                    coherence = torch.sqrt(torch.sum(v_x)**2 + torch.sum(v_y)**2) / (local_window.numel() + 1e-6)
-                    if coherence.item() > self.cfg.tau_trace_gate:
-                        valid_mask[0, c] = 1.0
-                        
-            if paradigm == 'A':
-                if finfo.get('dominant_metric') == 'Isurf':
-                    if len(sc_values) > 0:
-                        isurf = sum(sc_values) / len(sc_values)
-                        if isurf > self.cfg.tau_surf_gate:
-                            valid_mask = torch.ones((1, C_m), device=self.device)
-                        else:
-                            continue
-                    else:
-                        continue
-                else:
-                    dom_c = finfo.get('dominant_channel', 0)
-                    if dom_c < C_m and valid_mask[0, dom_c].item() == 0:
-                        continue
-                    else:
-                        valid_mask = torch.ones((1, C_m), device=self.device)
-                    
-            if torch.sum(valid_mask) == 0:
+            descriptor = self._build_descriptor(mod_id, X_m, x, y)
+            if descriptor is None:
                 continue
 
-            local_vec = X_m[0, :, y, x].unsqueeze(0)
-            
             matched_node = None
             best_sim = -1.0
-            
+
             for node in gmem_i.nodes.values():
                 if node.modality_id == mod_id:
                     w_node = node.prototype.unsqueeze(0)
-                    sim = SimilarityEngine.calculate_similarity(local_vec, w_node, self.cfg, mod_id, mask_X=valid_mask, mask_W=node.mask.unsqueeze(0)).item()
+                    sim = SimilarityEngine.calculate_similarity(
+                        descriptor.values,
+                        w_node,
+                        self.cfg,
+                        mod_id,
+                        mask_X=descriptor.sim_mask,
+                        mask_W=node.mask.unsqueeze(0),
+                    ).item()
                     if sim > best_sim:
                         best_sim = sim
                         matched_node = node
-                        
-            if matched_node and best_sim >= similarity_threshold:
+
+            # print(descriptor)
+            # print("sim", best_sim)
+            threshold = similarity_threshold if similarity_threshold is not None else descriptor.match_threshold
+            if matched_node and best_sim >= threshold:
+                matched_node.update_from_descriptor(descriptor)
                 matched_node.count += 1
                 matched_node.last_seen = time.time()
                 active_nodes.append(matched_node)
             else:
-                new_node = gmem_i.add_node(mod_id, local_vec.squeeze(0).detach().clone(), mask=valid_mask.squeeze(0).detach().clone())
+                new_node = gmem_i.add_node(
+                    mod_id,
+                    descriptor.values.squeeze(0).detach().clone(),
+                    mask=descriptor.sim_mask.squeeze(0).detach().clone(),
+                    gate_context=dict(descriptor.gate_context),
+                    topology_context=dict(descriptor.topology_context),
+                    match_threshold=descriptor.match_threshold,
+                )
                 active_nodes.append(new_node)
                 
         return active_nodes
 
     def _modality_topology(self, modality_id: int) -> str:
+        spec = self._feature_spec(modality_id)
+        if spec.get('topology'):
+            return spec['topology']
         attrs = self.cfg.feature_attributes.get(modality_id, {})
         values = set(attrs.values())
         if 'CONTINUITY_SURFACE' in values:
@@ -1081,6 +1553,10 @@ class Controller:
             self.semantic_history = torch.zeros((1, 1, H, W), device=self.device)
         if self.boundary_visited is None:
             self.boundary_visited = torch.zeros((1, 1, H, W), device=self.device)
+        if self.boundary_rejected is None:
+            self.boundary_rejected = torch.zeros((1, 1, H, W), device=self.device)
+        if self.boundary_suppression is None:
+            self.boundary_suppression = torch.zeros((1, 1, H, W), device=self.device)
 
     def _xy_grids(self, H: int, W: int):
         y_grid = torch.arange(H, device=self.device).view(H, 1)
@@ -1095,16 +1571,191 @@ class Controller:
     def _argmax_point(self, drive: torch.Tensor) -> Tuple[int, int]:
         H, W = drive.shape[-2], drive.shape[-1]
         if drive.max() < 1e-6:
+            mask = self.optimizer.valid_view_mask(drive)
+            valid = torch.nonzero(mask[0, 0] > 0.0, as_tuple=False)
+            if valid.numel() > 0:
+                ridx = torch.randint(0, valid.shape[0], (1,), device=self.device).item()
+                yx = valid[ridx]
+                return int(yx[1].item()), int(yx[0].item())
             idx = torch.randint(0, H * W, (1,), device=self.device).item()
         else:
             idx = torch.argmax(drive).item()
         return int(idx % W), int(idx // W)
+
+    def _suppress_invalid_view(self, drive: torch.Tensor, invalid_value: float = 0.0) -> torch.Tensor:
+        return self.optimizer.suppress_invalid_view(drive, invalid_value=invalid_value)
 
     def _mark_map_visited(self, target: torch.Tensor, pt: Tuple[int, int], sigma: float, weight: float = 1.0) -> torch.Tensor:
         H, W = target.shape[-2], target.shape[-1]
         dist_sq = self._distance_sq_from(pt, H, W)
         mark = weight * torch.exp(-dist_sq / (2 * sigma ** 2)).view(1, 1, H, W)
         return torch.max(target, mark.clamp(max=1.0))
+
+    def _local_window_mean(self, value: torch.Tensor, pt: Tuple[int, int], radius: int) -> float:
+        x, y = pt
+        H, W = value.shape[-2], value.shape[-1]
+        r = max(0, int(radius))
+        x1, x2 = max(0, x - r), min(W, x + r + 1)
+        y1, y2 = max(0, y - r), min(H, y + r + 1)
+        if x1 >= x2 or y1 >= y2:
+            return 0.0
+        return float(value[:, :, y1:y2, x1:x2].mean().item())
+
+    def _local_window_max(self, value: torch.Tensor, pt: Tuple[int, int], radius: int) -> float:
+        x, y = pt
+        H, W = value.shape[-2], value.shape[-1]
+        r = max(0, int(radius))
+        x1, x2 = max(0, x - r), min(W, x + r + 1)
+        y1, y2 = max(0, y - r), min(H, y + r + 1)
+        if x1 >= x2 or y1 >= y2:
+            return 0.0
+        return float(value[:, :, y1:y2, x1:x2].max().item())
+
+    def _micro_contour_response(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
+        ref = fields['boundary']
+        contour = (
+            self.cfg.micro_w_edge * fields.get('edge', torch.zeros_like(ref))
+            + self.cfg.micro_w_corner * fields.get('corner', torch.zeros_like(ref))
+            + self.cfg.micro_w_junction * fields.get('junction', torch.zeros_like(ref))
+            + self.cfg.micro_w_terminator * fields.get('terminator', torch.zeros_like(ref))
+        )
+        return self._normalize_map(contour, ref)
+
+    def _tangent_gate_at(self, ref: torch.Tensor, pt: Tuple[int, int],
+                         tangent: Optional[Tuple[float, float]]) -> torch.Tensor:
+        if tangent is None:
+            return torch.ones_like(ref)
+        tx, ty = tangent
+        H, W = ref.shape[-2], ref.shape[-1]
+        cx, cy = pt
+        x_grid, y_grid = self._xy_grids(H, W)
+        vx = (x_grid - cx).float()
+        vy = (y_grid - cy).float()
+        norm = torch.sqrt(vx ** 2 + vy ** 2 + 1e-6)
+        cosang = ((vx * tx + vy * ty) / norm).clamp(-1.0, 1.0)
+        angle = torch.acos(cosang)
+        dist_gate = torch.exp(-((norm - self.cfg.trace_step) ** 2) / (2 * self.cfg.sigma_trace_step ** 2))
+        angle_gate = torch.exp(-(angle ** 2) / (2 * self.cfg.sigma_trace_angle ** 2))
+        return (dist_gate * angle_gate).view(1, 1, H, W)
+
+    def _boundary_hit_confidence_at(self, fields: Dict[str, torch.Tensor],
+                                    pt: Optional[Tuple[int, int]] = None) -> float:
+        point = pt if pt is not None else self.fixation_point
+        return self._local_window_mean(fields['boundary'], point, self.cfg.boundary_hit_radius)
+
+    def _estimate_boundary_tangent(self, fields: Dict[str, torch.Tensor],
+                                   pt: Optional[Tuple[int, int]] = None) -> Optional[Tuple[float, float]]:
+        point = pt if pt is not None else self.fixation_point
+        x, y = point
+        source = fields.get('mask', fields['boundary'])
+        H, W = source.shape[-2], source.shape[-1]
+        x0, x1 = max(0, x - 1), min(W - 1, x + 1)
+        y0, y1 = max(0, y - 1), min(H - 1, y + 1)
+        gx = float(source[0, 0, y, x1].item() - source[0, 0, y, x0].item())
+        gy = float(source[0, 0, y1, x].item() - source[0, 0, y0, x].item())
+        norm = math.sqrt(gx * gx + gy * gy)
+
+        if norm <= 1e-6 and self.anchor_position is not None:
+            ax, ay = self.anchor_position
+            gx = float(x - ax)
+            gy = float(y - ay)
+            norm = math.sqrt(gx * gx + gy * gy)
+        if norm <= 1e-6:
+            return self.last_boundary_tangent
+
+        nx, ny = gx / norm, gy / norm
+        tangent = (-ny, nx)
+        if self.last_boundary_tangent is not None:
+            dot = tangent[0] * self.last_boundary_tangent[0] + tangent[1] * self.last_boundary_tangent[1]
+            if dot < 0:
+                tangent = (-tangent[0], -tangent[1])
+        return tangent
+
+    def _boundary_forward_support_at(self, fields: Dict[str, torch.Tensor],
+                                     tangent: Optional[Tuple[float, float]],
+                                     pt: Optional[Tuple[int, int]] = None) -> float:
+        point = pt if pt is not None else self.fixation_point
+        contour = self._micro_contour_response(fields)
+        gate = self._tangent_gate_at(fields['boundary'], point, tangent)
+        support = fields['boundary'] * contour * gate
+        return float(support.max().item())
+
+    def _boundary_role_confidence_at(self, fields: Dict[str, torch.Tensor],
+                                     pt: Optional[Tuple[int, int]] = None) -> float:
+        point = pt if pt is not None else self.fixation_point
+        ref = fields['boundary']
+        role_map = (
+            self.cfg.micro_w_corner * fields.get('corner', torch.zeros_like(ref))
+            + self.cfg.micro_w_junction * fields.get('junction', torch.zeros_like(ref))
+            + self.cfg.micro_w_terminator * fields.get('terminator', torch.zeros_like(ref))
+        )
+        if role_map.max() <= 1e-6:
+            return 0.0
+        role_map = self._normalize_map(role_map, ref)
+        return self._local_window_max(role_map, point, self.cfg.boundary_hit_radius)
+
+    def _best_boundary_tangent(self, fields: Dict[str, torch.Tensor],
+                               pt: Optional[Tuple[int, int]] = None) -> Tuple[Optional[Tuple[float, float]], float]:
+        tangent = self._estimate_boundary_tangent(fields, pt)
+        if tangent is None:
+            return None, self._boundary_forward_support_at(fields, None, pt)
+        forward = self._boundary_forward_support_at(fields, tangent, pt)
+        reverse_tangent = (-tangent[0], -tangent[1])
+        reverse = self._boundary_forward_support_at(fields, reverse_tangent, pt)
+        if reverse > forward:
+            return reverse_tangent, reverse
+        return tangent, forward
+
+    def _pending_boundary_arrived(self) -> bool:
+        if self.pending_boundary_target is None:
+            return False
+        tx, ty = self.pending_boundary_target
+        cx, cy = self.fixation_point
+        dist = math.sqrt((cx - tx) ** 2 + (cy - ty) ** 2)
+        return dist <= self.cfg.boundary_pending_radius
+
+    def _try_enter_contour_trace_from_seek(self, fields: Dict[str, torch.Tensor]) -> bool:
+        if not self._pending_boundary_arrived():
+            return False
+
+        point = self.fixation_point
+        hit = self._boundary_hit_confidence_at(fields, point)
+        tangent, fwd = self._best_boundary_tangent(fields, point)
+        self.boundary_hit_confidence = hit
+        self.boundary_forward_support = fwd
+        self.pending_boundary_target = None
+
+        if hit > self.cfg.theta_boundary_hit_enter and fwd > self.cfg.theta_trace_fwd_enter:
+            self.micro_intention = MicroIntention.CONTOUR_TRACE
+            self.last_boundary_tangent = tangent
+            self.trace_age = 0
+            self.boundary_start_point = point
+            return True
+
+        if self.boundary_rejected is not None:
+            self.boundary_rejected = self._mark_map_visited(
+                self.boundary_rejected,
+                point,
+                self.cfg.sigma_boundary_reject,
+                1.0,
+            )
+        return False
+
+    def _mark_boundary_trace_progress(self, pt: Tuple[int, int]):
+        if self.boundary_visited is not None:
+            self.boundary_visited = self._mark_map_visited(
+                self.boundary_visited,
+                pt,
+                self.cfg.sigma_boundary_visit,
+                1.0,
+            )
+        if self.boundary_suppression is not None:
+            self.boundary_suppression = self._mark_map_visited(
+                self.boundary_suppression,
+                pt,
+                self.cfg.sigma_boundary_suppression,
+                1.0,
+            )
 
     def _reset_micro_context(self, H: int, W: int, intention: MicroIntention = MicroIntention.SURFACE_CONFIRM):
         self.micro_intention = intention
@@ -1115,8 +1766,15 @@ class Controller:
         self.color_residual = 1.0
         self.boundary_coverage = 0.0
         self.boundary_visited = torch.zeros((1, 1, H, W), device=self.device)
+        self.boundary_rejected = torch.zeros((1, 1, H, W), device=self.device)
+        self.boundary_suppression = torch.zeros((1, 1, H, W), device=self.device)
         self.last_boundary_tangent = None
         self.boundary_start_point = None
+        self.pending_boundary_target = None
+        self.trace_age = 0
+        self.boundary_hit_confidence = 0.0
+        self.boundary_forward_support = 0.0
+        self.boundary_role_confidence = 0.0
         self.micro_explore_time = 0.0
         self.micro_max_span = 0.0
         self.m_aversion = torch.zeros((1, 1, H, W), device=self.device)
@@ -1355,51 +2013,51 @@ class Controller:
 
     def _micro_boundary_seek_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
         boundary = fields['boundary']
-        unseen = (1.0 - self.boundary_visited).clamp(0.0, 1.0)
+        if self.boundary_rejected is not None:
+            self.boundary_rejected = self.boundary_rejected * self.cfg.boundary_reject_decay
+        coverage_suppression = self.cfg.boundary_coverage_suppression * self.boundary_visited
+        rejected = self.boundary_rejected if self.boundary_rejected is not None else torch.zeros_like(boundary)
+        suppression = torch.max(coverage_suppression, rejected)
+        unseen = (1.0 - suppression).clamp(0.0, 1.0)
         drive = (
             self.cfg.micro_w_boundary * boundary
             + self.cfg.micro_w_unseen_boundary * boundary * unseen
         )
         drive = drive * self._micro_span_gate(boundary) * unseen * self._micro_seek_gate(boundary)
-        if drive.max() > self.cfg.theta_boundary:
-            self.micro_intention = MicroIntention.CONTOUR_TRACE
-            if self.boundary_start_point is None:
-                self.boundary_start_point = self.fixation_point
         return drive
 
     def _micro_tangent_gate(self, ref: torch.Tensor) -> torch.Tensor:
-        if self.last_boundary_tangent is None:
-            return torch.ones_like(ref)
-        tx, ty = self.last_boundary_tangent
-        H, W = ref.shape[-2], ref.shape[-1]
-        cx, cy = self.fixation_point
-        x_grid, y_grid = self._xy_grids(H, W)
-        vx = (x_grid - cx).float()
-        vy = (y_grid - cy).float()
-        norm = torch.sqrt(vx ** 2 + vy ** 2 + 1e-6)
-        cosang = ((vx * tx + vy * ty) / norm).clamp(-1.0, 1.0)
-        angle = torch.acos(cosang)
-        dist_gate = torch.exp(-((norm - self.cfg.trace_step) ** 2) / (2 * self.cfg.sigma_trace_step ** 2))
-        angle_gate = torch.exp(-(angle ** 2) / (2 * self.cfg.sigma_trace_angle ** 2))
-        return (dist_gate * angle_gate).view(1, 1, H, W)
+        return self._tangent_gate_at(ref, self.fixation_point, self.last_boundary_tangent)
 
     def _micro_contour_trace_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
         boundary = fields['boundary']
-        self.boundary_visited = self._mark_map_visited(
-            self.boundary_visited,
-            self.fixation_point,
-            self.cfg.sigma_boundary_visit,
-            1.0,
-        )
-        contour = (
-            self.cfg.micro_w_edge * fields['edge']
-            + self.cfg.micro_w_corner * fields['corner']
-        )
-        drive = boundary * contour * self._micro_tangent_gate(boundary) * (1.0 - self.boundary_visited)
+        contour = self._micro_contour_response(fields)
+        suppression = self.boundary_suppression if self.boundary_suppression is not None else torch.zeros_like(boundary)
+        drive = boundary * contour * self._micro_tangent_gate(boundary) * (1.0 - suppression).clamp(0.0, 1.0)
+        hit = self._boundary_hit_confidence_at(fields)
+        fwd = self._boundary_forward_support_at(fields, self.last_boundary_tangent)
+        role = self._boundary_role_confidence_at(fields)
+        self.boundary_hit_confidence = hit
+        self.boundary_forward_support = fwd
+        self.boundary_role_confidence = role
+
         if self.boundary_coverage >= self.cfg.theta_bd_cover and self.color_residual < self.cfg.theta_res:
             self.micro_intention = MicroIntention.RESUME_OR_EXIT
-        elif drive.max() < self.cfg.theta_boundary:
+        elif (
+            self.trace_age >= self.cfg.trace_min_age
+            and fwd < self.cfg.theta_trace_fwd_exit
+            and hit < self.cfg.theta_boundary_hit_exit
+            and role < self.cfg.theta_boundary_role
+        ):
             self.micro_intention = MicroIntention.BOUNDARY_SEEK
+            self.pending_boundary_target = None
+            self.trace_age = 0
+        elif role >= self.cfg.theta_boundary_role and fwd < self.cfg.theta_trace_fwd_exit:
+            tangent, _ = self._best_boundary_tangent(fields)
+            self.last_boundary_tangent = tangent
+            self.trace_age = 0
+        else:
+            self.trace_age += 1
         return drive
 
     def _micro_resume_or_exit_target(self, fields: Dict[str, torch.Tensor]) -> torch.Tensor:
@@ -1426,6 +2084,10 @@ class Controller:
         if not fields:
             return self.fixation_point, self.semantic_mask
 
+        if self.micro_intention == MicroIntention.BOUNDARY_SEEK:
+            self._try_enter_contour_trace_from_seek(fields)
+
+        intention_for_drive = self.micro_intention
         if self.micro_intention == MicroIntention.SURFACE_CONFIRM:
             drive = self._micro_surface_confirm_target(fields)
         elif self.micro_intention == MicroIntention.INTERIOR_SAMPLE:
@@ -1437,10 +2099,18 @@ class Controller:
         else:
             drive = self._micro_resume_or_exit_target(fields)
 
+        drive = self._suppress_invalid_view(drive, invalid_value=0.0)
         next_pt = self._argmax_point(drive)
         self.matrix1 = drive
-        print(drive.max())
-        if self.micro_intention == MicroIntention.CONTOUR_TRACE:
+
+        if intention_for_drive == MicroIntention.BOUNDARY_SEEK and self.micro_intention == MicroIntention.BOUNDARY_SEEK:
+            self.pending_boundary_target = next_pt if drive.max() > 1e-6 else None
+
+        if intention_for_drive == MicroIntention.CONTOUR_TRACE:
+            if self.boundary_hit_confidence > self.cfg.theta_boundary_hit_exit:
+                self._mark_boundary_trace_progress(self.fixation_point)
+            if self.micro_intention != MicroIntention.CONTOUR_TRACE:
+                return next_pt, drive
             dx = float(next_pt[0] - self.fixation_point[0])
             dy = float(next_pt[1] - self.fixation_point[1])
             norm = math.sqrt(dx * dx + dy * dy)
@@ -1464,10 +2134,8 @@ class Controller:
         gamma_dist = getattr(self.cfg, 'gamma_dist', 0.001)
         
         drive = I_map - alpha_ior * self.ior_map - gamma_dist * torch.sqrt(dist_sq).view(1, 1, H, W)
-        if drive.max() < -1e3:
-            idx = torch.randint(0, H*W, (1,)).item()
-        else:
-            idx = torch.argmax(drive).item()
+        drive = self._suppress_invalid_view(drive, invalid_value=-1e6)
+        idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W))
 
     def _decide_next_saccade_macro(self, gmem_ii: GmemoryII, S_maps: Dict[int, torch.Tensor]) -> Tuple[Tuple[int, int], torch.Tensor]:
@@ -1504,12 +2172,7 @@ class Controller:
         
         I_macro = I_con1 * (1.0 - M_suppress)
         
-        if self.optimizer.H_orig is not None and self.optimizer.W_orig is not None:
-            # 保留兴趣压制：压低外围兴趣
-            h1, h2 = max(0, H//2-(self.optimizer.H_orig-self.optimizer.r)//2), min(H, H//2+(self.optimizer.H_orig-self.optimizer.r)//2)
-            w1, w2 = max(0, W//2-(self.optimizer.W_orig-self.optimizer.r)//2), min(W, W//2+(self.optimizer.W_orig-self.optimizer.r)//2)
-            I_macro[:, :, :w1, :] = 0; I_macro[:, :, w2:, :] = 0
-            I_macro[:, :, :, :h1] = 0; I_macro[:, :, :, h2:] = 0
+        I_macro = self._suppress_invalid_view(I_macro, invalid_value=0.0)
         
         kernel_size = 15
         padding = kernel_size // 2
@@ -1523,6 +2186,7 @@ class Controller:
         gamma_dist = getattr(self.cfg, 'gamma_macro_dist', 0.001)
 
         drive = I_macro * K_lowpass - gamma_dist * torch.sqrt(dist_sq).view(1, 1, H, W)
+        drive = self._suppress_invalid_view(drive, invalid_value=-1e6)
         idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W)), drive
 
@@ -1547,11 +2211,10 @@ class Controller:
         self.m_aversion = torch.max(self.m_aversion, torch.exp(-dist_sq / (2 * sigma_consume**2)).view(1, 1, H, W))
         
         # Next saccade point is the max of remaining dynamic energy
-        drive = self.semantic_mask
+        drive = self._suppress_invalid_view(self.semantic_mask, invalid_value=0.0)
         if drive.max() < 1e-6:
-            idx = torch.randint(0, H*W, (1,)).item()
-        else:
-            idx = torch.argmax(drive).item()
+            return self._argmax_point(drive)
+        idx = torch.argmax(drive).item()
         return (int(idx % W), int(idx // W))
 
     def _start_micro_learning(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition,
@@ -1754,6 +2417,13 @@ class Controller:
         self.m_aversion = torch.zeros((B, C, H, W), device=self.device)
         self.micro_intention = MicroIntention.SURFACE_CONFIRM
         self.boundary_visited = torch.zeros((B, C, H, W), device=self.device)
+        self.boundary_rejected = torch.zeros((B, C, H, W), device=self.device)
+        self.boundary_suppression = torch.zeros((B, C, H, W), device=self.device)
+        self.pending_boundary_target = None
+        self.trace_age = 0
+        self.boundary_hit_confidence = 0.0
+        self.boundary_forward_support = 0.0
+        self.boundary_role_confidence = 0.0
 
     def _process_review_observation(self, X_subspaces: Dict[int, torch.Tensor], gpos: Gposition,
                                     local_nodes: List[ModalityNode], gmem_i: GmemoryI,
@@ -1927,20 +2597,69 @@ class MultilevelCoordinator:
         self.controller = Controller(cfg)
         self.current_view = self.controller.fixation_point
         self.viewroute = []
-        
+
+    def _as_4d(self, value: torch.Tensor) -> torch.Tensor:
+        if value.dim() == 2:
+            return value.unsqueeze(0).unsqueeze(0)
+        if value.dim() == 3:
+            return value.unsqueeze(0)
+        return value
+
+    def _prepare_grad_subspace(self, grad: torch.Tensor) -> torch.Tensor:
+        grad = grad.detach()
+        if grad.dim() == 5 and grad.shape[-1] == 2:
+            dx = grad[..., 0]
+            dy = grad[..., 1]
+            if dx.dim() == 3:
+                dx = dx.unsqueeze(1)
+                dy = dy.unsqueeze(1)
+        elif grad.dim() == 4 and grad.shape[-1] == 2:
+            dx = grad[..., 0].unsqueeze(1)
+            dy = grad[..., 1].unsqueeze(1)
+        else:
+            grad = self._as_4d(grad)
+            if grad.shape[1] >= 4:
+                return grad
+            if grad.shape[1] >= 2:
+                dx = grad[:, 0:1]
+                dy = grad[:, 1:2]
+            else:
+                strength = grad[:, 0:1].abs()
+                theta = torch.zeros_like(strength)
+                return torch.cat([strength, theta, torch.zeros_like(strength), torch.zeros_like(strength)], dim=1)
+
+        strength = torch.sqrt(dx ** 2 + dy ** 2 + 1e-6)
+        theta = torch.atan2(dy, dx)
+        return torch.cat([strength, theta, dx, dy], dim=1)
+
+    def _prepare_orientation_subspace(self, orientation: torch.Tensor) -> torch.Tensor:
+        orientation = self._as_4d(orientation.detach())
+        if orientation.numel() > 0 and float(orientation.detach().abs().max().item()) <= 1.05:
+            return orientation * (math.pi / 2.0)
+        return orientation
+
+    def _first_available_feature(self, features: dict, names: List[str]) -> Optional[torch.Tensor]:
+        for name in names:
+            value = features.get(name)
+            if value is not None:
+                return value
+        return None
+
     def handle_new_view(self, features: dict, H_orig: int = None, W_orig: int = None):
         X_subspaces = {}
         if 'grad' in features and features['grad'] is not None:
-             X_subspaces[0] = features['grad'].detach()
-        if 'hue' in features and features['hue'] is not None:
-             X_subspaces[1] = features['hue'].detach()
+            X_subspaces[0] = self._prepare_grad_subspace(features['grad'])
+
+        surface = self._first_available_feature(features, ['rgb', 'RGB', 'image', 'x', 'cropped', 'hue'])
+        if surface is not None:
+            X_subspaces[1] = self._as_4d(surface.detach())
         if 'curvature' in features and features['curvature'] is not None:
-             X_subspaces[2] = features['curvature'].detach()
+            X_subspaces[2] = self._as_4d(features['curvature'].detach())
         if 'aspect' in features and features['aspect'] is not None:
-             X_subspaces[3] = features['aspect'].detach()
+            X_subspaces[3] = self._as_4d(features['aspect'].detach())
         if 'orientation' in features and features['orientation'] is not None:
-             X_subspaces[4] = features['orientation'].detach()
-             
+            X_subspaces[4] = self._prepare_orientation_subspace(features['orientation'])
+
         if not X_subspaces:
             return
         
