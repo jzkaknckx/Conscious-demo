@@ -2,6 +2,7 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-07-26_alg_optimizer_beta_gpos_workspace_surface_self_relation.md | 修订 Alg_optimizer_beta：用 Gpos 响应域生成不规则工作视窗，并新增二维 surface 面域自指关系与外沿壳层引导 | chatgpt | 2026-07-26 15:26:22 CST |
 | 2026-07-23_alg_optimizer_beta_dynamic_window_scale.md | 在 Alg_optimizer_beta 中新增动态视窗口尺度机制、固定注意力预算下的最低写入尺度和尺度竞争流程 | chatgpt | 2026-07-23 22:23:46 CST |
 | 2026-07-23_alg_optimizer_beta_local_vector_route.md | 新建 Alg_optimizer_beta，讨论 MICRO 从全局 drive 改为视窗口向量引导，并补充动态竞争状态机与窗口写入流程 | chatgpt | 2026-07-23 19:50:38 CST |
 | 2026-07-21_alg_beta_unified_micro_drive_review.md | 在 Alg_beta 过渡带统一图表征章末新增通用 MICRO drive 评判、支持维度归一化与工作关系边增强方案 | chatgpt | 2026-07-21 19:53:55 CST |

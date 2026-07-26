@@ -151,33 +151,131 @@ $$
 
 ## 3. 动态视窗口与尺度选择
 
-视窗口向量路线必须引入动态尺度。若窗口半径固定，系统会在两个极端之间摇摆：小窗口能看到像素级细节，却难以把树、山脉、建筑轮廓作为整体；大窗口能看到整体，却会把叶脉、枝杈、纹理噪声和整体轮廓混在同一个写入流程中。
+视窗口向量路线必须引入动态尺度与动态形状。若窗口只是固定半径的圆，系统会在两个极端之间摇摆：小窗口能看到像素级细节，却难以把树、山脉、建筑轮廓作为整体；大窗口能看到整体，却会把叶脉、枝杈、纹理噪声和整体轮廓混在同一个写入流程中。
 
-因此，视窗口半径应成为优化器的内生变量：
-
-$$
-r_t\in[r_{min},r_{max}]
-$$
-
-每一步先决定 $r_t$，再以：
+同时，真实对象的可学习区域通常不是圆形。更合理的做法是区分两类窗口：
 
 $$
-\mathcal{W}_t(r_t)
+\mathcal{C}_t(r)
 =
-\{\mathbf{q}\mid \|\mathbf{q}-\mathbf{p}_t\|\le r_t\}
+\{\mathbf{q}\mid \|\mathbf{q}-\mathbf{p}_t\|\le r\}
 $$
 
-作为局部向量、关键点采样和 GmemII 填充的工作域。
-
-### 3.1 固定总注意力预算
-
-用户提出的“视窗内总注意力为常数”可以形式化为一个预算约束。设总注意力预算为 $B_{att}$，窗口有效面积为：
-
 $$
-A(r_t)
+\mathcal{W}_t
 =
-\sum_{\mathbf{q}\in \mathcal{W}_t(r_t)}
-M_{valid}(\mathbf{q})
+\text{由 Gpos 响应域、当前 Gmem 节点和连通约束生成的工作视窗}
+$$
+
+其中 $\mathcal{C}_t(r)$ 只是计算上限、距离先验和注意力预算边界，真正参与写入和局部向量估计的是不规则工作视窗 $\mathcal{W}_t$。这使系统可以从局部细节起步，随着 GmemII 的填充和 Gpos 响应域扩大，逐渐把工作视窗扩展到覆盖整个物体或同一连续特征流形。
+
+### 3.1 三种工作视窗方案的评判
+
+**方案一：直接将 Gpos 响应的不规则区域作为工作视窗。**
+
+设当前最相关响应为 $R_t^{work}(\mathbf{q})$，可直接取：
+
+$$
+\mathcal{W}_t
+=
+\operatorname{CC}_{seed}
+\left(
+\{\mathbf{q}\mid R_t^{work}(\mathbf{q})>\theta_w\}
+\right)
+$$
+
+其中 $\operatorname{CC}_{seed}$ 表示包含当前注视点、当前 anchor 或最强 Gpos 峰值的连通分量。该方案最贴近对象真实形状，能自然得到不规则窗口；但它对 Gpos 噪声、断裂响应和多对象粘连很敏感。若直接使用全图 Gpos 连通域，视窗可能跨越远处相似纹理，破坏当前 GmemII 的局部性。
+
+**方案二：将 Gpos 响应作为 mask 作用在圆形窗口上。**
+
+$$
+\mathcal{W}_t
+=
+\mathcal{C}_t(r_{cap})
+\cap
+\{\mathbf{q}\mid R_t^{work}(\mathbf{q})>\theta_w\}
+\cap
+M_{valid}
+$$
+
+该方案稳定、便宜，也便于继承原有半径与步长参数；但圆形边界仍会截断长条边缘、弯曲轮廓或大面积面域，使窗口形状受到人工几何先验限制。
+
+**推荐方案：种子化 Gpos 响应域工作视窗。**
+
+推荐保留半径或面积预算作为安全边界，但窗口形状由 Gpos 响应域决定：
+
+$$
+\mathcal{W}_t
+=
+\operatorname{Grow}_{seed}
+\left(
+R_t^{work},\,
+B_t^{barrier},\,
+A_t^{budget}
+\right)
+$$
+
+其中 $R_t^{work}$ 是当前工作响应，$B_t^{barrier}$ 是阻断图，$A_t^{budget}$ 是注意力预算允许的最大有效面积。`Grow` 可以先用阈值和连通分量实现，后续再替换为地形代价扩散或测地距离扩张。
+
+工作响应由当前语境决定：
+
+$$
+R_t^{work}(\mathbf{q})
+=
+\lambda_I
+\max_{i\in\mathcal{A}_h}
+S_i^I(\mathbf{q})
++
+\lambda_{II}S_h^{II}(\mathbf{q})
++
+\lambda_N N(\mathbf{q})
++
+\lambda_F F_h(\mathbf{q})
+$$
+
+其中 $\mathcal{A}_h$ 是当前工作 GmemII 相关的 GmemI 节点集合。若尚未开启 GmemII，则用当前注视窗口内最强 GposI 原型或最稳定的新奇响应作为 seed：
+
+$$
+i^*
+=
+\arg\max_i
+\max_{\mathbf{q}\in \mathcal{C}_t(r_{init})}
+S_i^I(\mathbf{q})
+$$
+
+$$
+R_t^{work}=S_{i^*}^I
+\quad
+\text{or}
+\quad
+R_t^{work}=N
+$$
+
+阻断图用于防止同色面域越过真实边界，也防止边缘追踪跨越无效区域：
+
+$$
+B_t^{barrier}
+=
+\lambda_g R_{grad}
++
+\lambda_{tr} R_{RGB\_TRANSITION}
++
+\lambda_{invalid}(1-M_{valid})
++
+\lambda_{conflict}R_{modality\_conflict}
+$$
+
+对 surface 学习，$B_t^{barrier}$ 应抑制跨边界扩张；对 edge/line 学习，$B_t^{barrier}$ 不应抑制边缘本身，而应抑制法向逃逸和无效区域。
+
+### 3.2 固定总注意力预算
+
+用户提出的“视窗内总注意力为常数”可以形式化为一个预算约束。设总注意力预算为 $B_{att}$，不规则工作视窗的有效面积为：
+
+$$
+A_t
+=
+\sum_{\mathbf{q}}
+\mathcal{W}_t(\mathbf{q})
 $$
 
 则单位面积注意力密度为：
@@ -185,15 +283,23 @@ $$
 $$
 \beta_t
 =
-\frac{B_{att}}{A(r_t)+\epsilon}
+\frac{B_{att}}{A_t+\epsilon}
 $$
 
-当 $r_t$ 增大时，$\beta_t$ 降低。其含义不是底层 CNN 看不到细节，而是优化器不允许把低预算下的细小响应写成独立节点；这些细节只能表现为纹理密度、粗糙度、边界复杂度或促使窗口缩小的尺度压力。
+当 $\mathcal{W}_t$ 覆盖面积增大时，$\beta_t$ 降低。其含义不是底层 CNN 看不到细节，而是优化器不允许把低预算下的细小响应写成独立节点；这些细节只能表现为纹理密度、粗糙度、边界复杂度或促使窗口收缩的尺度压力。
+
+为兼容原有半径参数，可定义不规则窗口的等效半径：
+
+$$
+r_t^{eff}
+=
+\sqrt{\frac{A_t}{\pi}}
+$$
 
 对一个候选特征 $c_j$，设其支持维度为 $d_j$，等效空间尺度为 $\ell_j$，响应强度为 $R_j$。可定义尺度可写入能量：
 
 $$
-E_{write}(c_j;r_t)
+E_{write}(c_j;\mathcal{W}_t)
 =
 R_j
 \cdot
@@ -207,30 +313,30 @@ $$
 其中 $d_j^{+}=\max(d_j,1)$，用于避免点事件的零维指数退化。写入条件为：
 
 $$
-E_{write}(c_j;r_t)>\theta_{write,d_j}
+E_{write}(c_j;\mathcal{W}_t)>\theta_{write,d_j}
 $$
 
 等价地，可以得到一个随窗口增大的最低写入尺度：
 
 $$
-\ell_{min,d}(r_t)
+\ell_{min,d}(\mathcal{W}_t)
 =
 \ell_{0,d}
 \left(
-\frac{A(r_t)}{B_{att}}
+\frac{A_t}{B_{att}}
 \right)^{\eta_d}
 $$
 
 其中 $\eta_d$ 是支持维度相关的增长指数。工程上推荐使用更稳定的截断形式：
 
 $$
-\ell_{min,d}(r_t)
+\ell_{min,d}(\mathcal{W}_t)
 =
 \operatorname{Clip}
 \left[
 \ell_{base,d}
 \left(
-\frac{r_t}{r_{min}}
+\frac{r_t^{eff}}{r_{min}}
 \right)^{\eta_d},
 \ell_{base,d},
 \ell_{max,d}
@@ -241,69 +347,103 @@ $$
 
 1.  小窗口时，$\ell_{min}$ 低，叶脉、枝杈、细边缘和像素级突变可以被写入。
 2.  大窗口时，$\ell_{min}$ 高，小纹理不会成为独立 GmemI/GmemII 结构，只作为当前大结构的纹理统计或复杂度压力。
-3.  若大量细节持续产生强残差，尺度竞争会推动 $r_t$ 缩小，进入细节观察。
+3.  若大量细节持续产生强残差，尺度竞争会推动 $\mathcal{W}_t$ 收缩到细节所在的 Gpos 响应域，进入细节观察。
 
-### 3.2 候选尺度集合
+### 3.3 候选工作域集合
 
-为避免连续优化窗口半径，可以使用对数间隔的候选尺度：
+为避免连续优化任意 mask，可使用对数间隔的候选面积预算：
 
 $$
-\mathcal{R}
+\mathcal{A}
 =
-\{r_1,r_2,\dots,r_K\},
-\quad
-r_k
+\{A_1,A_2,\dots,A_K\}
+$$
+
+其中：
+
+$$
+A_k
 =
-r_{min}
+\pi r_{min}^2
 \left(
-\frac{r_{max}}{r_{min}}
+\frac{r_{max}^2}{r_{min}^2}
 \right)^{\frac{k-1}{K-1}}
 $$
 
-每一步只评估这些候选半径，并通过迟滞选择下一尺度：
+对每个面积预算 $A_k$，从同一个 seed 出发生成一个候选工作域：
 
 $$
-r_t^{*}
+\mathcal{W}_t^{(k)}
 =
-\arg\max_{r\in\mathcal{R}}
-Z_r(t)
+\operatorname{Grow}_{seed}
+\left(
+R_t^{work},\,
+B_t^{barrier},\,
+A_k
+\right)
 $$
 
+最小实现可以使用以下迭代：
+
+```text
+W = seed
+while area(W) < A_k:
+    W_next = Dilate(W)
+             ∩ [R_work > theta_low(k)]
+             ∩ [B_barrier < theta_barrier]
+             ∩ M_valid
+    if W_next == W:
+        break
+    W = W_next
+return W
+```
+
+然后选择：
+
 $$
-\log r_{t+1}
+k^*
 =
-(1-\alpha_r)\log r_t
+\arg\max_k Z_k(t)
+$$
+
+为了避免窗口尺度震荡，不直接替换 $\mathcal{W}_t$，而是平滑其面积或等效半径：
+
+$$
+\log r_{t+1}^{eff}
+=
+(1-\alpha_r)\log r_t^{eff}
 +
-\alpha_r\log r_t^{*}
+\alpha_r\log r_{k^*}^{eff}
 $$
 
-同时限制单步尺度变化：
+同时限制单步面积变化：
 
 $$
 \left|
-\log r_{t+1}-\log r_t
+\log r_{t+1}^{eff}-\log r_t^{eff}
 \right|
 <
 \Delta_{\log r}^{max}
 $$
 
-这样可以避免视窗口在树叶尺度和整棵树尺度之间剧烈震荡。
+这样可以避免视窗口在叶脉尺度和整棵树尺度之间剧烈震荡，同时允许工作域边界沿 Gpos 响应的不规则形状生长。
 
-### 3.3 尺度表征量
+### 3.4 尺度表征量
 
-每个候选半径 $r$ 计算以下尺度表征：
+每个候选工作域 $\mathcal{W}^{(k)}$ 计算以下尺度表征：
 
 | 表征量 | 定义 | 倾向 |
 | --- | --- | --- |
-| $G_r^{scale}$ | GposI/GposII/GposIII 的响应尺度与 $r$ 的匹配度 | 选择匹配已知结构或原型尺度的窗口 |
-| $D_r^{fine}$ | 窗口内低于 $\ell_{min}(r)$ 的稳定细节残差 | 推动缩小窗口 |
-| $C_r^{coarse}$ | 窗口内可被大尺度连贯解释的 surface/contour 强度 | 推动扩大或保持窗口 |
-| $T_r^{frontier}$ | 当前结构 frontier 是否触及窗口外沿 | 推动扩大窗口 |
-| $M_r^{mix}$ | 窗口内互不相容组件数量或模态冲突 | 推动缩小窗口 |
-| $Q_r^{valid}$ | 有效视野占比与门控质量 | 排除 padding 和低质量窗口 |
-| $H_r^{detail}$ | 细节熵或局部复杂度 | 在粗结构未稳定时推动缩小，在粗结构稳定后可作为纹理统计 |
+| $G_k^{domain}$ | 候选工作域与 Gpos 响应域的连通一致性 | 选择贴合对象或连续特征的窗口 |
+| $G_k^{scale}$ | GposI/GposII/GposIII 的响应尺度与 $r_k^{eff}$ 的匹配度 | 选择匹配已知结构或原型尺度的窗口 |
+| $D_k^{fine}$ | 工作域内低于 $\ell_{min}(\mathcal{W}^{(k)})$ 的稳定细节残差 | 推动收缩窗口 |
+| $C_k^{coarse}$ | 工作域内可被大尺度连贯解释的 surface/contour 强度 | 推动扩大或保持窗口 |
+| $T_k^{frontier}$ | 当前结构 frontier 是否触及工作域外沿 | 推动扩张窗口 |
+| $M_k^{mix}$ | 工作域内互不相容组件数量或模态冲突 | 推动收缩或分裂窗口 |
+| $Q_k^{valid}$ | 有效视野占比与门控质量 | 排除 padding 和低质量窗口 |
+| $H_k^{detail}$ | 细节熵或局部复杂度 | 在粗结构未稳定时推动收缩，在粗结构稳定后可作为纹理统计 |
 
-#### 3.3.1 Gpos 响应尺度
+#### 3.4.1 Gpos 响应域与响应尺度
 
 对 GposI 响应图 $S_i^I$，可在阈值以上做连通域估计。二维 surface 的等效尺度为：
 
@@ -338,32 +478,54 @@ s_h^{II}
 \|\Delta\mathbf{p}_e\|
 $$
 
-候选窗口与响应尺度的匹配度为：
+候选工作域与响应尺度的匹配度为：
 
 $$
-G_r^{scale}
+G_k^{scale}
 =
 \max_j
 S_j^{peak}
 \exp
 \left(
 -\frac{
-(\log r-\log(\kappa_s s_j))^2
+(\log r_k^{eff}-\log(\kappa_s s_j))^2
 }{2\sigma_s^2}
 \right)
 $$
 
 其中 $s_j$ 可来自 GposI 响应域或 GposII/GposIII 结构跨度，$\kappa_s$ 表示窗口应略大于目标结构。
 
-#### 3.3.2 细节残差与粗结构连贯度
-
-设窗口内候选特征集合为 $\mathcal{C}(r)$。低于当前最低写入尺度的稳定响应不直接写入，而累计为细节压力：
+响应域一致性可用软 IoU 表示：
 
 $$
-D_r^{fine}
+G_k^{domain}
 =
-\sum_{c_j\in\mathcal{C}(r)}
-\mathbf{1}[\ell_j<\ell_{min,d_j}(r)]
+\frac{
+\sum_{\mathbf{q}}
+\mathcal{W}^{(k)}(\mathbf{q})
+R_t^{work}(\mathbf{q})
+}{
+\sum_{\mathbf{q}}
+\max
+\left(
+\mathcal{W}^{(k)}(\mathbf{q}),
+R_t^{work}(\mathbf{q})
+\right)
++\epsilon
+}
+$$
+
+若 $G_k^{domain}$ 低，说明候选窗口主要由圆形上限或扩张操作产生，而不是由当前特征响应支撑，不应继续扩大。
+
+#### 3.4.2 细节残差与粗结构连贯度
+
+设工作域内候选特征集合为 $\mathcal{C}(\mathcal{W}^{(k)})$。低于当前最低写入尺度的稳定响应不直接写入，而累计为细节压力：
+
+$$
+D_k^{fine}
+=
+\sum_{c_j\in\mathcal{C}(\mathcal{W}^{(k)})}
+\mathbf{1}[\ell_j<\ell_{min,d_j}(\mathcal{W}^{(k)})]
 R_j
 \left(
 1-E_j
@@ -375,50 +537,54 @@ $$
 粗结构连贯度可用大尺度 surface/contour 的可解释覆盖表示：
 
 $$
-C_r^{coarse}
+C_k^{coarse}
 =
 \frac{
-\sum_{\mathbf{q}\in\mathcal{W}(r)}
+\sum_{\mathbf{q}}
+\mathcal{W}^{(k)}(\mathbf{q})
 E_{coarse}(\mathbf{q})
 }{
-\sum_{\mathbf{q}\in\mathcal{W}(r)}
+\sum_{\mathbf{q}}
+\mathcal{W}^{(k)}(\mathbf{q})
 R_{coarse}(\mathbf{q})+\epsilon
 }
 $$
 
-当 $C_r^{coarse}$ 高时，说明大窗口不是把无关细节混在一起，而是在观察一个可被整体解释的粗结构。
+当 $C_k^{coarse}$ 高时，说明大窗口不是把无关细节混在一起，而是在观察一个可被整体解释的粗结构。
 
-### 3.4 尺度竞争函数
+### 3.5 工作域竞争函数
 
-候选半径的分数可定义为：
+候选工作域的分数可定义为：
 
 $$
-Z_r
+Z_k
 =
-w_g G_r^{scale}
+w_{domain}G_k^{domain}
 +
-w_c C_r^{coarse}
+w_g G_k^{scale}
 +
-w_f T_r^{frontier}
+w_c C_k^{coarse}
 +
-w_q Q_r^{valid}
+w_f T_k^{frontier}
++
+w_q Q_k^{valid}
 -
-w_d D_r^{fine}
+w_{fine}D_k^{fine}
 -
-w_m M_r^{mix}
+w_m M_k^{mix}
 -
 w_s
 \left|
-\log r-\log r_t
+\log r_k^{eff}-\log r_t^{eff}
 \right|
 $$
 
-其中 $D_r^{fine}$ 不应永远惩罚大窗口。推荐加入粗结构完成度调制：
+其中 $D_k^{fine}$ 不应永远惩罚大窗口。推荐加入粗结构完成度调制：
 
 $$
-w_d
+w_{fine}
 =
-w_d^0
+w_{fine}^0
 \left(
 1-C_h^{coarse}
 \right)
@@ -437,30 +603,30 @@ $$
 \right)
 $$
 
-当 $\psi_{detail}$ 低时，系统偏向寻找整体轮廓；当 $\psi_{detail}$ 高且 $D_r^{fine}$ 高时，系统允许缩小窗口学习细节。
+当 $\psi_{detail}$ 低时，系统偏向寻找整体轮廓；当 $\psi_{detail}$ 高且 $D_k^{fine}$ 高时，系统允许缩小窗口学习细节。
 
-### 3.5 动态窗口对特征写入的约束
+### 3.6 动态窗口对特征写入的约束
 
 写入特征时，候选点必须满足尺度门控：
 
 $$
-\ell_j\ge \ell_{min,d_j}(r_t)
+\ell_j\ge \ell_{min,d_j}(\mathcal{W}_t)
 $$
 
 或满足强事件例外：
 
 $$
-R_j>\theta_{event}^{strong}(r_t)
+R_j>\theta_{event}^{strong}(\mathcal{W}_t)
 $$
 
 其中强事件阈值随窗口增大而提高：
 
 $$
-\theta_{event}^{strong}(r_t)
+\theta_{event}^{strong}(\mathcal{W}_t)
 =
 \theta_{event}^{0}
 \left(
-\frac{r_t}{r_{min}}
+\frac{r_t^{eff}}{r_{min}}
 \right)^{\eta_0}
 $$
 
@@ -472,25 +638,25 @@ $$
 
 当系统进入小窗口时，这些细节才被允许成为独立 GmemI 节点和 GmemII 关系。
 
-### 3.6 动态窗口对眼动向量的影响
+### 3.7 动态窗口对眼动向量的影响
 
-视窗口半径改变的不只是可见范围，也改变动态矩阵和向量合成的物理尺度：
+工作视窗改变的不只是可见范围，也改变动态矩阵和向量合成的物理尺度：
 
 $$
-s_{min}(r_t)=\kappa_{min}r_t,\quad
-s_{max}(r_t)=\kappa_{max}r_t
+s_{min}(\mathcal{W}_t)=\kappa_{min}r_t^{eff},\quad
+s_{max}(\mathcal{W}_t)=\kappa_{max}r_t^{eff}
 $$
 
 边缘蝴蝶核的预测步长应随窗口变化：
 
 $$
-s_e(r_t)=\kappa_e r_t
+s_e(\mathcal{W}_t)=\kappa_e r_t^{eff}
 $$
 
 surface frontier 的膨胀半径也应随窗口变化：
 
 $$
-\delta_{surf}(r_t)=\kappa_{surf}r_t
+\delta_{surf}(\mathcal{W}_t)=\kappa_{surf}r_t^{eff}
 $$
 
 访问抑制同样按尺度分层：
@@ -507,38 +673,44 @@ $$
 
 小窗口主要更新 $O^{fine}$，大窗口主要更新 $O^{coarse}$。这样模型在看完整棵树的外轮廓后，不会因为叶片级访问抑制而错误认为整体轮廓已经覆盖；反过来，观察叶脉细节时，也不会破坏粗尺度树冠 frontier。
 
-### 3.7 最小可实现流程
+### 3.8 最小可实现流程
 
 动态视窗口的最小流程为：
 
 ```text
-Step A: 生成候选尺度
-    R = logspace(r_min, r_max, K)
+Step A: 构造工作响应
+    若存在 h_work:
+        R_work = active GmemI/GposI + GposII + frontier + novelty
+    否则:
+        R_work = 当前局部最强 GposI 或稳定新奇残差
 
-Step B: 每个尺度估计轻量统计
-    对每个 r in R:
-        取 W(r)
-        估计 Gpos 响应尺度匹配 G_r^{scale}
-        估计细节残差 D_r^{fine}
-        估计粗结构连贯度 C_r^{coarse}
-        估计 frontier 触边 T_r^{frontier}
-        估计多对象混合 M_r^{mix}
-        计算 Z_r
+Step B: 生成候选工作域
+    A = logspace(pi*r_min^2, pi*r_max^2, K)
+    对每个 A_k:
+        W_k = seeded_grow(R_work, barrier, A_k)
+        估计 Gpos 响应域一致性 G_k^{domain}
+        估计 Gpos 响应尺度匹配 G_k^{scale}
+        估计细节残差 D_k^{fine}
+        估计粗结构连贯度 C_k^{coarse}
+        估计 frontier 触边 T_k^{frontier}
+        估计多对象混合 M_k^{mix}
+        计算 Z_k
 
-Step C: 平滑选择尺度
-    r* = argmax Z_r
-    r_t = smooth_log_radius(r_{t-1}, r*)
+Step C: 平滑选择工作域
+    k* = argmax Z_k
+    W_t = smooth_or_hysteresis(W_{t-1}, W_{k*})
+    r_eff = sqrt(area(W_t)/pi)
 
 Step D: 按尺度执行窗口写入
-    只写入 size >= ell_min_d(r_t) 的关键点
+    只写入 size >= ell_min_d(W_t) 的关键点
     小于阈值的稳定细节写入纹理统计和 detail_pressure
 
 Step E: 按尺度执行局部向量
-    使用 s_min(r_t), s_max(r_t), s_e(r_t), delta_surf(r_t)
+    使用 s_min(W_t), s_max(W_t), s_e(W_t), delta_surf(W_t)
     合成下一眼向量
 ```
 
-该流程只需要少量候选半径上的局部统计、阈值和池化，不要求复杂矩阵优化，也不要求引入传统 attention。它把“整体轮廓”和“细节纹理”的切换归结为同一件事：在固定注意力预算下选择当前最值得解释的空间尺度。
+该流程只需要少量候选面积预算上的阈值、连通扩张和池化，不要求复杂矩阵优化，也不要求引入传统 attention。它把“整体轮廓”和“细节纹理”的切换归结为同一件事：在固定注意力预算下选择当前最值得解释的 Gpos 响应域。
 
 ---
 
@@ -795,14 +967,42 @@ $$
 
 其中 $\lambda_P$ 是短时衰减，$U_t^{return}$ 来自位置级、节点级和关系边级访问抑制。
 
-下一眼向量由局部加权一阶矩给出。设候选环带：
+下一眼向量由局部加权一阶矩给出。由于 $\mathcal{W}_t$ 已是不规则工作域，候选集合不再是简单圆环，而是工作域外沿、工作域邻域和步长约束的交集：
+
+$$
+\Omega_t^{vec}
+=
+\operatorname{Dilate}
+\left(
+\mathcal{W}_t,\delta_{out}
+\right)
+\cap M_{valid}
+$$
+
+$$
+\partial\mathcal{W}_t
+=
+\operatorname{Dilate}
+\left(
+\mathcal{W}_t,\delta_b
+\right)
+-
+\operatorname{Erode}
+\left(
+\mathcal{W}_t,\delta_b
+\right)
+$$
 
 $$
 \mathcal{A}_t
 =
-\{\mathbf{q}\mid s_{min}\le \|\mathbf{q}-\mathbf{p}_t\|\le s_{max}\}
+\Omega_t^{vec}
 \cap
-\mathcal{W}_t
+\left[
+\partial\mathcal{W}_t
+\cup
+\{\mathbf{q}\mid s_{min}(\mathcal{W}_t)\le \|\mathbf{q}-\mathbf{p}_t\|\le s_{max}(\mathcal{W}_t)\}
+\right]
 $$
 
 则：
@@ -911,25 +1111,88 @@ $$
 
 ### 5.3 二维 surface 的外沿响应
 
-对某个 surface 原型 $i$，令：
+二维连续特征不能直接使用普通高斯吸引。若对已观察 surface 点简单叠加正高斯：
+
+$$
+U(\mathbf{q})
+=
+\sum_{\mathbf{x}\in O_{h,i}^{surf}}
+G_\sigma(\mathbf{q}-\mathbf{x})
+$$
+
+最高响应会落在已观察内部，容易诱导回看。二维 surface 需要的是“外延壳层”而不是“中心吸引”。因此，高斯可以使用，但应以墨西哥帽、差分高斯或锥形距离核的形式出现，并且必须乘以同类 Gpos 响应与边界阻断。
+
+对某个 surface 原型 $i$，令软响应域为：
 
 $$
 M_i^{surf}(\mathbf{q})
 =
-\mathbf{1}
-\left[
-S_i^I(\mathbf{q})>\theta_{surf}
-\right]
-$$
-
-令 $O_{h,i}^{surf}$ 是当前 GmemII 已观察到的该 surface 覆盖。二维 frontier 定义为：
-
-$$
-F_{h,i}^{surf}
-=
-\operatorname{Dilate}
+\operatorname{Clip}
 \left(
+\frac{S_i^I(\mathbf{q})-\theta_{surf}^{low}}
+{\theta_{surf}^{high}-\theta_{surf}^{low}+\epsilon},
+0,
+1
+\right)
+$$
+
+令 $O_{h,i}^{surf}$ 是当前 GmemII 已观察到的该 surface 覆盖。推荐的外沿壳层为：
+
+$$
+F_{h,i}^{shell}
+=
+\left[
+\operatorname{DoG}^{+}_{\sigma_o,\sigma_i}
+*
 O_{h,i}^{surf}
+\right]
+\odot
+M_i^{surf}
+\odot
+\left(
+1-O_{h,i}^{surf}
+\right)
+\odot
+\left(
+1-B_t^{barrier}
+\right)
+$$
+
+其中：
+
+$$
+\operatorname{DoG}^{+}_{\sigma_o,\sigma_i}
+=
+\operatorname{ReLU}
+\left(
+G_{\sigma_o}
+-
+\lambda_i G_{\sigma_i}
+\right),
+\quad
+\sigma_o>\sigma_i
+$$
+
+该核在已观察区域附近形成正壳层，在内部被 $\left(1-O_{h,i}^{surf}\right)$ 消除，因此势能会落在 surface 外沿，而不是落在内部。
+
+若希望更便宜，可用锥形距离核替代：
+
+$$
+D_i^{out}(\mathbf{q})
+=
+\operatorname{dist}
+\left(
+\mathbf{q},O_{h,i}^{surf}
+\right)
+$$
+
+$$
+F_{h,i}^{cone}
+=
+\max
+\left(
+0,
+1-\frac{D_i^{out}}{\delta_{surf}}
 \right)
 \odot
 M_i^{surf}
@@ -937,51 +1200,65 @@ M_i^{surf}
 \left(
 1-O_{h,i}^{surf}
 \right)
+\odot
+\left(
+1-B_t^{barrier}
+\right)
 $$
 
-它表示“与已观察 surface 相邻、仍像同一 surface、尚未观察”的位置。对应动态矩阵写入为：
+最终 surface 势能为：
 
 $$
 U_t^{surface}
 =
 \sum_i
 \omega_i
-F_{h,i}^{surf}
+\left[
+\lambda_{shell}F_{h,i}^{shell}
++
+\lambda_{cone}F_{h,i}^{cone}
++
+\lambda_{low}L_i^{surf}
+\right]
 \odot
 \left(
 1-O_{node,i}^{wide}
 \right)
 $$
 
-若 surface 在窗口内大面积均匀，系统不应在内部反复采样，而应估计其延伸方向。简单方式是对 $F_{h,i}^{surf}$ 中的点做加权质心：
+其中：
+
+$$
+L_i^{surf}(\mathbf{q})
+=
+\mathbf{1}
+\left[
+\theta_{surf}^{low}
+<
+S_i^I(\mathbf{q})
+<
+\theta_{surf}^{high}
+\right]
+$$
+
+`L_i^{surf}` 对应“同类 surface 的低但非零响应”，常位于颜色过渡、阴影、模糊边界或尺度变化处。它不单独决定写入，只作为外沿采样的辅助。
+
+二维 surface 的延伸方向不是一维边缘的两个方向，而是一组连续角度。简单向量可由外沿壳层的一阶矩得到：
 
 $$
 \mathbf{v}_{surf,i}
 =
 \frac{
-\sum_{\mathbf{q}\in\mathcal{W}_t}
-F_{h,i}^{surf}(\mathbf{q})
+\sum_{\mathbf{q}\in\Omega_t^{vec}}
+F_{h,i}^{shell}(\mathbf{q})
 (\mathbf{q}-\mathbf{p}_t)
 }{
-\sum_{\mathbf{q}\in\mathcal{W}_t}
-F_{h,i}^{surf}(\mathbf{q})+\epsilon
+\sum_{\mathbf{q}\in\Omega_t^{vec}}
+F_{h,i}^{shell}(\mathbf{q})+\epsilon
 }
 $$
 
-若需要更强的方向性，可对窗口内高响应 surface 点做二阶矩：
-
-$$
-\Sigma_i
-=
-\sum_{\mathbf{q}\in\mathcal{W}_t}
-M_i^{surf}(\mathbf{q})
-(\mathbf{q}-\bar{\mathbf{q}})
-(\mathbf{q}-\bar{\mathbf{q}})^T
-$$
-
-主特征向量 $\hat{\mathbf{u}}_1$ 表示该 surface 在窗口内的主要延伸轴。当各向异性显著时，优先沿 $\pm\hat{\mathbf{u}}_1$ 中 frontier 更强的一侧移动；当各向同性不显著时，直接使用 frontier 质心向量。
-
-该机制的目标不是完整填满面域，而是用少量样本估计内部颜色/纹理统计，并把注意力推向面域外沿，以找到边界、孔洞、相邻对象或过渡带。
+若 surface 外沿在多个方向都很强，优化器不应强行压缩成一个方向；可以保留多个局部峰，按注意力预算逐个采样，或交给动态工作视窗在后续步骤中继续扩张。该机制的目标不是完整填满面域，而是用少量样本估计内部颜色/纹理统计，并把注意力推向面域外沿，以找到边界、孔洞、相邻对象或过渡带。
 
 ### 5.4 点事件、关系缺口与其他因素
 
@@ -1057,7 +1334,7 @@ $$
 
 新路线要求每次注视不只写入中心点特征，而是写入视窗口内的关键点集合。关键点集合既服务于 GmemI 原型学习，也服务于 GmemII 关系边学习。
 
-动态视窗口机制加入后，关键点写入还必须受当前窗口半径 $r_t$ 控制。窗口越大，允许写入的最低特征尺度越大；窗口越小，才允许细节成为独立节点。
+动态视窗口机制加入后，关键点写入还必须受当前工作域 $\mathcal{W}_t$ 的有效面积控制。工作域越大，允许写入的最低特征尺度越大；工作域越小，才允许细节成为独立节点。
 
 ### 6.1 视窗口特征抽取
 
@@ -1102,7 +1379,7 @@ $$
 2.  对候选图做小窗口 max pooling 或简单非极大值抑制。
 3.  每个支持维度最多取 $K_d$ 个点。
 4.  保证关键点之间距离大于 $r_{nms}$。
-5.  丢弃 $\ell_j<\ell_{min,d_j}(r_t)$ 的普通候选，只把它们累计为纹理统计或细节压力。
+5.  丢弃 $\ell_j<\ell_{min,d_j}(\mathcal{W}_t)$ 的普通候选，只把它们累计为纹理统计或细节压力。
 6.  优先保留离当前注视点不太近、且不在已访问覆盖中的点。
 
 关键点分为四类：
@@ -1155,7 +1432,106 @@ $$
 \text{该原型在当前结构中的位置、方向、角色和时间}
 $$
 
-### 6.4 GmemII 开启
+### 6.4 二维连续特征的面域自指关系
+
+一维连续特征可以用自指边压缩：同一个边缘原型沿 $\theta$ 与 $\theta+\pi$ 两个方向延伸，系统只需记录切向、步长、端点和置信度。二维连续特征也应沿用这个思想，但它的延伸方向不是两个离散方向，而是一组连续角度扇区。
+
+一维自指边可抽象为：
+
+$$
+e_{self}^{1D}
+=
+\left(
+n_i\rightarrow n_i,\,
+support\_dim=1,\,
+\hat{\mathbf{t}},\,
+s,\,
+endpoint_+,\,
+endpoint_-,\,
+confidence
+\right)
+$$
+
+二维 surface 的自指关系应升级为“面域外延自指关系”：
+
+$$
+e_{self}^{2D}
+=
+\left(
+n_i\rightarrow n_i,\,
+support\_dim=2,\,
+anchor,\,
+\Theta_i,\,
+\rho_i^{min}(\theta),\,
+\rho_i^{max}(\theta),\,
+C_i(\theta),\,
+boundary_i(\theta),\,
+holes_i,\,
+confidence
+\right)
+$$
+
+其中：
+
+*   $\Theta_i$ 是该 surface 已观察到的连续角度扇区集合。
+*   $\rho_i^{min}(\theta),\rho_i^{max}(\theta)$ 是从 anchor 出发，在方向 $\theta$ 上同类 surface 的内外径范围。
+*   $C_i(\theta)$ 是该方向上同类 surface 连续性的置信度。
+*   $boundary_i(\theta)$ 记录该方向最终遇到的是边缘、颜色过渡、相邻 surface、无效视野还是未知 frontier。
+*   $holes_i$ 记录孔洞候选或内边界关系。
+
+工程上不需要连续函数精确表示，可以把 $\theta$ 离散成 $K_\theta$ 个角度 bin，或用少量连续扇区区间表示：
+
+$$
+\Theta_i
+=
+\{[\theta_1,\theta_2],[\theta_3,\theta_4],\dots\}
+$$
+
+当窗口关键点 $\mathbf{k}$ 被判定为同一 surface 原型 $n_i$ 时，以 GmemII anchor $\mathbf{a}$ 为参照：
+
+$$
+\Delta\mathbf{p}
+=
+\mathbf{k}-\mathbf{a},
+\quad
+\rho=\|\Delta\mathbf{p}\|,
+\quad
+\theta=\operatorname{atan2}(\Delta y,\Delta x)
+$$
+
+更新对应角度扇区：
+
+$$
+\rho_i^{max}(\theta)
+\leftarrow
+\max
+\left(
+\rho_i^{max}(\theta),
+\rho
+\right)
+$$
+
+$$
+C_i(\theta)
+\leftarrow
+(1-\alpha)C_i(\theta)
++
+\alpha S_i^I(\mathbf{k})
+$$
+
+若相邻角度 bin 的 $C_i(\theta)$ 连续高于阈值，则合并为一个扇区；若中间出现强边界或强异质 surface，则切分扇区。这样，大面积同色区域不会生成大量重复关系边，而是被压缩为“同一 surface 在一组连续方向上延伸到某个外径”的结构。
+
+面域自指关系的写入触发条件应是结构性变化，而不是每个同色采样点：
+
+1.  新增未覆盖角度扇区。
+2.  某个方向的 $\rho_i^{max}$ 增长超过 $\theta_{\rho}^{expand}$。
+3.  颜色均值、方差或纹理统计出现稳定残差。
+4.  该方向遇到边缘、过渡带、孔洞、交界或无效视野。
+5.  GposII/GposI 对该 surface 的解释域发生明显扩张或分裂。
+
+该结构仍然遵守图表征约束：GmemI 节点保存 surface 原型，GmemII 中的自指关系保存该原型在当前对象中的二维外延关系；真正的复杂边界形状仍由边缘、过渡带、角点和关系边补足，而不是把像素 mask 直接塞进节点。
+
+### 6.5 GmemII 开启
 
 当当前窗口中存在稳定关键点，且没有正在学习的 GmemII，立即开启一个临时 GmemII：
 
@@ -1189,7 +1565,7 @@ $$
 
 这样 GmemII 从第一步开始就是正在生长的结构，而不是 MICRO 结束后才批量生成的容器。
 
-### 6.5 GmemII 填充
+### 6.6 GmemII 填充
 
 当存在当前工作 GmemII $h$ 时，每次注视执行：
 
@@ -1202,8 +1578,9 @@ $$
     =
     (src,\ dst,\ \Delta\mathbf{p},\ \hat{\mathbf{t}},\ age,\ confidence)
     $$
-5.  对二维 surface，更新覆盖图 $O_h^{surf}$、颜色均值、颜色方差和 surface frontier。
-6.  对点事件，写入 `corner`、`junction`、`terminator` 等角色关系。
+5.  对二维 surface，更新覆盖图 $O_h^{surf}$、颜色均值、颜色方差、surface frontier 和 $e_{self}^{2D}$ 的角度扇区外延。
+6.  若二维 surface 的新关键点没有带来扇区扩张、统计残差或边界事件，则只更新统计，不新增关系边实例。
+7.  对点事件，写入 `corner`、`junction`、`terminator` 等角色关系。
 
 关系边合并只在相对位置接近时发生：
 
@@ -1219,7 +1596,7 @@ $$
 
 否则应保留为多重边，避免同一对特征原型的不同空间关系互相覆盖。
 
-### 6.6 GmemII 闭合、挂起与恢复
+### 6.7 GmemII 闭合、挂起与恢复
 
 GmemII 不应只依赖固定步数闭合，而应由完成度和 frontier 共同决定。
 
@@ -1258,7 +1635,9 @@ $$
     \quad
     \Delta \sigma_{rgb}<\theta_{\sigma}
     $$
-2.  surface frontier 已转化为边界、过渡带、相邻 surface，或已离开有效视野。
+2.  $e_{self}^{2D}$ 中高置信角度扇区的 $\rho^{max}(\theta)$ 不再显著增长。
+3.  surface frontier 已转化为边界、过渡带、相邻 surface，或已离开有效视野。
+4.  若存在 $holes_i$，内边界已被边缘、过渡带或无效区域证据解释；否则 GmemII 只能标记为未完成或含孔洞候选。
 
 挂起条件：
 
@@ -1290,10 +1669,11 @@ Input:
     动态矩阵 P_t
 
 Step 1: 选择动态视窗口
-    生成候选半径 R = logspace(r_min, r_max, K)
-    根据 Gpos 响应尺度、细节残差、粗结构连贯度、frontier 触边和多对象混合计算 Z_r
-    平滑得到 r_t
-    W_t = crop(X_t, center=p_t, radius=r_t)
+    构造 R_work = 当前 Gmem/Gpos 响应域 + frontier + novelty
+    生成候选面积预算 A = logspace(pi*r_min^2, pi*r_max^2, K)
+    对每个 A_k 执行 seeded_grow(R_work, barrier, A_k) 得到 W_k
+    根据响应域一致性、Gpos 响应尺度、细节残差、粗结构连贯度、frontier 触边和多对象混合计算 Z_k
+    平滑得到不规则工作域 W_t 和等效半径 r_eff
 
 Step 2: 实时计算 Gpos
     计算 W_t 内活跃 GmemI 的 GposI 响应
@@ -1311,7 +1691,7 @@ Step 3: 动态状态竞争
 
 Step 4: 窗口关键点采样
     生成 known_confirm, known_extend, novel_seed, event_peak 候选
-    过滤 size < ell_min_d(r_t) 的普通细节候选
+    过滤 size < ell_min_d(W_t) 的普通细节候选
     阈值筛选 + NMS
     每个支持维度最多取 K_d 个关键点
 
@@ -1322,12 +1702,13 @@ Step 5: Gmem 写入
         匹配或创建 GmemI
         写入 observation relation
         更新工作关系边、coverage、frontier
+        若为二维连续 surface，更新 e_self^{2D} 的连续角度扇区与径向外延
 
 Step 6: 更新动态矩阵
-    P_{t+1} = decay(P_t) + edge butterfly + surface frontier + event + relation gap - return inhibition
+    P_{t+1} = decay(P_t) + edge butterfly + surface shell/frontier + event + relation gap - return inhibition
 
 Step 7: 合成局部眼动向量
-    根据 r_t 设置 s_min, s_max, edge step 和 surface dilation
+    根据 W_t 的有效面积和 r_eff 设置 s_min, s_max, edge step 和 surface dilation
     v_t = lambda_P v_P + lambda_low v_lowGpos + lambda_gap v_gap
           + lambda_nov v_novel + lambda_inertia v_{t-1} - lambda_return v_return
 
@@ -1418,7 +1799,7 @@ $$
 
 动态视窗口可能在粗尺度和细尺度之间震荡，也可能在大窗口下长期忽略细节。控制方式是：
 
-1.  对 $\log r_t$ 做平滑和最大变化限制。
+1.  对 $\log r_t^{eff}$ 做平滑和最大变化限制。
 2.  将小尺度残差写入 `detail_pressure`，若同一区域多次产生稳定细节压力，则强制生成一次细节观察。
 3.  维护尺度分层访问抑制，避免粗尺度覆盖错误压制细尺度探索。
 4.  对大窗口写入设置最低尺度阈值，避免把细节噪声错误固化为整体结构的一部分。

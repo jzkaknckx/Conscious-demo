@@ -518,244 +518,179 @@ $$
 
 
 ---
+我认为这两个问题都指向同一个核心：**空间外延不能挂在 GmemI 特征原型本身上，而应作为可学习、可检索、可复用但有作用域的关系结构。**
 
-结论：这个思想**方向可取**，但要把一句话改准：
+**1. 自指边的风险是真实存在的**
 
-不是“追踪 GposII 响应最高处”，而是“追踪当前活跃 GmemII 所解释区域的**内在外沿 / frontier**”。
+如果自指边被存到 GmemI 节点上，风险很大。
 
-标准 GposII 响应本身通常**不对应外端点或外边缘**。它对应的是“这个已学习子图在当前位置是否匹配”。
-
-**算一下**
-理想 GposII 可写成：
-
-```math
-S_h^{II}(\mathbf{c})
-=
-S_a^I(\mathbf{c})
-\prod_k
-S_{b_k}^I(\mathbf{c}+\Delta_k)
-```
-
-这里 `c` 是候选锚点位置，`\Delta_k` 是 GmemII 中记录的相对位置边。若底层特征响应是完美的 0/1 图，这就是“已学习模板是否能放在这里”。
-
-二维面域例子：设某颜色面域为区域 `Ω`，所有子节点都是同类 surface 响应：
-
-```math
-S_h^{II}(\mathbf{c})
-=
-\prod_{\Delta_k \in P}
-1_{\Omega}(\mathbf{c}+\Delta_k)
-=
-1_{\Omega \ominus P}(\mathbf{c})
-```
-
-这等于区域 `Ω` 被已学习模板 `P` 做形态学腐蚀后的内部区域。也就是说，GposII 高响应在**能完整容纳已学习结构的内部**，不是外边缘。外边缘处反而可能降低，因为一部分已学习偏移会落到区域外。
-
-一维线段例子：设线段为 `[0,L]`，已学习偏移集合为 `δ_k`：
-
-```math
-S_h^{II}(u)
-=
-\prod_k 1_{0 \le u+\delta_k \le L}
-=
-1_{[-\delta_{min},\, L-\delta_{max}]}(u)
-```
-
-它同样是一个内部可匹配区间。响应边界是“模板刚好放不下的位置”，不天然等于线段端点；只有在特定锚点和偏移定义下才可能碰巧接近端点。
-
-所以，**raw GposII 不是端点/边缘探测器**。端点和外边缘是“存在支持的截止”，本质上是响应支撑集的导数、边界或未闭合关系缺口，而不是正向匹配响应本身。
-
-**我认为可取的改法**
-可以在第一个 GmemI 写入时就创建一个临时 GmemII，但它应是 `WorkingSemanticNode / provisional GmemII`，随着观察逐步填充。优化器不直接最大化 `S_II`，而是维护该 GmemII 的解释支撑图：
-
-```math
-E_h(\mathbf{q})
-=
-\max_k
-S_{b_k}^I(\mathbf{q})
-K_k(\mathbf{q}-(\mathbf{c}+\Delta_k))
-```
-
-然后用它生成 frontier：
-
-二维：
-
-```math
-F_2(\mathbf{q})
-=
-Dilate(E_h)(\mathbf{q})\cdot(1-E_h(\mathbf{q}))
-```
-
-一维应按线的**内在维度**算端点，而不是按二维拓扑算整条线的边界：
-
-```math
-F_1(\mathbf{q})
-=
-(1-E_h(\mathbf{q}))
-\max_{\mathbf{p}}
-E_h(\mathbf{p})K(\mathbf{q}-(\mathbf{p}+s\hat{\mathbf{t}}_{\mathbf{p}}))
-```
-
-这表示从已学习线段端部沿切向预测下一段。若前方还有线响应，就继续追踪；若前方线响应消失但端点/角点/终止子模态响应升高，就学习端点事件。
-
-统一 drive 可以是：
-
-```math
-U(\mathbf{q})
-=
-M_{valid}
-(1-O)
-[
-\lambda_f F_h(\mathbf{q})R_{support}(\mathbf{q})
-+
-\lambda_g G_{gap}(\mathbf{q})
-+
-\lambda_n R_{all}(\mathbf{q})(1-E_h(\mathbf{q}))
-]
-```
-
-这样 surface、edge、transition、line 都不用拆成多个手写意图。差异只来自 `support_dim` 决定的 frontier 算子：二维是面域外沿，一维是内在线段端点，零维是稀疏事件与关系缺口。
-
-当前实现上要注意：`Gposition.l2_structure_synthesis()` 只是雏形，且没有被调用；`calculate_I_map()` 里的 GmemII 近似只是把相关 GposI 响应求平均，不是真正结构 GposII。因此你这个思路不能基于当前 `sum_I_spatial_II` 直接成立，需要新增“活跃 GmemII 解释支撑图 + frontier drive”。
-
-一句话评价：**把 GmemII 从一开始就作为正在生长的解释结构是优雅的；但 drive 应该追踪 GmemII 解释支撑的 frontier，而不是追踪 GposII raw response 的峰值。**
-
-
------
-
-
-这条路线是可取的，而且更接近 MICRO 学习应有的形态。
-
-我会这样评价：**现有全局 drive 更适合 MACRO / REVIEW / top-down 召回；你提出的局部向量优化器更适合 MICRO 的连续结构学习。** 问题不在于二选一，而在于现在把 MICRO 也做成全局场 argmax，容易导致视线在大块连续响应里打转，或者被局部强边缘峰吸走。
-
-**现有全局 Drive 路线**
-
-优点：
-- 能处理远距离跳转，适合 MACRO 找新对象。
-- 容易叠加 GposI/GposII/GposIII、期望、疲劳、新奇残差等多种场。
-- 对 REVIEW 或识别任务更自然，因为识别本来就是“哪里最像已知结构”。
-
-缺点：
-- MICRO 中容易被面积优势支配。二维 surface 大面积响应会压过一维边缘；强边缘又可能压过内部颜色。
-- 需要大量权重调参，否则 `argmax` 不是“理解结构”，只是“哪里数值最大”。
-- 对连续大块特征不友好，因为全局最高点可能一直落在同一响应流形内部。
-- 计算整图 drive 成本较高，而且很多计算对当前注视点附近的微观学习并不必要。
-
-**局部向量优化器路线**
-
-优点：
-- 更符合“眼睛每次只根据当前中央凹和近旁视野决定下一步”的机制。
-- 对一维追踪更自然：看到线，就估计切向，沿未访问方向走。
-- 对二维面域更自然：看到面，就估计局部支持范围、颜色稳定性、边界梯度，向 frontier 走。
-- 不需要全局 argmax，避免大面积连续响应造成的全局竞争失衡。
-- 复杂度低，可以只在注视点附近窗口计算。
-
-缺点：
-- 容易局部困住。若当前窗口内没有有效线索，它不知道远处哪里值得看。
-- 对断裂边缘、遮挡、低对比边界，需要局部失败后的恢复策略。
-- 如果没有 MACRO 全局机制兜底，系统可能探索效率很差。
-- 需要维护“当前正在生长的 GmemII / frontier / visited”状态，否则局部向量会退化成短视爬山。
-
-所以我认为更合理的结构是：
+例如同一个绿色 surface 原型可能出现在：
 
 ```text
-MACRO：全局 drive / 稀疏 saliency / GposII 召回，决定去哪一片区域
-MICRO：局部向量优化器，决定下一眼沿哪个方向补全当前 GmemII
-REVIEW：GposII/GposIII 结构响应，验证或补全已知结构
+树叶：细长椭圆
+草地：大块连续面
+树冠：复杂团块
+衣服：折叠面
 ```
 
-**简单算法流程**
+如果这些结构都复用同一个 `Green_Surface` GmemI 节点，而该节点内部又带一个不断更新的二维自指边，那么迭代会把不同对象的外延形态平均到一起，最后得到一个谁都不像的空间结构。
 
-1. 当前注视点为 `p_t`，取局部窗口：
+一维也一样。同一个 edge 原型可以出现在直线、圆弧、锯齿、闭环、纹理线中。如果自指边全局更新，切向、端点、曲率会互相污染。
 
-```math
-W_t = \{\mathbf{q}: \|\mathbf{q}-\mathbf{p}_t\| < r_f\}
-```
-
-2. 在 `W_t` 内计算或读取 GposI 响应，并按支持维度统计：
-
-```math
-M_d = \sum_{\mathbf{q}\in W_t}\sum_{i:support\_dim_i=d} S_i^{GposI}(\mathbf{q})
-```
-
-其中 `d=0` 表示端点/角点，`d=1` 表示线/边/过渡带，`d=2` 表示面域。
-
-3. 根据局部特征决定主导模式，但不要硬切换，可用 softmax：
-
-```math
-\alpha_d = Softmax(M_d + \lambda N_d - \mu C_d^{visited})
-```
-
-4. 分别计算候选移动向量。
-
-一维向量：沿切向走，偏向未访问端：
-
-```math
-\mathbf{v}_1 =
-s_1 \hat{\mathbf{t}}
--
-\beta \nabla O_{edge}
-+
-\gamma \nabla N_1
-```
-
-其中 `t` 来自局部方向/结构张量/上一段关系边。
-
-二维向量：在面域内向未解释 frontier 走：
-
-```math
-\mathbf{v}_2 =
-s_2 \operatorname{Norm}(\nabla F_2)
--
-\beta \nabla O_{node}
-```
-
-`F_2` 可以定义为当前 GmemII 已解释面域的外沿：
-
-```math
-F_2 = Dilate(E_h)(1-E_h)
-```
-
-点事件向量：若角点、端点、交点响应高，则跳向局部峰：
-
-```math
-\mathbf{v}_0 = \mathbf{q}_{event}^{*} - \mathbf{p}_t
-```
-
-5. 合成下一步向量：
-
-```math
-\mathbf{v}
-=
-\alpha_0\mathbf{v}_0
-+
-\alpha_1\mathbf{v}_1
-+
-\alpha_2\mathbf{v}_2
-+
-\lambda_g\mathbf{v}_{gap}
-```
-
-其中 `v_gap` 来自当前 GmemII 未闭合关系边的预测方向。
-
-6. 限制步长并执行眼跳：
-
-```math
-\mathbf{p}_{t+1}
-=
-\mathbf{p}_t
-+
-clip(\mathbf{v}, s_{min}, s_{max})
-```
-
-7. 到达后，把整个局部窗口内稳定特征写入当前临时 GmemII，而不是只写一个点：
+所以原则应当是：
 
 ```text
-- 新 GmemI 原型：当前窗口中未解释且稳定的刺激
-- 新 relation edge：窗口内特征之间、以及与上一注视窗口之间的位置关系
-- 更新 visited / coverage / frontier
+GmemI 节点：只存视觉特征原型
+自指边 / 外延结构：存于当前 GmemII 内部，或存为被 GmemII 引用的关系模式
 ```
 
-8. 若连续若干步局部窗口内 `M_d`、`N_d`、`F_d` 都低，或运动向量震荡，则退出 MICRO，交给 MACRO 全局机制重新选区。
+也就是说：
 
-我的判断：这条路线比纯全局 drive 更适合解决你现在的问题。它把“看边缘”“看面域”“看端点”统一成局部响应流形上的运动向量，而不是多个手写意图。但它不能完全替代全局优化器；最好让它成为 MICRO 的主机制，让全局 drive 退到 MACRO、REVIEW 和失败恢复。
+```text
+错误：
+    Green_Surface 节点自带“它如何二维延伸”
+
+正确：
+    某个 GmemII 中存在：
+        Green_Surface 在本对象内如何二维延伸
+```
+
+这样，同一个 GmemI 可以复用，但不同空间组合会生成不同 GmemII 关系结构。
+
+可以形式化为：
+
+```math
+n_i = \text{visual prototype}
+```
+
+```math
+e_{self,h}^{2D}
+=
+(h,\ n_i\rightarrow n_i,\ \Theta,\rho^{max}(\theta),boundary(\theta),confidence)
+```
+
+这里 `h` 是 GmemII 作用域。没有 `h`，这个自指边就是危险的。
+
+**自指边安全使用的条件**
+
+1. 自指边必须有 GmemII 作用域，不能作为 GmemI 的全局属性。
+2. 更新自指边前必须先做归属判定：当前观察是否属于同一个工作 GmemII、同一个 Gpos 工作域、同一个连通响应流形。
+3. 若空间外延差异超过阈值，不修正旧自指边，而是新建关系模式。
+4. 自指边更新应是低速、带置信度和迟滞的，不能被单次观察大幅改写。
+5. 对复杂二维 surface，自指边只编码粗外延和角度扇区；复杂边界仍交给 edge、transition、corner 等节点和关系边。
+
+所以你的担忧成立，但不是否定自指边，而是要求它从“节点内属性”降级为“GmemII 内部的空间关系模式”。
+
+**2. 把空间信息看成视觉信息同等地位的模态，是否可行**
+
+可行，而且从理论上很优雅。但我不建议“完全抛弃边”，而建议把边**对象化 / 节点化**。
+
+图论上，带属性的边：
+
+```math
+e=(u,v,\Delta p)
+```
+
+可以等价改写成一个关系节点：
+
+```math
+r_e=(type=spatial,\Delta p,\Sigma,confidence)
+```
+
+再用普通连接表示：
+
+```math
+u - r_e - v
+```
+
+这样空间关系就变成一种节点，也可以拥有原型、相似度、激活值、Gpos 响应和生命周期。
+
+这相当于把当前图改成 factor graph / incidence graph：
+
+```text
+视觉节点：颜色、边缘、方向、曲率、纹理
+空间关系节点：相对位移、方向、尺度、时间差、自指外延
+高层 Gmem 节点：视觉节点 + 空间关系节点 的组合
+```
+
+这种做法的优点：
+
+- 空间关系可以像视觉特征一样被检索、复用、聚类。
+- 同一对特征之间的不同空间组合不会互相覆盖，因为它们是不同 relation node。
+- 自指边可以自然变成 relation node，不再污染 GmemI。
+- GposII 的结构检索会更统一：既匹配视觉响应，也匹配空间关系响应。
+- “再现”和“联想”更清晰：激活关系节点可以预测另一个特征应出现的位置。
+
+但代价也明显：
+
+- 关系节点数量可能暴涨。窗口内 `K` 个关键点若全连接，会产生 `O(K^2)` 个空间节点。
+- 当前代码里 GmemII、RelationEdge、GposII、写入流程、匹配流程都要重构。
+- 如果把绝对像素位置也存入节点，会破坏平移不变性。空间模态必须是相对坐标、局部坐标或 anchor 坐标。
+- 关系节点没有独立感官实体，它依赖端点特征共同出现，因此匹配逻辑比普通视觉节点复杂。
+
+所以我的判断是：
+
+```text
+完全改成“所有空间都存节点、边只做连接”：
+    理论可行，但工程代价大。
+
+把现有 RelationEdge 升级为可激活、可复用、可检索的 RelationNode：
+    更合理，代价可控。
+```
+
+**推荐折中结构**
+
+不要把空间信息塞进视觉 GmemI 节点，而是新增一类空间关系节点：
+
+```text
+GmemI-Visual:
+    RGB surface
+    grad edge
+    ori
+    curv
+    RGB transition
+
+GmemI/II-Relation:
+    Δp relation
+    temporal relation
+    1D continuation relation
+    2D surface extension relation
+    boundary adjacency relation
+```
+
+高层 GmemII 存：
+
+```math
+h
+=
+(
+\{visual\_node\},
+\{relation\_node\},
+anchor
+)
+```
+
+其中二维 surface 自指关系就是一种 relation node：
+
+```math
+r_{surf}^{self}
+=
+(
+feature=n_i,
+support\_dim=2,
+\Theta,
+\rho^{max}(\theta),
+boundary(\theta),
+holes,
+confidence
+)
+```
+
+这样做后，GmemI 仍然复用视觉原型；GmemII 复用的是“视觉原型 + 空间关系节点”的组合。相同绿色可以出现在不同对象中，但只有空间外延也相似时，才复用同一个高层结构。
+
+我的结论：
+
+- 自指边可用，但必须作用域化、关系节点化，不能挂在 GmemI 原型上。
+- 把空间作为模态是可行且有解释力的。
+- 不建议彻底抛弃边；建议把“带属性边”重构为“空间关系节点 + 普通连接”。
+- 这是中等到偏大的架构改动，但可以渐进实现：先把 `RelationEdge` 概念上升级为 relation node，再逐步让它参与 Gpos 检索和状态竞争。
