@@ -2,6 +2,9 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-11_alg_onceoptimizer_beta.md | 新建一次性区域构图器设计：同模态连续分区、实例采样、区域星型与稀疏跨区接触，明确现有 Gmem/Gpos 兼容边界及验证计划 | chatgpt | 2026-09-11 15:08:41 CST |
+| 2026-09-09_newoptimizer_saccade_parameter_diagnosis.md | 为新优化器增加执行状态诊断，重构调参 Notebook，实测区分 REVIEW 往返、MACRO 停留与 MICRO 局部振荡 | chatgpt | 2026-09-09 15:35:00 CST |
+| 2026-09-07_graph_memorypool_newoptimizer_vector_state.md | 在 graph_memorypool_newoptimizer 中实现 Alg_optimizer_beta 视窗口向量优化器、动态状态竞争与窗口关键点即时写入 | chatgpt | 2026-09-07 22:24:34 CST |
 | 2026-07-26_alg_optimizer_beta_gpos_workspace_surface_self_relation.md | 修订 Alg_optimizer_beta：用 Gpos 响应域生成不规则工作视窗，并新增二维 surface 面域自指关系与外沿壳层引导 | chatgpt | 2026-07-26 15:26:22 CST |
 | 2026-07-23_alg_optimizer_beta_dynamic_window_scale.md | 在 Alg_optimizer_beta 中新增动态视窗口尺度机制、固定注意力预算下的最低写入尺度和尺度竞争流程 | chatgpt | 2026-07-23 22:23:46 CST |
 | 2026-07-23_alg_optimizer_beta_local_vector_route.md | 新建 Alg_optimizer_beta，讨论 MICRO 从全局 drive 改为视窗口向量引导，并补充动态竞争状态机与窗口写入流程 | chatgpt | 2026-07-23 19:50:38 CST |

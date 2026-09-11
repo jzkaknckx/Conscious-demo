@@ -1,0 +1,4739 @@
+{
+  "name": "no_review_low_norm",
+  "spec": {
+    "params": {
+      "state_bias_review": -10.0,
+      "theta_vector_norm": 0.25
+    }
+  },
+  "original_hw": [
+    375,
+    500
+  ],
+  "valid_bounds": [
+    80,
+    431,
+    18,
+    494
+  ],
+  "initial": [
+    335,
+    225
+  ],
+  "torch_version": "2.8.0+cu126",
+  "effective_review_bias": -10.0,
+  "source_sha256": "3bdcd2f25a5f2c4449c0cbaf26005e02108ea165f540617184e700740bcc5c71",
+  "summary": {
+    "steps": 50,
+    "unique_points": 7,
+    "repeated_fraction": 0.86,
+    "stationary_steps": 1,
+    "return_jumps": 42,
+    "moving_steps": 49,
+    "tail20_unique": 3,
+    "handlers": {
+      "MACRO_SEARCH": 2,
+      "MICRO_BUILD": 48
+    },
+    "review_outcomes": {},
+    "written_keypoints": 255,
+    "gi_nodes": 7,
+    "gii_nodes": 1,
+    "completed": 0,
+    "path_length": 106.60060815490863
+  },
+  "rows": [
+    {
+      "step": 1,
+      "before": [
+        335,
+        225
+      ],
+      "point": [
+        337,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MACRO_SEARCH",
+      "selected": "MACRO_SEARCH",
+      "state_after": "MACRO_SEARCH",
+      "handlers": [
+        "MACRO_SEARCH"
+      ],
+      "reason": "minimum_age",
+      "state_age": 1,
+      "scores": {
+        "MACRO_SEARCH": 0.8299993920326234,
+        "MICRO_BUILD": 1.2550012825244483,
+        "REVIEW_VERIFY": -10.0,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.11848372877062903,
+        "frontier": 0.3538909840639637,
+        "quality": 1.0,
+        "completion": 0.0,
+        "recall_out": 0.0,
+        "recall_in": 0.0,
+        "gap": 0.0,
+        "fail": 0.0,
+        "global_novelty": 0.9999989867210388,
+        "review_target": null,
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": null,
+      "suspend_depth": 0,
+      "window_radius": 11.879316690594422,
+      "window_area": 427.0,
+      "window_scores": {
+        "selected": 1.4373794835801155,
+        "domain": 0.0072888407037292775,
+        "frontier": 0.6837622149843905,
+        "coarse": 0.7741324002625513,
+        "valid": 1.0,
+        "fine": 0.04263854194301632,
+        "mix": 0.0,
+        "r_eff": 11.65840132267193,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": null,
+      "vector_components": null,
+      "written_keypoints": 0,
+      "gi_nodes": 1,
+      "gii_nodes": 0,
+      "completed": 0,
+      "micro_time": 0.0
+    },
+    {
+      "step": 2,
+      "before": [
+        337,
+        226
+      ],
+      "point": [
+        337,
+        226
+      ],
+      "distance": 0.0,
+      "state_before": "MACRO_SEARCH",
+      "selected": "MACRO_SEARCH",
+      "state_after": "MACRO_SEARCH",
+      "handlers": [
+        "MACRO_SEARCH"
+      ],
+      "reason": "minimum_age",
+      "state_age": 2,
+      "scores": {
+        "MACRO_SEARCH": 0.8299993920326234,
+        "MICRO_BUILD": 1.1445700084590258,
+        "REVIEW_VERIFY": -10.0,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07165486752577722,
+        "frontier": 0.3047913784838923,
+        "quality": 1.0,
+        "completion": 0.0,
+        "recall_out": 0.0,
+        "recall_in": 0.0,
+        "gap": 0.0,
+        "fail": 0.0,
+        "global_novelty": 0.9999989867210388,
+        "review_target": null,
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": null,
+      "suspend_depth": 0,
+      "window_radius": 11.849430361223787,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.4008272042689796,
+        "domain": 0.008133533384078542,
+        "frontier": 0.6726961198220446,
+        "coarse": 0.682002576046732,
+        "valid": 1.0,
+        "fine": 0.027174746690134706,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": null,
+      "vector_components": null,
+      "written_keypoints": 0,
+      "gi_nodes": 1,
+      "gii_nodes": 0,
+      "completed": 0,
+      "micro_time": 0.0
+    },
+    {
+      "step": 3,
+      "before": [
+        337,
+        226
+      ],
+      "point": [
+        339,
+        228
+      ],
+      "distance": 2.8284271247461903,
+      "state_before": "MACRO_SEARCH",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 0,
+      "scores": {
+        "MACRO_SEARCH": 0.8299993920326234,
+        "MICRO_BUILD": 1.1733513934661377,
+        "REVIEW_VERIFY": -10.0,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0718151677391349,
+        "frontier": 0.3286289241275744,
+        "quality": 1.0,
+        "completion": 0.0,
+        "recall_out": 0.0,
+        "recall_in": 0.0,
+        "gap": 0.0,
+        "fail": 0.0,
+        "global_novelty": 0.9999989867210388,
+        "review_target": null,
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.830044579021806,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.4336150643412786,
+        "domain": 0.008033805651471802,
+        "frontier": 0.7253072682749633,
+        "coarse": 0.6729763563492205,
+        "valid": 1.0,
+        "fine": 0.027227475932315504,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.6966202945730937,
+      "vector_components": {
+        "potential": [
+          1.4127609360189,
+          0.18252894125013525
+        ],
+        "low_gpos": [
+          0.7909890500849903,
+          0.005698814747466761
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -3.0207559446873673,
+          0.6859379230181522
+        ],
+        "inertia": [
+          0.0,
+          0.0
+        ],
+        "return": [
+          -0.006454193775078409,
+          0.0017178759816555153
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 3,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 1.0
+    },
+    {
+      "step": 4,
+      "before": [
+        339,
+        228
+      ],
+      "point": [
+        338,
+        225
+      ],
+      "distance": 3.1622776601683795,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 1,
+      "scores": {
+        "MACRO_SEARCH": 0.05299614976690892,
+        "MICRO_BUILD": 1.2174297584107379,
+        "REVIEW_VERIFY": -8.103273636102676,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.10747808286199853,
+        "frontier": 0.21011382218629326,
+        "quality": 1.0,
+        "completion": 0.253745947167857,
+        "recall_out": 1.0,
+        "recall_in": 0.9934527277946472,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.9999989867210388,
+        "review_target": [
+          372,
+          170
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.817460831182247,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.2403469102784916,
+        "domain": 0.006022187412414126,
+        "frontier": 0.4637360597559298,
+        "coarse": 0.6635726823959525,
+        "valid": 1.0,
+        "fine": 0.03217299961116276,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 2.9543479735218914,
+      "vector_components": {
+        "potential": [
+          -0.29367890604030317,
+          -2.352510801137791
+        ],
+        "low_gpos": [
+          -0.8072666860014607,
+          -1.2904496937867915
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -1.8601944064079399,
+          -1.136665877509168
+        ],
+        "inertia": [
+          0.7058247357625284,
+          0.7083865063549395
+        ],
+        "return": [
+          -1.0717041153737499,
+          -1.0501041338802086
+        ]
+      },
+      "written_keypoints": 7,
+      "gi_nodes": 5,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 2.0
+    },
+    {
+      "step": 5,
+      "before": [
+        338,
+        225
+      ],
+      "point": [
+        337,
+        227
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 2,
+      "scores": {
+        "MACRO_SEARCH": -0.01660576394820934,
+        "MICRO_BUILD": 1.0507894594495086,
+        "REVIEW_VERIFY": -8.10291046500206,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07439680121310516,
+        "frontier": 0.1913418802571242,
+        "quality": 1.0,
+        "completion": 0.3734399014261276,
+        "recall_out": 1.0,
+        "recall_in": 0.9941790699958801,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7244038581848145,
+        "review_target": [
+          323,
+          226
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.809288573936058,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1939182842529654,
+        "domain": 0.005695082558212954,
+        "frontier": 0.4223050568184759,
+        "coarse": 0.6322422333112844,
+        "valid": 1.0,
+        "fine": 0.03450906085749785,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.6777321303867614,
+      "vector_components": {
+        "potential": [
+          0.12104448571032869,
+          0.6654520838168138
+        ],
+        "low_gpos": [
+          -0.13287522834164042,
+          0.577568246253544
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -1.11444686823052,
+          0.4831120863432281
+        ],
+        "inertia": [
+          -0.2799817743957157,
+          -0.9600053156135265
+        ],
+        "return": [
+          -0.2551930105463079,
+          0.7456320774872046
+        ]
+      },
+      "written_keypoints": 7,
+      "gi_nodes": 6,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 3.0
+    },
+    {
+      "step": 6,
+      "before": [
+        337,
+        227
+      ],
+      "point": [
+        338,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 3,
+      "scores": {
+        "MACRO_SEARCH": -0.022849478317889305,
+        "MICRO_BUILD": 1.0194309073067698,
+        "REVIEW_VERIFY": -8.10148183107376,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07527115252252574,
+        "frontier": 0.18512434271980477,
+        "quality": 1.0,
+        "completion": 0.40106133869092575,
+        "recall_out": 1.0,
+        "recall_in": 0.997036337852478,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.6771690845489502,
+        "review_target": [
+          377,
+          318
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.803979637560635,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1823324914652509,
+        "domain": 0.004082279115321684,
+        "frontier": 0.40858251191905137,
+        "coarse": 0.6321123415599972,
+        "valid": 1.0,
+        "fine": 0.03472712711011245,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.4181123300434582,
+      "vector_components": {
+        "potential": [
+          0.693074482217326,
+          -1.303781965867192
+        ],
+        "low_gpos": [
+          0.40593443867582935,
+          -0.5207480501036483
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.3308152121737086,
+          -0.4556054736167638
+        ],
+        "inertia": [
+          -0.60486435458347,
+          0.796328520495356
+        ],
+        "return": [
+          0.32010680740179337,
+          -0.407379253561666
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 4.0
+    },
+    {
+      "step": 7,
+      "before": [
+        338,
+        225
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 4,
+      "scores": {
+        "MACRO_SEARCH": -0.009175831600512163,
+        "MICRO_BUILD": 1.0133611875426365,
+        "REVIEW_VERIFY": -8.106511449813842,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.072987519358061,
+        "frontier": 0.18352625517332308,
+        "quality": 1.0,
+        "completion": 0.4028835811658637,
+        "recall_out": 1.0,
+        "recall_in": 0.9869771003723145,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.6975288391113281,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.800530108832387,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.180877436834467,
+        "domain": 0.003961074244948353,
+        "frontier": 0.40505541972569076,
+        "coarse": 0.6349982429696439,
+        "valid": 1.0,
+        "fine": 0.03529285457096056,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.9032392763624435,
+      "vector_components": {
+        "potential": [
+          -0.46308681548374897,
+          0.6552702672472036
+        ],
+        "low_gpos": [
+          -0.20238454037006257,
+          0.5845514228192694
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.8923192563262112,
+          0.4846956922074542
+        ],
+        "inertia": [
+          0.3003703295647052,
+          -0.9538226591548296
+        ],
+        "return": [
+          -0.29327651266944044,
+          0.7793361751184745
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 5.0
+    },
+    {
+      "step": 8,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 5,
+      "scores": {
+        "MACRO_SEARCH": -0.004004380593856438,
+        "MICRO_BUILD": 1.0133345160872005,
+        "REVIEW_VERIFY": -8.107134854793548,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07247335141528935,
+        "frontier": 0.1841977466434854,
+        "quality": 1.0,
+        "completion": 0.4031801105909544,
+        "recall_out": 1.0,
+        "recall_in": 0.9857302904129028,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7057525515556335,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.798288455755479,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1817817453229296,
+        "domain": 0.003966727668197427,
+        "frontier": 0.4065374488720489,
+        "coarse": 0.6346914610000715,
+        "valid": 1.0,
+        "fine": 0.03537796072883519,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.4967432705355397,
+      "vector_components": {
+        "potential": [
+          1.4622173866487644,
+          -0.3240839247404864
+        ],
+        "low_gpos": [
+          1.0360566910338653,
+          0.03714400268536476
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.26429768259017344,
+          0.011317549656943737
+        ],
+        "inertia": [
+          -0.8183796278289056,
+          0.5746779835304479
+        ],
+        "return": [
+          0.8464822763393217,
+          0.16357766313023228
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 6.0
+    },
+    {
+      "step": 9,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 6,
+      "scores": {
+        "MACRO_SEARCH": -0.001733326857368378,
+        "MICRO_BUILD": 1.0092292965408107,
+        "REVIEW_VERIFY": -8.107460832595825,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07226926074693624,
+        "frontier": 0.18081797724184784,
+        "quality": 1.0,
+        "completion": 0.402985662290106,
+        "recall_out": 1.0,
+        "recall_in": 0.9850783348083496,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7097969055175781,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79683160961138,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1761669872795517,
+        "domain": 0.003968417113904615,
+        "frontier": 0.3990780588667144,
+        "coarse": 0.6337945095734411,
+        "valid": 1.0,
+        "fine": 0.035369720284398685,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.6698894439340858,
+      "vector_components": {
+        "potential": [
+          -0.5273056374539615,
+          -0.36062351307457163
+        ],
+        "low_gpos": [
+          -0.1738357532880309,
+          0.024900274758284022
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7972045804322647,
+          0.007950486621178234
+        ],
+        "inertia": [
+          0.9903017615267381,
+          -0.13893315341213375
+        ],
+        "return": [
+          -0.3918630757846058,
+          0.1464264956825981
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 7.0
+    },
+    {
+      "step": 10,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 7,
+      "scores": {
+        "MACRO_SEARCH": 0.0004621819173170616,
+        "MICRO_BUILD": 1.0092908240286986,
+        "REVIEW_VERIFY": -8.107667690515518,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07211849291210044,
+        "frontier": 0.1816370983691183,
+        "quality": 1.0,
+        "completion": 0.40382518811956963,
+        "recall_out": 1.0,
+        "recall_in": 0.9846646189689636,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7123367190361023,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.795884756085416,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1784517494006628,
+        "domain": 0.003969868174285201,
+        "frontier": 0.4008859171031251,
+        "coarse": 0.635810555255113,
+        "valid": 1.0,
+        "fine": 0.03540025532109241,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.740785059787156,
+      "vector_components": {
+        "potential": [
+          1.495297613608553,
+          0.7016423702256104
+        ],
+        "low_gpos": [
+          1.0657259074628629,
+          0.5880395577907288
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3269428100752572,
+          0.4493953180924826
+        ],
+        "inertia": [
+          -0.7294267748674256,
+          -0.6840589010505643
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 8.0
+    },
+    {
+      "step": 11,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 8,
+      "scores": {
+        "MACRO_SEARCH": 0.001506752476812201,
+        "MICRO_BUILD": 1.0070325600850285,
+        "REVIEW_VERIFY": -8.107812201976776,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07201219641644022,
+        "frontier": 0.17978195085678275,
+        "quality": 1.0,
+        "completion": 0.40373092232361535,
+        "recall_out": 1.0,
+        "recall_in": 0.9843755960464478,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7142033576965332,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.795269342047666,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.175633354221838,
+        "domain": 0.003970641426976492,
+        "frontier": 0.3967914753920333,
+        "coarse": 0.6358595090818078,
+        "valid": 1.0,
+        "fine": 0.035397051673732034,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.44380928334159675,
+      "vector_components": {
+        "potential": [
+          -0.4563791468015277,
+          -0.2708233664212172
+        ],
+        "low_gpos": [
+          -0.17910926310799935,
+          0.02577666947305925
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7751189483791642,
+          0.005077813046681094
+        ],
+        "inertia": [
+          0.9215737225712965,
+          0.3882033923938363
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 9.0
+    },
+    {
+      "step": 12,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 9,
+      "scores": {
+        "MACRO_SEARCH": 0.00242979697286394,
+        "MICRO_BUILD": 1.0064169241629481,
+        "REVIEW_VERIFY": -8.107904976606369,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07198887176862843,
+        "frontier": 0.17945100622809998,
+        "quality": 1.0,
+        "completion": 0.4039451948292468,
+        "recall_out": 1.0,
+        "recall_in": 0.984190046787262,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7154560685157776,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794869340140792,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1749357964373386,
+        "domain": 0.003968724404581553,
+        "frontier": 0.3960610572000941,
+        "coarse": 0.6354017454099328,
+        "valid": 1.0,
+        "fine": 0.03535151754418554,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.8118733104667155,
+      "vector_components": {
+        "potential": [
+          1.5520997350559949,
+          0.7700227064712388
+        ],
+        "low_gpos": [
+          1.0637297230534961,
+          0.5886352991436082
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3438954587712663,
+          0.4470029759914889
+        ],
+        "inertia": [
+          -0.912879871884747,
+          -0.40822829336988425
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 10.0
+    },
+    {
+      "step": 13,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 10,
+      "scores": {
+        "MACRO_SEARCH": 0.00298540957732385,
+        "MICRO_BUILD": 1.0062402734762257,
+        "REVIEW_VERIFY": -8.107988035678863,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07192180467688519,
+        "frontier": 0.17939964311892162,
+        "quality": 1.0,
+        "completion": 0.40399101833456985,
+        "recall_out": 1.0,
+        "recall_in": 0.984023928642273,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7163209915161133,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794609346175523,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1748118240098566,
+        "domain": 0.003968824976483514,
+        "frontier": 0.39594769518697503,
+        "coarse": 0.635286868027746,
+        "valid": 1.0,
+        "fine": 0.03534548779101339,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.38423404510352366,
+      "vector_components": {
+        "potential": [
+          -0.41433678004948227,
+          -0.21240461754545506
+        ],
+        "low_gpos": [
+          -0.17930091315239752,
+          0.025514913036236604
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7699228230092148,
+          0.005498685258630991
+        ],
+        "inertia": [
+          0.8899953110736365,
+          0.4559696769160653
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 11.0
+    },
+    {
+      "step": 14,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 11,
+      "scores": {
+        "MACRO_SEARCH": 0.0032230274082593047,
+        "MICRO_BUILD": 1.006177915833395,
+        "REVIEW_VERIFY": -8.108051335811615,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07187570532617635,
+        "frontier": 0.17939564510668443,
+        "quality": 1.0,
+        "completion": 0.40399863027053234,
+        "recall_out": 1.0,
+        "recall_in": 0.98389732837677,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7167068719863892,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794440353171376,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747801779425522,
+        "domain": 0.003969014728481551,
+        "frontier": 0.3959388712913244,
+        "coarse": 0.6352247853573727,
+        "valid": 1.0,
+        "fine": 0.03534572566401222,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.875287348493843,
+      "vector_components": {
+        "potential": [
+          1.5898153104085353,
+          0.8162779692494508
+        ],
+        "low_gpos": [
+          1.06349094029423,
+          0.5885379926583144
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3490507233575123,
+          0.4462006370373739
+        ],
+        "inertia": [
+          -0.9638470985140097,
+          -0.26645594511311754
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 12.0
+    },
+    {
+      "step": 15,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 12,
+      "scores": {
+        "MACRO_SEARCH": 0.003225443674170325,
+        "MICRO_BUILD": 1.0061348215388273,
+        "REVIEW_VERIFY": -8.108104562759399,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0718348479107261,
+        "frontier": 0.17939945107466568,
+        "quality": 1.0,
+        "completion": 0.40400165060292115,
+        "recall_out": 1.0,
+        "recall_in": 0.9837908744812012,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7167068719863892,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794330509017122,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747702734369452,
+        "domain": 0.003969284622074709,
+        "frontier": 0.3959472713317254,
+        "coarse": 0.6351864463404605,
+        "valid": 1.0,
+        "fine": 0.03534646983550397,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.3496617695558815,
+      "vector_components": {
+        "potential": [
+          -0.38576029255354977,
+          -0.172877543942926
+        ],
+        "low_gpos": [
+          -0.17940974810665133,
+          0.02531991119963111
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7669448783181211,
+          0.005856425575401995
+        ],
+        "inertia": [
+          0.8730249781718695,
+          0.48767549404087035
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 13.0
+    },
+    {
+      "step": 16,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 13,
+      "scores": {
+        "MACRO_SEARCH": 0.0035175470574768664,
+        "MICRO_BUILD": 1.0061070835394283,
+        "REVIEW_VERIFY": -8.108146673440933,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07180513342676229,
+        "frontier": 0.17940390300968964,
+        "quality": 1.0,
+        "completion": 0.40400208881299604,
+        "recall_out": 1.0,
+        "recall_in": 0.9837066531181335,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7171931266784668,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794259110865443,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747624724247334,
+        "domain": 0.003969432955976181,
+        "frontier": 0.39595709706705695,
+        "coarse": 0.6351535543969894,
+        "valid": 1.0,
+        "fine": 0.03534752607891161,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.644340369693945,
+      "vector_components": {
+        "potential": [
+          1.6156092537875997,
+          -0.15238248213909308
+        ],
+        "low_gpos": [
+          1.029153548062559,
+          0.03754578287372335
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3150258692602492,
+          0.007752272998831693
+        ],
+        "inertia": [
+          -0.9883187013859369,
+          -0.152401261447585
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 14.0
+    },
+    {
+      "step": 17,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 14,
+      "scores": {
+        "MACRO_SEARCH": 0.004000809405433792,
+        "MICRO_BUILD": 1.0060812173604752,
+        "REVIEW_VERIFY": -8.10818383693695,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07177819049058298,
+        "frontier": 0.17940788356335813,
+        "quality": 1.0,
+        "completion": 0.4040032061613943,
+        "recall_out": 1.0,
+        "recall_in": 0.9836323261260986,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7179970741271973,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79421270229863,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747578891994213,
+        "domain": 0.0039696216675391685,
+        "frontier": 0.3959658824304122,
+        "coarse": 0.6351295314064288,
+        "valid": 1.0,
+        "fine": 0.03534818513988085,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.3591505018533279,
+      "vector_components": {
+        "potential": [
+          -0.366921748957249,
+          -0.14573811139394077
+        ],
+        "low_gpos": [
+          -0.18060946099852357,
+          0.025755170739434344
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7600180647455984,
+          0.004744860955944801
+        ],
+        "inertia": [
+          0.9908044640068953,
+          -0.13530156726368378
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 15.0
+    },
+    {
+      "step": 18,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 15,
+      "scores": {
+        "MACRO_SEARCH": 0.004402934801114755,
+        "MICRO_BUILD": 1.0060896934955892,
+        "REVIEW_VERIFY": -8.108205771446228,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07178271662452401,
+        "frontier": 0.17940423472249536,
+        "quality": 1.0,
+        "completion": 0.40399445505382264,
+        "recall_out": 1.0,
+        "recall_in": 0.983588457107544,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7186789512634277,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794182536828126,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174728852821385,
+        "domain": 0.003969588419823893,
+        "frontier": 0.3959578291806699,
+        "coarse": 0.635081206088208,
+        "valid": 1.0,
+        "fine": 0.035348442653769484,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9364638406289076,
+      "vector_components": {
+        "potential": [
+          1.6318970410590663,
+          0.8690757734278033
+        ],
+        "low_gpos": [
+          1.0624801683481324,
+          0.5887781497540692
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.358456531970704,
+          0.4448291596294714
+        ],
+        "inertia": [
+          -0.804530833610991,
+          -0.5939108836931717
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 16.0
+    },
+    {
+      "step": 19,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 16,
+      "scores": {
+        "MACRO_SEARCH": 0.004721686736397057,
+        "MICRO_BUILD": 1.0060648692440173,
+        "REVIEW_VERIFY": -8.108233547210693,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0717597760652241,
+        "frontier": 0.179406888424941,
+        "quality": 1.0,
+        "completion": 0.4039975373641304,
+        "recall_out": 1.0,
+        "recall_in": 0.9835329055786133,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7192060947418213,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794162929313668,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174726519180099,
+        "domain": 0.003969743738147207,
+        "frontier": 0.3959636860895734,
+        "coarse": 0.6350675185703304,
+        "valid": 1.0,
+        "fine": 0.03534903624510601,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.3054520693050379,
+      "vector_components": {
+        "potential": [
+          -0.35406107553726696,
+          -0.12804363872551783
+        ],
+        "low_gpos": [
+          -0.18041448818840228,
+          0.025560365889304118
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7592998688383902,
+          0.005133671386124756
+        ],
+        "inertia": [
+          0.89375590682331,
+          0.44855365232984407
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 17.0
+    },
+    {
+      "step": 20,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 17,
+      "scores": {
+        "MACRO_SEARCH": 0.004824105323861239,
+        "MICRO_BUILD": 1.006049138026085,
+        "REVIEW_VERIFY": -8.108256256580352,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0717426928557302,
+        "frontier": 0.17941017063586062,
+        "quality": 1.0,
+        "completion": 0.4039985132981219,
+        "recall_out": 1.0,
+        "recall_in": 0.9834874868392944,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.719375491142273,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794150184446753,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174724783928268,
+        "domain": 0.00396982231533479,
+        "frontier": 0.39597093016111196,
+        "coarse": 0.6350539008867276,
+        "valid": 1.0,
+        "fine": 0.03534976077570795,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.6653607829785042,
+      "vector_components": {
+        "potential": [
+          1.6438941152296462,
+          -0.11741169488214595
+        ],
+        "low_gpos": [
+          1.0283405860833335,
+          0.03776167676406541
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.32222110879174626,
+          0.007003028823093299
+        ],
+        "inertia": [
+          -0.9977706940161171,
+          -0.06673561389989642
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 18.0
+    },
+    {
+      "step": 21,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 18,
+      "scores": {
+        "MACRO_SEARCH": 0.004961817662830437,
+        "MICRO_BUILD": 1.0060330803329178,
+        "REVIEW_VERIFY": -8.108277863264084,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07172598064082165,
+        "frontier": 0.17941313859254326,
+        "quality": 1.0,
+        "completion": 0.4039998864145519,
+        "recall_out": 1.0,
+        "recall_in": 0.9834442734718323,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7196031808853149,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79414190029064,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747245662268477,
+        "domain": 0.003969943108031095,
+        "frontier": 0.395977480651333,
+        "coarse": 0.6350440542539688,
+        "valid": 1.0,
+        "fine": 0.035350181963678354,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.31525877102831584,
+      "vector_components": {
+        "potential": [
+          -0.34506409526799137,
+          -0.11641389742533899
+        ],
+        "low_gpos": [
+          -0.18125065632526988,
+          0.025881867603706553
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7547838504882216,
+          0.004331074510515013
+        ],
+        "inertia": [
+          0.9952556754871625,
+          -0.09729409237251609
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 19.0
+    },
+    {
+      "step": 22,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 19,
+      "scores": {
+        "MACRO_SEARCH": 0.005112860164598665,
+        "MICRO_BUILD": 1.0060440546146303,
+        "REVIEW_VERIFY": -8.108288890123367,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07173386318459936,
+        "frontier": 0.17940994367446725,
+        "quality": 1.0,
+        "completion": 0.40399306709760935,
+        "recall_out": 1.0,
+        "recall_in": 0.9834222197532654,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.719864010810852,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794136515592289,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174703679348792,
+        "domain": 0.0039698909058676155,
+        "frontier": 0.3959704292412715,
+        "coarse": 0.6350120701560712,
+        "valid": 1.0,
+        "fine": 0.035350284532769595,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9639833396956723,
+      "vector_components": {
+        "potential": [
+          1.6518473502257547,
+          0.8918292454243839
+        ],
+        "low_gpos": [
+          1.0619129602344992,
+          0.5889182259369319
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.36366230130854205,
+          0.44406358911699245
+        ],
+        "inertia": [
+          -0.836620328335693,
+          -0.5477831927099237
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 20.0
+    },
+    {
+      "step": 23,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 20,
+      "scores": {
+        "MACRO_SEARCH": 0.0052280263551585104,
+        "MICRO_BUILD": 1.0060271029554517,
+        "REVIEW_VERIFY": -8.108306264877319,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07171854329054633,
+        "frontier": 0.17941188157559532,
+        "quality": 1.0,
+        "completion": 0.4039957618276915,
+        "recall_out": 1.0,
+        "recall_in": 0.9833874702453613,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7200523614883423,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794133015539682,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747038090092552,
+        "domain": 0.003969996197568765,
+        "frontier": 0.3959747063260629,
+        "coarse": 0.6350064135798055,
+        "valid": 1.0,
+        "fine": 0.03535067953288692,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2899509580649829,
+      "vector_components": {
+        "potential": [
+          -0.3390069657086839,
+          -0.10858949504381858
+        ],
+        "low_gpos": [
+          -0.18106859883493923,
+          0.025716002797104103
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7548385788695756,
+          0.004695494982222015
+        ],
+        "inertia": [
+          0.8875228486768856,
+          0.46076370633597685
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 21.0
+    },
+    {
+      "step": 24,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 21,
+      "scores": {
+        "MACRO_SEARCH": 0.005267164363468191,
+        "MICRO_BUILD": 1.006016488232962,
+        "REVIEW_VERIFY": -8.108320480585098,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07170700754126368,
+        "frontier": 0.17941436069235375,
+        "quality": 1.0,
+        "completion": 0.4039967622036792,
+        "recall_out": 1.0,
+        "recall_in": 0.9833590388298035,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7201162576675415,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794130740506041,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747040226375516,
+        "domain": 0.003970044811734767,
+        "frontier": 0.39598017791201223,
+        "coarse": 0.6349996396551416,
+        "valid": 1.0,
+        "fine": 0.035351196742985286,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.6764707999211095,
+      "vector_components": {
+        "potential": [
+          1.6572988329262437,
+          -0.10206939830378406
+        ],
+        "low_gpos": [
+          1.0278199465122584,
+          0.0379019034501475
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.32655585843891743,
+          0.006538320996048515
+        ],
+        "inertia": [
+          -0.9999591417081625,
+          0.009039630206774485
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 22.0
+    },
+    {
+      "step": 25,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 22,
+      "scores": {
+        "MACRO_SEARCH": 0.0052930808340111435,
+        "MICRO_BUILD": 1.0060050533942069,
+        "REVIEW_VERIFY": -8.108334696292877,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07169520118416584,
+        "frontier": 0.1794166826819937,
+        "quality": 1.0,
+        "completion": 0.40399813357425224,
+        "recall_out": 1.0,
+        "recall_in": 0.9833306074142456,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7201576232910156,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794129261734408,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1747055014052707,
+        "domain": 0.003970133538710759,
+        "frontier": 0.39598530270730276,
+        "coarse": 0.6349955194329233,
+        "valid": 1.0,
+        "fine": 0.03535148699169028,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.29445011088350015,
+      "vector_components": {
+        "potential": [
+          -0.334941568635578,
+          -0.10330931317143777
+        ],
+        "low_gpos": [
+          -0.1816155874430797,
+          0.025958918670581293
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7515447939558323,
+          0.004068140741766033
+        ],
+        "inertia": [
+          0.9972569996673338,
+          -0.0740167319901888
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 23.0
+    },
+    {
+      "step": 26,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 23,
+      "scores": {
+        "MACRO_SEARCH": 0.00544226053923158,
+        "MICRO_BUILD": 1.00601613391131,
+        "REVIEW_VERIFY": -8.108340865373611,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07170374715355496,
+        "frontier": 0.17941383693529211,
+        "quality": 1.0,
+        "completion": 0.4039924726333443,
+        "recall_out": 1.0,
+        "recall_in": 0.9833182692527771,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7204138040542603,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794128300532952,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746890395061174,
+        "domain": 0.003970076529882499,
+        "frontier": 0.39597902194314966,
+        "coarse": 0.6349714964423627,
+        "valid": 1.0,
+        "fine": 0.03535151099722227,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9769976966842244,
+      "vector_components": {
+        "potential": [
+          1.660868097645512,
+          0.9021580618232375
+        ],
+        "low_gpos": [
+          1.0615402551892206,
+          0.5890117973652607
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3669692865235911,
+          0.4435738514790014
+        ],
+        "inertia": [
+          -0.8550586330625848,
+          -0.5185313240539516
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 24.0
+    },
+    {
+      "step": 27,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 24,
+      "scores": {
+        "MACRO_SEARCH": 0.00556035696505397,
+        "MICRO_BUILD": 1.006003380339566,
+        "REVIEW_VERIFY": -8.108352875709533,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07169248201208747,
+        "frontier": 0.179415285996496,
+        "quality": 1.0,
+        "completion": 0.40399480684398237,
+        "recall_out": 1.0,
+        "recall_in": 0.9832942485809326,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7206075191497803,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794127675752042,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.17469005046119,
+        "domain": 0.003970155757186222,
+        "frontier": 0.39598222012366935,
+        "coarse": 0.6349691919112915,
+        "valid": 1.0,
+        "fine": 0.035351783787358544,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2833683985874429,
+      "vector_components": {
+        "potential": [
+          -0.3322005559720593,
+          -0.09975812925456144
+        ],
+        "low_gpos": [
+          -0.18144880061826296,
+          0.025814640365145945
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7519140857361951,
+          0.004400987652217756
+        ],
+        "inertia": [
+          0.8840943532234069,
+          0.46730843625862983
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 25.0
+    },
+    {
+      "step": 28,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 25,
+      "scores": {
+        "MACRO_SEARCH": 0.005561125840420567,
+        "MICRO_BUILD": 1.005995583430068,
+        "REVIEW_VERIFY": -8.108362710475921,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0716839709598358,
+        "frontier": 0.17941731119046767,
+        "quality": 1.0,
+        "completion": 0.40399576793819053,
+        "recall_out": 1.0,
+        "recall_in": 0.9832745790481567,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7206075191497803,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79412726964447,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746912074845182,
+        "domain": 0.0039701893985782544,
+        "frontier": 0.3959866898699378,
+        "coarse": 0.6349657001975472,
+        "valid": 1.0,
+        "fine": 0.03535218315211804,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.6827010551693282,
+      "vector_components": {
+        "potential": [
+          1.6633567359950416,
+          -0.0950960884502137
+        ],
+        "low_gpos": [
+          1.0274879736140048,
+          0.03799653875956537
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3294540043295665,
+          0.006221990021426194
+        ],
+        "inertia": [
+          -0.9988916920353051,
+          0.047067903956360936
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 26.0
+    },
+    {
+      "step": 29,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 26,
+      "scores": {
+        "MACRO_SEARCH": 0.005571071452352472,
+        "MICRO_BUILD": 1.005986795135745,
+        "REVIEW_VERIFY": -8.108372843265533,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07167491432731157,
+        "frontier": 0.17941923163302703,
+        "quality": 1.0,
+        "completion": 0.40399702408221,
+        "recall_out": 1.0,
+        "recall_in": 0.9832543134689331,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7206224203109741,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794127005674556,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746932791091078,
+        "domain": 0.003970257915649172,
+        "frontier": 0.3959909284224338,
+        "coarse": 0.6349640241749499,
+        "valid": 1.0,
+        "fine": 0.035352394837263795,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2855750119229316,
+      "vector_components": {
+        "potential": [
+          -0.3302772681583297,
+          -0.09746124522340022
+        ],
+        "low_gpos": [
+          -0.18122613864691042,
+          0.02567967672105725
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.752249857560299,
+          0.004690092559772269
+        ],
+        "inertia": [
+          0.9980215756848356,
+          -0.06287236648606369
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 27.0
+    },
+    {
+      "step": 30,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 27,
+      "scores": {
+        "MACRO_SEARCH": 0.0056794718364827634,
+        "MICRO_BUILD": 1.0059806303405439,
+        "REVIEW_VERIFY": -8.108381098508834,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07166790034732776,
+        "frontier": 0.17942102986560535,
+        "quality": 1.0,
+        "completion": 0.4039976988558911,
+        "recall_out": 1.0,
+        "recall_in": 0.9832378029823303,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7208021879196167,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126834094115,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174694388841405,
+        "domain": 0.003970284845057387,
+        "frontier": 0.3959948972488618,
+        "coarse": 0.6349610911354048,
+        "valid": 1.0,
+        "fine": 0.03535273746167495,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9832798170699075,
+      "vector_components": {
+        "potential": [
+          1.66503052287901,
+          0.9067423403549049
+        ],
+        "low_gpos": [
+          1.0612819830145486,
+          0.5890776792273132
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.36925761667660456,
+          0.44323305889559356
+        ],
+        "inertia": [
+          -0.8648568940108923,
+          -0.502018478625869
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 28.0
+    },
+    {
+      "step": 31,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 28,
+      "scores": {
+        "MACRO_SEARCH": 0.0057758884462666416,
+        "MICRO_BUILD": 1.0059886302931962,
+        "REVIEW_VERIFY": -8.108385270833969,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0716745302387997,
+        "frontier": 0.1794185682074156,
+        "quality": 1.0,
+        "completion": 0.403993631009379,
+        "recall_out": 1.0,
+        "recall_in": 0.9832294583320618,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7209683060646057,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79412672256683,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174682445186791,
+        "domain": 0.00397026833748215,
+        "frontier": 0.39598946419520786,
+        "coarse": 0.6349446102465317,
+        "valid": 1.0,
+        "fine": 0.035352571605272096,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2802226727244767,
+      "vector_components": {
+        "potential": [
+          -0.3290315760623209,
+          -0.09589573637176493
+        ],
+        "low_gpos": [
+          -0.1817383190808358,
+          0.025888447395300662
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7498482319786209,
+          0.004188974041413703
+        ],
+        "inertia": [
+          0.8823581678864598,
+          0.4705784350818151
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 29.0
+    },
+    {
+      "step": 32,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 29,
+      "scores": {
+        "MACRO_SEARCH": 0.005820153321499655,
+        "MICRO_BUILD": 1.0059813595849594,
+        "REVIEW_VERIFY": -8.108392542600631,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07166788288875903,
+        "frontier": 0.17941963318010762,
+        "quality": 1.0,
+        "completion": 0.40399500499873736,
+        "recall_out": 1.0,
+        "recall_in": 0.9832149147987366,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7210402488708496,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126650074096,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746828051456304,
+        "domain": 0.003970290750821064,
+        "frontier": 0.39599181466522837,
+        "coarse": 0.6349424453840103,
+        "valid": 1.0,
+        "fine": 0.035352903318077805,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.6861171698604414,
+      "vector_components": {
+        "potential": [
+          1.6661965808275392,
+          -0.09211114668677046
+        ],
+        "low_gpos": [
+          1.0272129937334264,
+          0.03807046882260225
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3315303954965396,
+          0.005992147576907109
+        ],
+        "inertia": [
+          -0.9979057478484055,
+          0.06468476181539777
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 30.0
+    },
+    {
+      "step": 33,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 30,
+      "scores": {
+        "MACRO_SEARCH": 0.005877348705614738,
+        "MICRO_BUILD": 1.0059740272479747,
+        "REVIEW_VERIFY": -8.108400171995163,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07166061575952874,
+        "frontier": 0.1794210996998802,
+        "quality": 1.0,
+        "completion": 0.40399622535269103,
+        "recall_out": 1.0,
+        "recall_in": 0.9831996560096741,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211339473724365,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126602953819,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746847861358651,
+        "domain": 0.003970346280784931,
+        "frontier": 0.39599505137804347,
+        "coarse": 0.6349419565440861,
+        "valid": 1.0,
+        "fine": 0.03535305826287521,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.28100990466126974,
+      "vector_components": {
+        "potential": [
+          -0.32810616671359566,
+          -0.09496125939738317
+        ],
+        "low_gpos": [
+          -0.1814813257405431,
+          0.025760328104979847
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7502965919953233,
+          0.0044558289271167525
+        ],
+        "inertia": [
+          0.9983236952656979,
+          -0.05787745218167632
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 31.0
+    },
+    {
+      "step": 34,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 31,
+      "scores": {
+        "MACRO_SEARCH": 0.0059003286994566695,
+        "MICRO_BUILD": 1.0059690320022923,
+        "REVIEW_VERIFY": -8.108406430482864,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07165495045397866,
+        "frontier": 0.179422618595359,
+        "quality": 1.0,
+        "completion": 0.40399687655730426,
+        "recall_out": 1.0,
+        "recall_in": 0.9831871390342712,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79412657232564,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746860909974628,
+        "domain": 0.003970366433101076,
+        "frontier": 0.3959984036877448,
+        "coarse": 0.634940210687214,
+        "valid": 1.0,
+        "fine": 0.035353335417653654,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9857691748898296,
+      "vector_components": {
+        "potential": [
+          1.6670512837932705,
+          0.908574896621692
+        ],
+        "low_gpos": [
+          1.0615035084625293,
+          0.5889301727777511
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.36884640336777813,
+          0.4432435846290037
+        ],
+        "inertia": [
+          -0.868229766460197,
+          -0.4961623450368556
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 32.0
+    },
+    {
+      "step": 35,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 32,
+      "scores": {
+        "MACRO_SEARCH": 0.005901041707403243,
+        "MICRO_BUILD": 1.0059632271154852,
+        "REVIEW_VERIFY": -8.108413225412368,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07164893597705413,
+        "frontier": 0.17942396290515053,
+        "quality": 1.0,
+        "completion": 0.40399776781723756,
+        "recall_out": 1.0,
+        "recall_in": 0.9831735491752625,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126552417323,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746878576580522,
+        "domain": 0.0039704139830819985,
+        "frontier": 0.396001370674492,
+        "coarse": 0.6349396520130148,
+        "valid": 1.0,
+        "fine": 0.03535346199227689,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2784259127569622,
+      "vector_components": {
+        "potential": [
+          -0.3274964790834475,
+          -0.09431444485774579
+        ],
+        "low_gpos": [
+          -0.1819340645262756,
+          0.025941710409005954
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7483104153239687,
+          0.0040289985574943005
+        ],
+        "inertia": [
+          0.8817282794612941,
+          0.4717576085218192
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 33.0
+    },
+    {
+      "step": 36,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 33,
+      "scores": {
+        "MACRO_SEARCH": 0.005898096796031371,
+        "MICRO_BUILD": 1.0059717768384666,
+        "REVIEW_VERIFY": -8.108414715528488,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0716559630509645,
+        "frontier": 0.17942188533547268,
+        "quality": 1.0,
+        "completion": 0.40399408667802267,
+        "recall_out": 1.0,
+        "recall_in": 0.9831705689430237,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126539476915,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746776993176509,
+        "domain": 0.003970367909667294,
+        "frontier": 0.39599678533133725,
+        "coarse": 0.6349258248265875,
+        "valid": 1.0,
+        "fine": 0.03535343362210271,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.6880287797719007,
+      "vector_components": {
+        "potential": [
+          1.6675505595314195,
+          -0.09086197067506414
+        ],
+        "low_gpos": [
+          1.0270363351149159,
+          0.03812305256733144
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.33308879715500544,
+          0.0058176975688334406
+        ],
+        "inertia": [
+          -0.9974119329930379,
+          0.0718987894410733
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 34.0
+    },
+    {
+      "step": 37,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 34,
+      "scores": {
+        "MACRO_SEARCH": 0.005899294453845627,
+        "MICRO_BUILD": 1.0059647161568115,
+        "REVIEW_VERIFY": -8.108420765399933,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07164993111547126,
+        "frontier": 0.17942265351249642,
+        "quality": 1.0,
+        "completion": 0.4039955837502905,
+        "recall_out": 1.0,
+        "recall_in": 0.9831584692001343,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79412653106565,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174678773593158,
+        "domain": 0.003970412310621616,
+        "frontier": 0.3959984807523356,
+        "coarse": 0.6349256851580377,
+        "valid": 1.0,
+        "fine": 0.0353535711083314,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.27880159866114324,
+      "vector_components": {
+        "potential": [
+          -0.32708420030056407,
+          -0.09387712015596317
+        ],
+        "low_gpos": [
+          -0.1817134087444221,
+          0.025827231734079022
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7488129293220069,
+          0.004275968052493885
+        ],
+        "inertia": [
+          0.9984408948053473,
+          -0.055819168574043225
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 35.0
+    },
+    {
+      "step": 38,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 35,
+      "scores": {
+        "MACRO_SEARCH": 0.005899858016443993,
+        "MICRO_BUILD": 1.0059604485842732,
+        "REVIEW_VERIFY": -8.108425682783126,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0716452565836961,
+        "frontier": 0.17942391052944437,
+        "quality": 1.0,
+        "completion": 0.4039962882035384,
+        "recall_out": 1.0,
+        "recall_in": 0.9831486344337463,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126525598331,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746801854645224,
+        "domain": 0.0039704279250951146,
+        "frontier": 0.39600125507760575,
+        "coarse": 0.634924916981014,
+        "valid": 1.0,
+        "fine": 0.03535380679900914,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9874250772835809,
+      "vector_components": {
+        "potential": [
+          1.6679580557034115,
+          0.909436995687036
+        ],
+        "low_gpos": [
+          1.0613037915330528,
+          0.5889911795590388
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3703483836320036,
+          0.44302321762140656
+        ],
+        "inertia": [
+          -0.869378211011859,
+          -0.4941472717903235
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 36.0
+    },
+    {
+      "step": 39,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 36,
+      "scores": {
+        "MACRO_SEARCH": 0.005900524933769136,
+        "MICRO_BUILD": 1.0059554589253328,
+        "REVIEW_VERIFY": -8.108431077003479,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07164014558770292,
+        "frontier": 0.17942506279497997,
+        "quality": 1.0,
+        "completion": 0.4039971218501948,
+        "recall_out": 1.0,
+        "recall_in": 0.983137845993042,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126522044573,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746819445060455,
+        "domain": 0.003970468762031174,
+        "frontier": 0.3960037982091033,
+        "coarse": 0.634924916981014,
+        "valid": 1.0,
+        "fine": 0.035353907185779285,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2773875438416945,
+      "vector_components": {
+        "potential": [
+          -0.32679921456914296,
+          -0.09357201003444961
+        ],
+        "low_gpos": [
+          -0.18208213947587965,
+          0.0259828810670612
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7471224991295262,
+          0.003904103617626776
+        ],
+        "inertia": [
+          0.8815613445563972,
+          0.4720694819451024
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 37.0
+    },
+    {
+      "step": 40,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 37,
+      "scores": {
+        "MACRO_SEARCH": 0.0058978558677829085,
+        "MICRO_BUILD": 1.0059635106426414,
+        "REVIEW_VERIFY": -8.108431941270828,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07164684967809193,
+        "frontier": 0.1794231248938519,
+        "quality": 1.0,
+        "completion": 0.40399378551771215,
+        "recall_out": 1.0,
+        "recall_in": 0.9831361174583435,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79412651973463,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746728512321765,
+        "domain": 0.003970424734698385,
+        "frontier": 0.3959995211243119,
+        "coarse": 0.6349127658171839,
+        "valid": 1.0,
+        "fine": 0.03535386572167857,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.689109576063267,
+      "vector_components": {
+        "potential": [
+          1.6681735788414287,
+          -0.09027298377246606
+        ],
+        "low_gpos": [
+          1.0269024261723239,
+          0.03816397055155085
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.33430271559163066,
+          0.005680323914813926
+        ],
+        "inertia": [
+          -0.99717896088398,
+          0.07506077517815705
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 38.0
+    },
+    {
+      "step": 41,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 38,
+      "scores": {
+        "MACRO_SEARCH": 0.005898964137725393,
+        "MICRO_BUILD": 1.005957385041927,
+        "REVIEW_VERIFY": -8.108436858654022,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07164169067103475,
+        "frontier": 0.17942378831946332,
+        "quality": 1.0,
+        "completion": 0.4039951708551402,
+        "recall_out": 1.0,
+        "recall_in": 0.9831262826919556,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126518233167,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746740525966786,
+        "domain": 0.003970463309817493,
+        "frontier": 0.3960009853515378,
+        "coarse": 0.6349131848228332,
+        "valid": 1.0,
+        "fine": 0.035353979202375256,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.27765288928740545,
+      "vector_components": {
+        "potential": [
+          -0.32660605612357674,
+          -0.09336495648810043
+        ],
+        "low_gpos": [
+          -0.18194803738249624,
+          0.025887184659882007
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7476432212941506,
+          0.004132835246621447
+        ],
+        "inertia": [
+          0.9984920537744,
+          -0.05489643476020173
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 39.0
+    },
+    {
+      "step": 42,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 39,
+      "scores": {
+        "MACRO_SEARCH": 0.005899479514674066,
+        "MICRO_BUILD": 1.005953725551337,
+        "REVIEW_VERIFY": -8.108440792560577,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07163771011736628,
+        "frontier": 0.17942487075072405,
+        "quality": 1.0,
+        "completion": 0.40399581507632604,
+        "recall_out": 1.0,
+        "recall_in": 0.9831184148788452,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713790893555,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126517257215,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174675429343711,
+        "domain": 0.003970475774714269,
+        "frontier": 0.3960033743538537,
+        "coarse": 0.6349128356514588,
+        "valid": 1.0,
+        "fine": 0.035354173428952286,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9883559690533052,
+      "vector_components": {
+        "potential": [
+          1.6683732135549754,
+          0.9098519535245284
+        ],
+        "low_gpos": [
+          1.061153431665828,
+          0.5890384805002863
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3715395026717463,
+          0.44284890155147216
+        ],
+        "inertia": [
+          -0.8697666390642078,
+          -0.4934632646620737
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 40.0
+    },
+    {
+      "step": 43,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 40,
+      "scores": {
+        "MACRO_SEARCH": 0.0059000785454459415,
+        "MICRO_BUILD": 1.005949414506963,
+        "REVIEW_VERIFY": -8.108445292711258,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07163329746412195,
+        "frontier": 0.17942591826484733,
+        "quality": 1.0,
+        "completion": 0.4039966085682744,
+        "recall_out": 1.0,
+        "recall_in": 0.9831094145774841,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713194847107,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126516622848,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746772777102787,
+        "domain": 0.003970512124090722,
+        "frontier": 0.3960056862915788,
+        "coarse": 0.634913324491383,
+        "valid": 1.0,
+        "fine": 0.03535425635715371,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.27731546797903583,
+      "vector_components": {
+        "potential": [
+          -0.3264219616043901,
+          -0.09329200734383475
+        ],
+        "low_gpos": [
+          -0.18174989909370165,
+          0.025790407447949047
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7481173311612357,
+          0.004341479432611639
+        ],
+        "inertia": [
+          0.8815267918281865,
+          0.472134001411787
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 41.0
+    },
+    {
+      "step": 44,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 41,
+      "scores": {
+        "MACRO_SEARCH": 0.005900469617385218,
+        "MICRO_BUILD": 1.0059463906828603,
+        "REVIEW_VERIFY": -8.1084488093853,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07162980575037767,
+        "frontier": 0.1794269657789706,
+        "quality": 1.0,
+        "completion": 0.4039970974081986,
+        "recall_out": 1.0,
+        "recall_in": 0.9831023812294006,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713194847107,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126516210508,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746786039411843,
+        "domain": 0.0039705223697936555,
+        "frontier": 0.3960079982293038,
+        "coarse": 0.6349129753200086,
+        "valid": 1.0,
+        "fine": 0.035354441854446375,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.6897997176758333,
+      "vector_components": {
+        "potential": [
+          1.6684984517646464,
+          -0.090049159861966
+        ],
+        "low_gpos": [
+          1.0267756339107674,
+          0.038199602748987344
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.3352750990739239,
+          0.005569893378576746
+        ],
+        "inertia": [
+          -0.9970705197335215,
+          0.07648776816148546
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 42.0
+    },
+    {
+      "step": 45,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 42,
+      "scores": {
+        "MACRO_SEARCH": 0.0058983606222837714,
+        "MICRO_BUILD": 1.0059525622869032,
+        "REVIEW_VERIFY": -8.108449763059616,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07163518298954386,
+        "frontier": 0.17942520246352975,
+        "quality": 1.0,
+        "completion": 0.4039944611643217,
+        "recall_out": 1.0,
+        "recall_in": 0.9831004738807678,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211713194847107,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126515942487,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.174671283551588,
+        "domain": 0.003970506020216771,
+        "frontier": 0.39600410646746664,
+        "coarse": 0.634903617527174,
+        "valid": 1.0,
+        "fine": 0.03535429563893334,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2769556499472161,
+      "vector_components": {
+        "potential": [
+          -0.326358771644233,
+          -0.09316260043076371
+        ],
+        "low_gpos": [
+          -0.18201933163865358,
+          0.02592070587325521
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7466986010206609,
+          0.004016756352374994
+        ],
+        "inertia": [
+          0.9985134416199691,
+          -0.05450602631126502
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 43.0
+    },
+    {
+      "step": 46,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 43,
+      "scores": {
+        "MACRO_SEARCH": 0.005903474548043075,
+        "MICRO_BUILD": 1.0059485999774394,
+        "REVIEW_VERIFY": -8.108452922105789,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07163172182829483,
+        "frontier": 0.17942574367916012,
+        "quality": 1.0,
+        "completion": 0.40399535504304024,
+        "recall_out": 1.0,
+        "recall_in": 0.9830941557884216,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7211786508560181,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126515768273,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746717951128691,
+        "domain": 0.003970514497586906,
+        "frontier": 0.3960053009686246,
+        "coarse": 0.6349031985215245,
+        "valid": 1.0,
+        "fine": 0.035354474589262726,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.9889384887955632,
+      "vector_components": {
+        "potential": [
+          1.6685840729342307,
+          0.9100199414439006
+        ],
+        "low_gpos": [
+          1.0610577464893172,
+          0.5890729648982156
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.37250549965677815,
+          0.4427066292598517
+        ],
+        "inertia": [
+          -0.8696470076442866,
+          -0.4936740646371228
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 44.0
+    },
+    {
+      "step": 47,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 44,
+      "scores": {
+        "MACRO_SEARCH": 0.005941932954286244,
+        "MICRO_BUILD": 1.0059446195110637,
+        "REVIEW_VERIFY": -8.108456707000732,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07162778492104817,
+        "frontier": 0.17942665152473364,
+        "quality": 1.0,
+        "completion": 0.40399617646869856,
+        "recall_out": 1.0,
+        "recall_in": 0.9830865859985352,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7212416529655457,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126515655035,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746735675679056,
+        "domain": 0.00397054593635405,
+        "frontier": 0.39600730464798634,
+        "coarse": 0.6349039666985483,
+        "valid": 1.0,
+        "fine": 0.03535454878817979,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2767984207915367,
+      "vector_components": {
+        "potential": [
+          -0.3262666529863165,
+          -0.09313618190370049
+        ],
+        "low_gpos": [
+          -0.18187786708519157,
+          0.02583637312600451
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7471768854118714,
+          0.004211746804096537
+        ],
+        "inertia": [
+          0.8815847694089388,
+          0.4720257348346469
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 45.0
+    },
+    {
+      "step": 48,
+      "before": [
+        336,
+        226
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.0,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 45,
+      "scores": {
+        "MACRO_SEARCH": 0.0059783912196038624,
+        "MICRO_BUILD": 1.0059419343831941,
+        "REVIEW_VERIFY": -8.10845968723297,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.07162471657759538,
+        "frontier": 0.17942757682887586,
+        "quality": 1.0,
+        "completion": 0.40399664348541187,
+        "recall_out": 1.0,
+        "recall_in": 0.9830806255340576,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.721301794052124,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.79412651558143,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746748613473608,
+        "domain": 0.003970554821887519,
+        "frontier": 0.39600934685964345,
+        "coarse": 0.6349038968642735,
+        "valid": 1.0,
+        "fine": 0.035354708097619376,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.689819491812356,
+      "vector_components": {
+        "potential": [
+          1.668689720628441,
+          -0.08999251236319142
+        ],
+        "low_gpos": [
+          1.0270076673273907,
+          0.03803978151121432
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.33461987722794434,
+          0.005940697448892979
+        ],
+        "inertia": [
+          -0.9970344372436049,
+          0.07695668229808261
+        ],
+        "return": [
+          0.7953799146676584,
+          0.09703534398237881
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 46.0
+    },
+    {
+      "step": 49,
+      "before": [
+        338,
+        226
+      ],
+      "point": [
+        336,
+        225
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 46,
+      "scores": {
+        "MACRO_SEARCH": 0.00601336236949368,
+        "MICRO_BUILD": 1.0059385714263942,
+        "REVIEW_VERIFY": -8.1084630548954,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0716212903334838,
+        "frontier": 0.17942837992303703,
+        "quality": 1.0,
+        "completion": 0.4039972632646015,
+        "recall_out": 1.0,
+        "recall_in": 0.983073890209198,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7213592529296875,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126515533584,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746763459388818,
+        "domain": 0.003970583626434075,
+        "frontier": 0.3960111193452327,
+        "coarse": 0.6349043857041976,
+        "valid": 1.0,
+        "fine": 0.03535475829100445,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 0.2766008821018383,
+      "vector_components": {
+        "potential": [
+          -0.32621289264548065,
+          -0.09310524385350903
+        ],
+        "low_gpos": [
+          -0.1822807436762181,
+          0.0259746197314402
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          -0.7459196819068271,
+          0.003920136525225021
+        ],
+        "inertia": [
+          0.9985223877933214,
+          -0.05434189061418594
+        ],
+        "return": [
+          -0.4441521795840483,
+          0.08655068339674842
+        ]
+      },
+      "written_keypoints": 6,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 47.0
+    },
+    {
+      "step": 50,
+      "before": [
+        336,
+        225
+      ],
+      "point": [
+        338,
+        226
+      ],
+      "distance": 2.23606797749979,
+      "state_before": "MICRO_BUILD",
+      "selected": "MICRO_BUILD",
+      "state_after": "MICRO_BUILD",
+      "handlers": [
+        "MICRO_BUILD"
+      ],
+      "reason": "score_winner",
+      "state_age": 47,
+      "scores": {
+        "MACRO_SEARCH": 0.0060442747022247945,
+        "MICRO_BUILD": 1.0059450651410302,
+        "REVIEW_VERIFY": -8.108462965488433,
+        "SUSPEND_RESUME": -0.05
+      },
+      "observation": {
+        "novelty": 0.0716267985119154,
+        "frontier": 0.17942684356898955,
+        "quality": 1.0,
+        "completion": 0.40399473177213685,
+        "recall_out": 1.0,
+        "recall_in": 0.9830740690231323,
+        "gap": 0.15679829136257362,
+        "fail": 0.0,
+        "global_novelty": 0.7214141488075256,
+        "review_target": [
+          446,
+          250
+        ],
+        "resume_value": 0.0
+      },
+      "review_outcome": null,
+      "review_target": null,
+      "recognized_semantic_id": null,
+      "fail_after": 0.0,
+      "review_fail_after": 0.0,
+      "active_semantic_id": 0,
+      "suspend_depth": 0,
+      "window_radius": 11.794126515502489,
+      "window_area": 437.0,
+      "window_scores": {
+        "selected": 1.1746695951246526,
+        "domain": 0.003970547679633723,
+        "frontier": 0.3960077285032359,
+        "coarse": 0.6348956564198369,
+        "valid": 1.0,
+        "fine": 0.03535471464458265,
+        "mix": 0.0,
+        "r_eff": 11.794126515444734,
+        "budget": 452.3893421169302
+      },
+      "window_contains_before": true,
+      "vector_norm": 1.989337935725865,
+      "vector_components": {
+        "potential": [
+          1.6687057009780841,
+          0.9100712794377652
+        ],
+        "low_gpos": [
+          1.0609884939911358,
+          0.5890999045703041
+        ],
+        "gap": [
+          0.0,
+          0.0
+        ],
+        "novel": [
+          0.37330452918113993,
+          0.4425889703829508
+        ],
+        "inertia": [
+          -0.8694778938084013,
+          -0.49397185362984636
+        ],
+        "return": [
+          0.8109626540844388,
+          0.692591368398156
+        ]
+      },
+      "written_keypoints": 5,
+      "gi_nodes": 7,
+      "gii_nodes": 1,
+      "completed": 0,
+      "micro_time": 48.0
+    }
+  ],
+  "elapsed_seconds": 55.71321059500042
+}

@@ -1,0 +1,13 @@
+case,unique,stationary,return_jumps,tail20_unique,micro,review,written,completed
+legacy_baseline,7,25,18,2,1,47,5,0
+correct_dimensions,7,25,18,2,1,47,5,0
+lower_review,3,47,0,1,3,0,20,0
+no_review,3,47,0,1,3,0,20,0
+no_review_low_norm,7,1,42,3,48,0,255,0
+no_review_no_distance,2,47,1,1,3,0,9,0
+lower_review_low_norm,7,1,42,3,48,0,255,0
+no_review_ignore_fail,2,47,1,1,48,0,246,0
+no_review_low_norm_inertia,7,1,42,5,48,0,289,0
+no_review_large_window,16,31,3,1,18,0,144,0
+lower_review_small_step,5,42,3,1,7,0,40,0
+lower_review_strong_return,10,40,0,1,9,0,48,0
