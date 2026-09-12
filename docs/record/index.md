@@ -2,6 +2,10 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-12_hypergraph_similarity_index_design.md | 澄清层级超图与模板等效条件，补充三层相似度、二进制关联索引、稀疏传播及复杂度边界 | chatgpt | 2026-09-12 |
+| 2026-09-11_graph_and_optimizer_design.md | 审查三层 Gmem/Gpos，完善结构检索与虚拟统一锚点，设计 GmemIII 跨观察归并和关系巩固及缺失模块清单 | chatgpt | 2026-09-11 23:10:00 CST |
+| 2026-09-11_onceoptimizer_notebook_plot_annotations.md | 为一次性构图 Notebook 的分割、采样、关系图和检索图增加读图说明、标记图例与色条，保留已有测试输出 | chatgpt | 2026-09-11 21:26:05 CST |
+| 2026-09-11_graph_memorypool_onceoptimizer_implementation.md | 续写一次观察区域构图器，保留 Gmem/Gpos 与 run_step 接口，新增区域采样、星型及接触写入和调试 Notebook；仅编译检查 | chatgpt | 2026-09-11 20:27:36 CST |
 | 2026-09-11_alg_onceoptimizer_beta.md | 新建一次性区域构图器设计：同模态连续分区、实例采样、区域星型与稀疏跨区接触，明确现有 Gmem/Gpos 兼容边界及验证计划 | chatgpt | 2026-09-11 15:08:41 CST |
 | 2026-09-09_newoptimizer_saccade_parameter_diagnosis.md | 为新优化器增加执行状态诊断，重构调参 Notebook，实测区分 REVIEW 往返、MACRO 停留与 MICRO 局部振荡 | chatgpt | 2026-09-09 15:35:00 CST |
 | 2026-09-07_graph_memorypool_newoptimizer_vector_state.md | 在 graph_memorypool_newoptimizer 中实现 Alg_optimizer_beta 视窗口向量优化器、动态状态竞争与窗口关键点即时写入 | chatgpt | 2026-09-07 22:24:34 CST |
