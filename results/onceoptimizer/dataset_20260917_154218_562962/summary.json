@@ -1,0 +1,76 @@
+{
+  "status": "interrupted",
+  "completed_train": 10,
+  "planned_train": 593,
+  "completed_evaluations": 0,
+  "baseline": {
+    "rss_mib": 1982.46484375,
+    "process_lifetime_peak_mib": 2133.20703125,
+    "host_available_mib": 23646.48046875,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 23.1337890625,
+    "cuda_reserved_mib": 46.0,
+    "cuda_peak_allocated_mib": 23.1337890625,
+    "cuda_peak_reserved_mib": 46.0,
+    "cuda_free_mib": 15101.75,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_elapsed_seconds": 4134.971592008001,
+  "cuda_environment": {
+    "python": "/home/p/anaconda3/envs/consciousLinux/bin/python",
+    "torch": "2.10.0+cu128",
+    "cuda_build": "12.8",
+    "cudnn_version": 91002,
+    "device": "cuda:0",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "compiled_arches": [
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+    ],
+    "total_memory_mib": 15840.3125
+  },
+  "final": {
+    "rss_mib": 2174.34765625,
+    "process_lifetime_peak_mib": 2345.41015625,
+    "host_available_mib": 23555.48046875,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 31.2333984375,
+    "cuda_reserved_mib": 322.0,
+    "cuda_peak_allocated_mib": 307.6396484375,
+    "cuda_peak_reserved_mib": 322.0,
+    "cuda_free_mib": 14642.3125,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_sampled_peak_rss_mib": 2339.48046875,
+  "peak_rss_increment_from_baseline_mib": 357.015625,
+  "minimum_host_available_mib": 23497.60546875,
+  "sampler_error": null,
+  "gmem_i": 8294,
+  "gmem_ii": 724,
+  "gmem_iii": 512,
+  "ii_relations": 41049,
+  "iii_memberships": 2034,
+  "iii_relations": 1522,
+  "stable_entities": 0,
+  "entity_raw_hits": 512,
+  "entity_support": 512.0,
+  "replay": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  },
+  "heldout": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  }
+}

@@ -2,6 +2,11 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-17_onceoptimizer_serial_bottleneck_discrimination_review.md | 新增第 0 章审查 region_matching 实际算法；复查 29 图单核瓶颈、后续优化及判别模块需求 | chatgpt | 2026-09-17 |
+| 2026-09-17_onceoptimizer_progressive_matching_implementation.md | 实现可评估性前移、逐批上界早退和局部响应；预留默认关闭的预算/未提交接口；CPU/GPU 回归与真实区域对照通过 | chatgpt | 2026-09-17 |
+| 2026-09-17_onceoptimizer_algorithm_revision_proposal.md | 评估不改双塔层级的 one_step 调度、区域候选搜索、保守上界早退与预算延期学习，区分等价加速和行为变更 | chatgpt | 2026-09-17 |
+| 2026-09-17_onceoptimizer_postoptimization_gpu_plan.md | 复查优化后 10 图日志，定位 256 MiB 缓存频繁淘汰及后置筛选，评估显存容量与 GPU 批量匹配迁移方向 | chatgpt | 2026-09-17 |
+| 2026-09-17_onceoptimizer_response_cache_performance.md | 共享有界响应缓存、批量 GPU 回传及必要条件筛选；4 项回归通过，真实图查询/局部匹配对照一致 | chatgpt | 2026-09-17 |
 | 2026-09-15_onceoptimizer_performance_cuda_report.md | 分析 CPU 与 6 图 GPU 实测；补充低占用、98.9% 检索耗时与密集回退证据及优化优先级；记录 CUDA 迁移 | chatgpt | 2026-09-15 |
 | 2026-09-15_onceoptimizer_dataset_reliability_resources.md | 扩展第 8 节为 659 图训练／留出与复查测试，记录证据、平移一致性、内存／显存及增量日志；仅静态编译 | chatgpt | 2026-09-15 |
 | 2026-09-12_hierarchy_retrieval_consolidation_implementation.md | 实现平移模式三层超图检索、位图反向关联、跨观察证据与实体巩固，扩充 Notebook 调试图；仅编译和静态检查 | chatgpt | 2026-09-12 15:48:12 CST |

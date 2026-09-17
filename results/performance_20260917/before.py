@@ -319,14 +319,8 @@ class MemoryConfig:
     graph_candidate_budget = 128
     graph_poses_per_node = 8
     graph_pose_bin = 3.0
-    graph_shared_response_cache_bytes = 256 * 1024 * 1024  # one observation, shared unmasked maps
     graph_response_cache = 32
     graph_query_chunk = 2048
-    graph_progressive_matching = True
-    graph_slot_batch = 8
-    graph_local_response_fraction = 0.25  # sparse request: compute only needed pixel rectangle
-    graph_search_budget_seconds = None   # cooperative region search budget; no limit by default
-    graph_search_budget_templates = None
     graph_evidence_prior = 1.0
     graph_maturity_support = 3.0
     graph_stable_support = 3.0
@@ -2094,7 +2088,7 @@ class Controller:
     @torch.no_grad()
     def run_step(self, X_subspaces, gmem_i, gmem_ii, gmem_iii=None, gpos=None,
                  valid_mask=None, H_orig=None, W_orig=None, source_id=None, episode_id=None,
-                 learn=True, search_budget=None):
+                 learn=True):
         """One observation. With GmemIII, query first and consolidate long-term memory.
 
         learn=False retains the raw BuildReport interface for segmentation diagnostics.
@@ -2103,7 +2097,7 @@ class Controller:
         if learn and gmem_iii is not None:
             result = GraphConsolidationOptimizer(self.cfg).learn(
                 X_subspaces, gmem_i, gmem_ii, gmem_iii, valid_mask, source_id, episode_id,
-                H_orig, W_orig, search_budget=search_budget)
+                H_orig, W_orig)
             report = result.observation
         else:
             result = self.optimizer.build_once(X_subspaces, gmem_i, gmem_ii, valid_mask,
@@ -2128,16 +2122,16 @@ class MultilevelCoordinator:
         self.last_report = None
 
     def handle_new_view(self, features, H_orig=None, W_orig=None, valid_mask=None,
-                        source_id=None, episode_id=None, learn=True, search_budget=None):
+                        source_id=None, episode_id=None, learn=True):
         self.last_report = self.controller.run_step(
             features, self.gmem_i, self.gmem_ii, self.gmem_iii, self.gpos,
             valid_mask=valid_mask, H_orig=H_orig, W_orig=W_orig,
-            source_id=source_id, episode_id=episode_id, learn=learn, search_budget=search_budget)
+            source_id=source_id, episode_id=episode_id, learn=learn)
         return self.last_report
 
-    def learn_view(self, features, source_id=None, episode_id=None, valid_mask=None, search_budget=None):
+    def learn_view(self, features, source_id=None, episode_id=None, valid_mask=None):
         return self.handle_new_view(features, source_id=source_id, episode_id=episode_id,
-                                    valid_mask=valid_mask, learn=True, search_budget=search_budget)
+                                    valid_mask=valid_mask, learn=True)
 
     def create_entity(self, components):
         """Explicit retrieval fixture: [(semantic_id, dx, dy), ...], not learned evidence."""
@@ -2320,41 +2314,6 @@ class EvidenceStats:
             self.mean = other.mean
 
 
-class SearchBudgetExceeded(RuntimeError):
-    """Unfinished search, never evidence that a template is absent."""
-
-
-@dataclass
-class SearchBudget:
-    """Optional cooperative region-search budget, reset for each learn_view call.
-
-    Does not bound CNN/build/query/commit or preempt an in-flight tensor kernel.
-    Exhaustion aborts the observation before any persistent graph commit.
-    """
-    max_seconds: Optional[float] = None
-    max_template_pairs: Optional[int] = None
-    used_template_pairs: int = field(default=0, init=False)
-    started: Optional[float] = field(default=None, init=False)
-
-    def start(self):
-        if self.max_seconds is not None and (not math.isfinite(self.max_seconds) or self.max_seconds < 0):
-            raise ValueError('max_seconds must be finite and nonnegative or None.')
-        if self.max_template_pairs is not None and (int(self.max_template_pairs) != self.max_template_pairs or
-                                                   self.max_template_pairs < 0):
-            raise ValueError('max_template_pairs must be a nonnegative integer or None.')
-        self.started, self.used_template_pairs = time.perf_counter(), 0
-
-    def check(self, template=False):
-        if self.started is None:
-            self.start()
-        if self.max_seconds is not None and time.perf_counter() - self.started >= self.max_seconds:
-            raise SearchBudgetExceeded('region_search_time_budget')
-        if template:
-            if self.max_template_pairs is not None and self.used_template_pairs >= self.max_template_pairs:
-                raise SearchBudgetExceeded('region_search_template_budget')
-            self.used_template_pairs += 1
-
-
 @dataclass
 class StructureView:
     template_id: int
@@ -2509,50 +2468,6 @@ class FeatureResponseCache:
         self.cache = OrderedDict()
         self.map_computations = 0
         self.signatures = {}
-        self.evaluable_nodes = {}
-        self.cache_bytes = 0
-        self.max_entries = cfg.graph_response_cache
-        self.max_bytes = cfg.graph_shared_response_cache_bytes
-        self.stats = Counter()
-        self.parent = None
-
-    def restricted(self, valid_mask):
-        """Cheap region view; mask AFTER sharing the observation response.
-
-        Local masks are never stored in the parent cache. Pools and inputs must
-        remain frozen throughout an observation; no cache survives a commit.
-        """
-        local = object.__new__(type(self))
-        local.cfg, local.nodes, local.inputs = self.cfg, self.nodes, self.inputs
-        local.shape, local.gates = self.shape, self.gates
-        mask = torch.as_tensor(valid_mask, device=self.valid.device)
-        if tuple(mask.shape) != self.shape:
-            raise ValueError('Region mask must match observation shape.')
-        local.valid = self.valid & (torch.isfinite(mask) & (mask > 0)).reshape_as(self.valid)
-        local.finite = {m: finite & local.valid for m, finite in self.finite.items()}
-        local.signatures, local.evaluable_nodes = self.signatures, self.evaluable_nodes
-        local.cache, local.cache_bytes = OrderedDict(), 0
-        local.max_entries, local.max_bytes = self.cfg.graph_response_cache, self.max_bytes
-        local.map_computations, local.stats, local.parent = 0, self.stats, self
-        # The shared cache has a byte budget rather than a tiny per-region entry budget.
-        self.max_entries = None
-        return local
-
-    def _store(self, key, response):
-        size = response.numel() * response.element_size()
-        if size > self.max_bytes:
-            return
-        self.cache[key] = response
-        self.cache_bytes += size
-        while (self.cache_bytes > self.max_bytes or
-               (self.max_entries is not None and len(self.cache) > self.max_entries)):
-            _, removed = self.cache.popitem(last=False)
-            self.cache_bytes -= removed.numel() * removed.element_size()
-            if self.parent is None:
-                self.stats['response_cache_evictions'] += 1
-        if self.parent is None:
-            self.stats['response_cache_peak_bytes'] = max(
-                self.stats['response_cache_peak_bytes'], self.cache_bytes)
 
     def signature(self, nid):
         if nid not in self.signatures:
@@ -2564,21 +2479,18 @@ class FeatureResponseCache:
 
     def evaluable(self, nid):
         node = self.nodes[nid]
-        if nid not in self.evaluable_nodes:
-            x = self.inputs.get(node.modality_id)
-            available = x is not None and self.cfg.modality_weights.get(node.modality_id, 1.) > 0
-            if available:
-                spec = self.cfg.feature_specs.get(node.modality_id, {})
-                common = min(x.shape[1], node.prototype.shape[0])
-                groups = spec.get('metric_groups', {})
-                # One bulk copy per node, instead of per-channel CUDA scalar reads.
-                mask = node.mask.detach().cpu().reshape(-1).numpy()
-                available = not groups or any(
-                    sum(float(mask[c]) > 0 for c in SimilarityEngine._group_channels(
-                        group.get('channels', 'all'), common)) >= int(group.get('min_valid_channels', 1))
-                    for group in groups.values())
-            self.evaluable_nodes[nid] = available
-        return self.finite[node.modality_id] if self.evaluable_nodes[nid] else None
+        x = self.inputs.get(node.modality_id)
+        if x is None or self.cfg.modality_weights.get(node.modality_id, 1.) <= 0:
+            return None
+        # Missing required metric channels are unknown, not a zero-valued match.
+        spec = self.cfg.feature_specs.get(node.modality_id, {})
+        common = min(x.shape[1], node.prototype.shape[0])
+        groups = spec.get('metric_groups', {})
+        if groups and not any(sum(float(node.mask[c].item()) > 0 for c in
+                              SimilarityEngine._group_channels(g.get('channels', 'all'), common))
+                              >= int(g.get('min_valid_channels', 1)) for g in groups.values()):
+            return None
+        return self.finite[node.modality_id]
 
     def get(self, nid):
         if self.evaluable(nid) is None:
@@ -2586,69 +2498,17 @@ class FeatureResponseCache:
         key = self.signature(nid)
         if key in self.cache:
             self.cache.move_to_end(key)
-            self.stats['response_cache_hits'] += 1
             return self.cache[key]
-        if self.parent is not None:
-            before = self.parent.map_computations
-            response = self.parent.get(nid) * self.valid
-            self.map_computations += self.parent.map_computations - before
-            self._store(key, response)
-            return response
         n = self.nodes[nid]
         x = self.inputs[n.modality_id]
         response = SimilarityEngine.calculate_similarity(x, n.prototype.to(x.device).view(1, -1, 1, 1),
                     self.cfg, n.modality_id, mask_W=n.mask.to(x.device).view(1, -1))
         response = response * self.gates[n.modality_id] * self.finite[n.modality_id]
-        response = response.clamp(0., 1.)
+        self.cache[key] = response.clamp(0., 1.)
         self.map_computations += 1
-        self.stats['response_cache_misses'] += 1
-        self._store(key, response)
+        while len(self.cache) > self.cfg.graph_response_cache:
+            self.cache.popitem(last=False)
         return response
-
-    def sample(self, nid, points):
-        """Score original pixels before interpolation (never interpolate descriptors).
-
-        A sparse request evaluates a conservative pixel rectangle, scatters it
-        into full-image coordinates, then uses the SAME grid_sample as get().
-        This avoids changing interpolation coordinates or mask semantics.
-        """
-        if self.evaluable(nid) is None:
-            return None
-        points = np.asarray(points, dtype=float).reshape(-1, 2)
-        h, w = self.shape
-        key = self.signature(nid)
-        parent = self.parent or self
-        if key in self.cache or key in parent.cache:
-            return SpatialStructureMatcher._sample(self.get(nid), points)
-        inside = (np.isfinite(points).all(1) & (points[:, 0] >= 0) & (points[:, 0] <= w - 1)
-                  & (points[:, 1] >= 0) & (points[:, 1] <= h - 1))
-        selected = points[inside]
-        if not len(selected):
-            x = next(iter(self.inputs.values()))
-            return torch.zeros(len(points), device=x.device, dtype=x.dtype)
-        # Include interpolation neighbors and a rounding guard; outside points
-        # are explicitly zeroed by _sample, just as in the full-map path.
-        low = np.floor(selected.min(0)).astype(int) - 2
-        high = np.ceil(selected.max(0)).astype(int) + 3
-        x0, y0 = max(0, low[0]), max(0, low[1])
-        x1, y1 = min(w, high[0]), min(h, high[1])
-        area = (x1 - x0) * (y1 - y0)
-        if area >= h * w * self.cfg.graph_local_response_fraction:
-            return SpatialStructureMatcher._sample(self.get(nid), points)
-        node = self.nodes[nid]
-        full_input = self.inputs[node.modality_id]
-        x = full_input[..., y0:y1, x0:x1]
-        response = SimilarityEngine.calculate_similarity(x,
-            node.prototype.to(x.device).view(1, -1, 1, 1), self.cfg, node.modality_id,
-            mask_W=node.mask.to(x.device).view(1, -1))
-        response = (response * self.gates[node.modality_id][..., y0:y1, x0:x1]
-                    * self.finite[node.modality_id][..., y0:y1, x0:x1]).clamp(0., 1.)
-        canvas = full_input.new_zeros((1, 1, h, w))
-        canvas[..., y0:y1, x0:x1] = response
-        self.stats['local_response_rectangles'] += 1
-        self.stats['local_response_pixels'] += int(area)
-        self.stats['avoided_full_response_pixels'] += int(h * w - area)
-        return SpatialStructureMatcher._sample(canvas, points)
 
 
 class SpatialStructureMatcher:
@@ -2668,85 +2528,7 @@ class SpatialStructureMatcher:
         return F.grid_sample(value.float(), p.float(), align_corners=True,
                              padding_mode='zeros').reshape(-1) * inside
 
-    def _progressive_data(self, view, provider, batch, shifts, penalty, weights, min_score, budget):
-        """Determine the final evaluable denominator BEFORE score upper bounds.
-
-        Bounds use float64 in the original slot order; rejected centers cannot
-        reach the learn score/coverage even if every unvisited slot scores one.
-        """
-        count = len(batch)
-        data, by_modality = {}, defaultdict(list)
-        for item in view.slots:
-            expected = batch + item['xy']
-            valid = provider.evaluable(item['node_id'])
-            known = np.zeros(count, bool)
-            data[item['key']] = (np.zeros(count), known, expected.copy())
-            if valid is not None:
-                mid = provider.nodes[item['node_id']].modality_id
-                by_modality[mid].append((item, expected, valid))
-        # One mask sampling/copy per modality; each slot uses the original
-        # in-bounds checks and exact grid coordinates, including mask holes.
-        for items in by_modality.values():
-            sampled = self._sample(items[0][2].float(), np.concatenate([x[1] for x in items]))
-            sampled = sampled.cpu().numpy().reshape(len(items), count)
-            for (item, expected, _), values in zip(items, sampled):
-                h, w = provider.shape
-                known = data[item['key']][1]
-                known[:] = ((expected[:, 0] >= 0) & (expected[:, 0] <= w - 1) &
-                            (expected[:, 1] >= 0) & (expected[:, 1] <= h - 1) & (values > .5))
-        evaluated = np.zeros(count)
-        for item in view.slots:
-            evaluated += data[item['key']][1] * weights[item['key']]
-        tolerance = 1e-12
-        active = evaluated >= self.cfg.graph_evaluable_min - tolerance
-        provider.stats['early_evaluable_rejected'] += int((~active).sum())
-        order = sorted(view.slots, key=lambda item: (-weights[item['key']], not item['anchor']))
-        done = set()
-        for start in range(0, len(order), self.cfg.graph_slot_batch):
-            if budget is not None:
-                budget.check()
-            if not active.any():
-                break
-            pending, tensors = [], []
-            for item in order[start:start + self.cfg.graph_slot_batch]:
-                key = item['key']
-                rows = np.flatnonzero(active & data[key][1])
-                done.add(key)
-                if not len(rows):
-                    continue
-                expected = batch[rows] + item['xy']
-                points = expected[:, None, :] + shifts[None, :, :]
-                values = provider.sample(item['node_id'], points.reshape(-1, 2)).reshape(len(rows), -1)
-                weighted = values * torch.as_tensor(penalty, device=values.device, dtype=values.dtype)
-                best, indices = weighted.max(dim=1)
-                tensors.append(torch.stack((best, indices.to(best.dtype)), dim=1))
-                pending.append((key, rows, expected))
-                provider.stats['progressive_sampled_slot_centers'] += len(rows)
-            if tensors:
-                packed = torch.cat(tensors).detach().cpu().numpy()
-                offset = 0
-                for key, rows, expected in pending:
-                    part = packed[offset:offset + len(rows)]; offset += len(rows)
-                    data[key][0][rows] = part[:, 0]
-                    data[key][2][rows] = expected + shifts[part[:, 1].astype(np.int64)]
-            log_upper, coverage_upper = np.zeros(count), np.zeros(count)
-            for item in view.slots:
-                key = item['key']; scores, known, _ = data[key]; weight = weights[key]
-                if key in done:
-                    log_upper += np.where(known, weight * np.log(np.maximum(scores, 1e-8)), 0.)
-                    coverage_upper += (known & (scores >= self.cfg.graph_recall_threshold)) * weight
-                else:
-                    coverage_upper += known * weight
-            upper = np.exp(log_upper / np.maximum(evaluated, 1e-300))
-            possible = ((upper >= min_score - tolerance) &
-                        (coverage_upper / np.maximum(evaluated, 1e-300) >= self.cfg.graph_coverage_min - tolerance))
-            provider.stats['upper_bound_rejected'] += int((active & ~possible).sum())
-            active &= possible
-        provider.stats['prefilter_rejected_centers'] += int((~active).sum())
-        provider.stats['full_assignment_centers'] += int(active.sum())
-        return data, active
-
-    def evaluate(self, view, provider, centers, min_score=None, budget=None):
+    def evaluate(self, view, provider, centers):
         if not view.slots or not len(centers):
             return []
         centers = np.asarray(centers, dtype=float).reshape(-1, 2)
@@ -2769,64 +2551,27 @@ class SpatialStructureMatcher:
         all_results = []
         for start in range(0, len(centers), self.cfg.graph_query_chunk):
             batch = centers[start:start + self.cfg.graph_query_chunk]
-            if budget is not None:
-                budget.check()
-            if min_score is not None and self.cfg.graph_progressive_matching and isinstance(provider, FeatureResponseCache):
-                data, survivors = self._progressive_data(
-                    view, provider, batch, shifts, penalty, slot_weights, min_score, budget)
-            else:
-                data, pending, tensors = {}, [], []
-                for item in view.slots:
-                    nid = item['node_id']
-                    valid = provider.evaluable(nid)
-                    response = provider.get(nid) if valid is not None else None
-                    expected = batch + item['xy']
-                    if response is None:
-                        data[item['key']] = (np.zeros(len(batch)), np.zeros(len(batch), bool), expected)
-                        continue
-                    h, w = response.shape[-2:]
-                    # Evaluable at the predicted point; response absence is negative evidence.
-                    known = ((expected[:, 0] >= 0) & (expected[:, 0] <= w - 1) &
-                             (expected[:, 1] >= 0) & (expected[:, 1] <= h - 1))
-                    sampled_valid = self._sample(valid.float(), expected)
-                    points = expected[:, None, :] + shifts[None, :, :]
-                    values = self._sample(response, points.reshape(-1, 2)).reshape(len(batch), -1)
-                    weighted = values * torch.as_tensor(penalty, device=values.device, dtype=values.dtype)
-                    best, indices = weighted.max(dim=1)
-                    # One device-to-host transfer for the complete slot batch.
-                    tensors.append(torch.stack((best, indices.to(best.dtype), sampled_valid)))
-                    pending.append((item['key'], expected, known))
-                if tensors:
-                    packed = torch.stack(tensors).detach().cpu().numpy()
-                    for (key, expected, known), (best, indices, sampled_valid) in zip(pending, packed):
-                        data[key] = (best, known & (sampled_valid > .5),
-                                     expected + shifts[indices.astype(np.int64)])
-                survivors = np.ones(len(batch), dtype=bool)
-                if min_score is not None:
-                    # Necessary conditions only, using the same weights and float64
-                    # arithmetic as the scalar verifier. Keep borderline cases so
-                    # vector/libm rounding cannot remove a threshold match.
-                    log_scores = np.zeros(len(batch), dtype=np.float64)
-                    evaluated = np.zeros(len(batch), dtype=np.float64)
-                    matched = np.zeros(len(batch), dtype=np.float64)
-                    for item in view.slots:
-                        scores, known, _ = data[item['key']]
-                        scores = scores.astype(np.float64)
-                        weight = slot_weights[item['key']]
-                        evaluated += known * weight
-                        log_scores += np.where(known, weight * np.log(np.maximum(scores, 1e-8)), 0.)
-                        matched += (known & (scores >= self.cfg.graph_recall_threshold)) * weight
-                    scores = np.exp(log_scores / np.maximum(evaluated, 1e-300))
-                    coverage = matched / np.maximum(evaluated, 1e-300)
-                    tolerance = 1e-12
-                    survivors = ((scores >= min_score - tolerance) &
-                                 (evaluated >= self.cfg.graph_evaluable_min - tolerance) &
-                                 (coverage >= self.cfg.graph_coverage_min - tolerance))
-                    if hasattr(provider, 'stats'):
-                        provider.stats['prefilter_rejected_centers'] += int((~survivors).sum())
-                        provider.stats['full_assignment_centers'] += int(survivors.sum())
-            for k in np.flatnonzero(survivors):
-                center = batch[k]
+            data = {}
+            for item in view.slots:
+                nid = item['node_id']
+                valid = provider.evaluable(nid)
+                response = provider.get(nid) if valid is not None else None
+                expected = batch + item['xy']
+                if response is None:
+                    data[item['key']] = (np.zeros(len(batch)), np.zeros(len(batch), bool), expected)
+                    continue
+                h, w = response.shape[-2:]
+                # Evaluable at the predicted point; response absence is negative evidence.
+                known = ((expected[:, 0] >= 0) & (expected[:, 0] <= w - 1) &
+                         (expected[:, 1] >= 0) & (expected[:, 1] <= h - 1))
+                known &= self._sample(valid.float(), expected).cpu().numpy() > .5
+                points = expected[:, None, :] + shifts[None, :, :]
+                values = self._sample(response, points.reshape(-1, 2)).reshape(len(batch), -1)
+                weighted = values * torch.as_tensor(penalty, device=values.device, dtype=values.dtype)
+                best, indices = weighted.max(dim=1)
+                chosen = expected + shifts[indices.cpu().numpy()]
+                data[item['key']] = (best.cpu().numpy(), known, chosen)
+            for k, center in enumerate(batch):
                 assignments, missing, member_positions = {}, [], {}
                 group_votes = defaultdict(list)
                 log_score = evaluable = matched = 0.
@@ -2952,11 +2697,8 @@ class HypergraphIndex:
             values *= provider.gates[node.modality_id][..., ::stride, ::stride]
             values *= valid[..., ::stride, ::stride]
             ys, xs = torch.where(values[0, 0] >= cfg.graph_recall_threshold)
-            host_scores = values[0, 0, ys, xs].detach().cpu().tolist()
-            host_xy = torch.stack((xs, ys)).cpu().tolist()
-            candidates = sorted([(score, x * stride, y * stride)
-                                 for score, x, y in zip(host_scores, *host_xy)],
-                                key=lambda t: (-t[0], t[2], t[1]))
+            candidates = sorted([(float(values[0, 0, y, x]), int(x) * stride, int(y) * stride)
+                                 for y, x in zip(ys, xs)], key=lambda t: (-t[0], t[2], t[1]))
             if cfg.graph_events_per_class and len(candidates) > cfg.graph_events_per_class:
                 truncated += len(candidates) - cfg.graph_events_per_class
                 candidates = candidates[:cfg.graph_events_per_class]
@@ -3019,8 +2761,7 @@ class HierarchyRetriever:
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(name + ' must be finite and positive.')
         for name in ('graph_query_stride', 'graph_poses_per_node', 'graph_response_cache',
-                     'graph_query_chunk', 'graph_max_members', 'graph_min_members',
-                     'graph_shared_response_cache_bytes', 'graph_slot_batch'):
+                     'graph_query_chunk', 'graph_max_members', 'graph_min_members'):
             value = getattr(self.cfg, name)
             if int(value) != value or value < 1:
                 raise ValueError(name + ' must be a positive integer.')
@@ -3031,7 +2772,7 @@ class HierarchyRetriever:
                 raise ValueError(name + ' must be a nonnegative integer.')
         for name in ('graph_recall_threshold', 'graph_bit_coverage_min', 'graph_verify_threshold', 'graph_learn_threshold',
                      'graph_evaluable_min', 'graph_coverage_min', 'graph_match_margin',
-                     'graph_member_remove_reliability', 'graph_local_response_fraction'):
+                     'graph_member_remove_reliability'):
             if not 0 <= float(getattr(self.cfg, name)) <= 1:
                 raise ValueError(name + ' must be in [0,1].')
         if not self.cfg.graph_recall_threshold <= self.cfg.graph_verify_threshold <= self.cfg.graph_learn_threshold:
@@ -3160,14 +2901,14 @@ class GraphConsolidationOptimizer:
             digest.update(tensor.numpy().tobytes())
         return digest.hexdigest()
 
-    def _region_match(self, region, report, gi, gii, provider, prior, budget=None):
+    def _region_match(self, region, report, gi, gii, provider, prior):
         if not gi.nodes:
             return None, False
         # Exhaustive local translation fallback: a sparse global miss is not novelty.
         h, w = report.shape
         mask = np.zeros((h, w), bool)
         mask.flat[region.pixels] = True
-        local = provider.restricted(mask & report.valid_mask)
+        local = FeatureResponseCache(provider.inputs, gi, self.cfg, mask & report.valid_mask)
         centers = [(int(p % w), int(p // w)) for p in region.pixels]
         choices = []
         unresolved = False
@@ -3176,7 +2917,7 @@ class GraphConsolidationOptimizer:
             x, y = map(lambda v: int(round(v)), match.point)
             if 0 <= x < w and 0 <= y < h and mask[y, x]:
                 sparse_centers[match.template_id].append(match.point)
-        for sid, sem in sorted(gii.semantic_nodes.items(), key=lambda pair: (pair[0] not in sparse_centers, pair[0])):
+        for sid, sem in sorted(gii.semantic_nodes.items()):
             if sem.kind != 'region' or gi.nodes[sem.anchor_id].modality_id != region.modality_id:
                 continue
             try:
@@ -3184,18 +2925,14 @@ class GraphConsolidationOptimizer:
             except ValueError:
                 unresolved = True
                 continue
-            if budget is not None:
-                budget.check(template=True)
             self.work_counts['region_template_pairs'] += 1
             self.work_counts['sparse_centers'] += len(sparse_centers.get(sid, []))
-            candidates = self.retriever.matcher.evaluate(view, local, sparse_centers.get(sid, []),
-                min_score=self.cfg.graph_learn_threshold, budget=budget)
+            candidates = self.retriever.matcher.evaluate(view, local, sparse_centers.get(sid, []))
             if not any(m.accepted and m.score >= self.cfg.graph_learn_threshold for m in candidates):
                 self.work_counts['dense_fallback_templates'] += 1
                 self.work_counts['dense_fallback_centers'] += len(centers)
                 self.work_counts['dense_slot_centers'] += len(centers) * len(view.slots)
-                candidates = self.retriever.matcher.evaluate(view, local, centers,
-                    min_score=self.cfg.graph_learn_threshold, budget=budget)
+                candidates = self.retriever.matcher.evaluate(view, local, centers)
             accepted = [m for m in candidates if m.accepted and m.score >= self.cfg.graph_learn_threshold]
             if accepted:
                 best = max(accepted, key=lambda m: (m.score, m.matched_coverage, -m.geometry_error))
@@ -3607,7 +3344,7 @@ class GraphConsolidationOptimizer:
 
     @torch.no_grad()
     def learn(self, features, gi, gii, giii, valid_mask=None, source_id=None, episode_id=None,
-              H_orig=None, W_orig=None, search_budget=None):
+              H_orig=None, W_orig=None):
         # Stage timings include completed CUDA work, not only asynchronous launches.
         stage_seconds = {}
         self.work_counts = Counter()
@@ -3649,33 +3386,14 @@ class GraphConsolidationOptimizer:
         original_provider = FeatureResponseCache(inputs, gi, self.cfg, report.valid_mask)
         decisions, ambiguous = {}, []
         # Every match sees the same frozen original pools, even within this observation.
-        if search_budget is None and (self.cfg.graph_search_budget_seconds is not None or
-                                      self.cfg.graph_search_budget_templates is not None):
-            search_budget = SearchBudget(self.cfg.graph_search_budget_seconds, self.cfg.graph_search_budget_templates)
-        if search_budget is not None:
-            search_budget.start()
-        try:
-            for region in report.regions:
-                if region.semantic_id is None:
-                    continue
-                if search_budget is not None:
-                    search_budget.check()
-                match, uncertain = self._region_match(region, report, gi, gii, original_provider, prior, search_budget)
-                if uncertain:
-                    ambiguous.append(region.region_id)
-                else:
-                    decisions[region.region_id] = match
-        except SearchBudgetExceeded as exc:
-            self.work_counts.update(original_provider.stats)
-            mark('region_matching')
-            result.diagnostics = {'source_id': source, 'episode_id': episode,
-                'learning_status': 'UNRESOLVED', 'observation_committed': False,
-                'budget_reason': str(exc), 'retry_required': True,
-                'unresolved_regions': [r.region_id for r in report.regions if r.semantic_id is not None],
-                'memory_counts': (len(gi.nodes), len(gii.semantic_nodes), len(giii.entity_nodes)),
-                'stage_seconds': stage_seconds, 'work_counts': dict(self.work_counts)}
-            return result
-        self.work_counts.update(original_provider.stats)
+        for region in report.regions:
+            if region.semantic_id is None:
+                continue
+            match, uncertain = self._region_match(region, report, gi, gii, original_provider, prior)
+            if uncertain:
+                ambiguous.append(region.region_id)
+            else:
+                decisions[region.region_id] = match
         mark('region_matching')
         # Stage updates, including indexes and evidence, before touching persistent pools.
         wi, wii, wiii = copy.deepcopy(gi), copy.deepcopy(gii), copy.deepcopy(giii)
@@ -3748,7 +3466,6 @@ class GraphConsolidationOptimizer:
         mark('entity_merge_prune_commit')
         result.diagnostics = {'source_id': source, 'episode_id': episode,
             'stage_seconds': stage_seconds, 'work_counts': dict(self.work_counts),
-            'learning_status': 'COMMITTED', 'observation_committed': True,
             'new_regions': new_regions, 'updated_regions': updated_regions,
             'ambiguous_regions': ambiguous, 'new_entities': new_entities,
             'updated_entities': updated_entities, 'ambiguous_entity_proposals': unresolved_entities,

@@ -1,0 +1,87 @@
+{
+  "first_build_seconds": 2.1459423010001046,
+  "query_old_seconds": 1.8800157610003225,
+  "query_new_seconds": 1.8547246889993403,
+  "query_equivalent": true,
+  "regions": [
+    {
+      "id": 0,
+      "pixels": 93
+    },
+    {
+      "id": 1,
+      "pixels": 88
+    },
+    {
+      "id": 2,
+      "pixels": 67
+    },
+    {
+      "id": 3,
+      "pixels": 80
+    },
+    {
+      "id": 4,
+      "pixels": 67
+    },
+    {
+      "id": 5,
+      "pixels": 73
+    },
+    {
+      "id": 6,
+      "pixels": 86
+    },
+    {
+      "id": 7,
+      "pixels": 59
+    },
+    {
+      "id": 8,
+      "pixels": 52
+    },
+    {
+      "id": 9,
+      "pixels": 37
+    },
+    {
+      "id": 10,
+      "pixels": 39
+    },
+    {
+      "id": 11,
+      "pixels": 40
+    }
+  ],
+  "old_region_seconds": 3.679584039000474,
+  "old_work_counts": {
+    "region_template_pairs": 672,
+    "sparse_centers": 3,
+    "dense_fallback_templates": 669,
+    "dense_fallback_centers": 43543,
+    "dense_slot_centers": 605571,
+    "local_response_maps_computed": 665
+  },
+  "new_region_seconds": 0.9873994419995142,
+  "new_work_counts": {
+    "region_template_pairs": 672,
+    "sparse_centers": 3,
+    "dense_fallback_templates": 669,
+    "dense_fallback_centers": 43543,
+    "dense_slot_centers": 605571,
+    "local_response_maps_computed": 0
+  },
+  "shared_cache_stats": {
+    "early_evaluable_rejected": 33796,
+    "prefilter_rejected_centers": 38095,
+    "full_assignment_centers": 5451,
+    "local_response_rectangles": 903,
+    "local_response_pixels": 466190,
+    "avoided_full_response_pixels": 58712818,
+    "progressive_sampled_slot_centers": 19211,
+    "upper_bound_rejected": 4299
+  },
+  "region_decisions_equivalent": true,
+  "query_speedup": 1.0136360248779712,
+  "region_speedup": 3.726540529078286
+}
