@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "torch": "2.10.0+cu128",
+  "cudnn": 91002,
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "bootstrap_reexec": "1",
+  "loaded_libraries": [
+    "/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cudnn/lib/libcudnn.so.9",
+    "/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9",
+    "/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9",
+    "/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9",
+    "/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9"
+  ]
+}

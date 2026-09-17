@@ -1,0 +1,76 @@
+{
+  "status": "interrupted",
+  "completed_train": 6,
+  "planned_train": 593,
+  "completed_evaluations": 0,
+  "baseline": {
+    "rss_mib": 2022.41015625,
+    "process_lifetime_peak_mib": 2180.6171875,
+    "host_available_mib": 18156.93359375,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 23.1337890625,
+    "cuda_reserved_mib": 46.0,
+    "cuda_peak_allocated_mib": 23.1337890625,
+    "cuda_peak_reserved_mib": 46.0,
+    "cuda_free_mib": 14837.6875,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_elapsed_seconds": 2534.37594965694,
+  "cuda_environment": {
+    "python": "/home/p/anaconda3/envs/consciousLinux/bin/python",
+    "torch": "2.10.0+cu128",
+    "cuda_build": "12.8",
+    "cudnn_version": 91002,
+    "device": "cuda:0",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "compiled_arches": [
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+    ],
+    "total_memory_mib": 15840.3125
+  },
+  "final": {
+    "rss_mib": 2089.75390625,
+    "process_lifetime_peak_mib": 2339.171875,
+    "host_available_mib": 18031.5,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 28.6064453125,
+    "cuda_reserved_mib": 64.0,
+    "cuda_peak_allocated_mib": 50.103515625,
+    "cuda_peak_reserved_mib": 64.0,
+    "cuda_free_mib": 14901.5625,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_sampled_peak_rss_mib": 2335.8203125,
+  "peak_rss_increment_from_baseline_mib": 313.41015625,
+  "minimum_host_available_mib": 17811.73046875,
+  "sampler_error": null,
+  "gmem_i": 5604,
+  "gmem_ii": 522,
+  "gmem_iii": 415,
+  "ii_relations": 27696,
+  "iii_memberships": 1654,
+  "iii_relations": 1239,
+  "stable_entities": 0,
+  "entity_raw_hits": 443,
+  "entity_support": 415.0,
+  "replay": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  },
+  "heldout": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  }
+}

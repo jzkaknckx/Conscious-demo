@@ -1,0 +1,1 @@
+{"phase": "error", "status": "interrupted", "at_phase": "train", "path": "/home/p/code/ILSVRC/Data/DET/train/ILSVRC2014_train_0006/ILSVRC2014_train_00060260.JPEG", "error_type": "KeyboardInterrupt", "message": "", "rss_mib": 1218.55078125, "process_lifetime_peak_mib": 1497.515625, "host_available_mib": 18770.3125, "host_total_mib": 31928.58203125}

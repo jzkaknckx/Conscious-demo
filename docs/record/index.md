@@ -2,6 +2,9 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-15_onceoptimizer_performance_cuda_report.md | 分析 CPU 与 6 图 GPU 实测；补充低占用、98.9% 检索耗时与密集回退证据及优化优先级；记录 CUDA 迁移 | chatgpt | 2026-09-15 |
+| 2026-09-15_onceoptimizer_dataset_reliability_resources.md | 扩展第 8 节为 659 图训练／留出与复查测试，记录证据、平移一致性、内存／显存及增量日志；仅静态编译 | chatgpt | 2026-09-15 |
+| 2026-09-12_hierarchy_retrieval_consolidation_implementation.md | 实现平移模式三层超图检索、位图反向关联、跨观察证据与实体巩固，扩充 Notebook 调试图；仅编译和静态检查 | chatgpt | 2026-09-12 15:48:12 CST |
 | 2026-09-12_hypergraph_similarity_index_design.md | 澄清层级超图与模板等效条件，补充三层相似度、二进制关联索引、稀疏传播及复杂度边界 | chatgpt | 2026-09-12 |
 | 2026-09-11_graph_and_optimizer_design.md | 审查三层 Gmem/Gpos，完善结构检索与虚拟统一锚点，设计 GmemIII 跨观察归并和关系巩固及缺失模块清单 | chatgpt | 2026-09-11 23:10:00 CST |
 | 2026-09-11_onceoptimizer_notebook_plot_annotations.md | 为一次性构图 Notebook 的分割、采样、关系图和检索图增加读图说明、标记图例与色条，保留已有测试输出 | chatgpt | 2026-09-11 21:26:05 CST |

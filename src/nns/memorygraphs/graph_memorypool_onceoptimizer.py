@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from collections import Counter, deque
 import copy
 import heapq
+import hashlib
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import numpy as np
 import torch
@@ -301,6 +302,38 @@ class MemoryConfig:
     once_write_local_contacts = False
     once_rejection_examples = 32
 
+    # Hierarchical hypergraph retrieval: translation-only first implementation.
+    graph_recall_threshold = 0.45
+    graph_bit_coverage_min = 0.1
+    graph_verify_threshold = 0.65
+    graph_learn_threshold = 0.78
+    graph_match_margin = 0.04
+    graph_evaluable_min = 0.7
+    graph_coverage_min = 0.7
+    graph_geometry_radius = 2
+    graph_geometry_sigma = 2.0
+    graph_cycle_tolerance = 1.0
+    graph_nms_radius = 6.0
+    graph_query_stride = 4
+    graph_events_per_class = 64
+    graph_candidate_budget = 128
+    graph_poses_per_node = 8
+    graph_pose_bin = 3.0
+    graph_response_cache = 32
+    graph_query_chunk = 2048
+    graph_evidence_prior = 1.0
+    graph_maturity_support = 3.0
+    graph_stable_support = 3.0
+    graph_stable_variance = 9.0
+    graph_member_radius = 96.0
+    graph_max_members = 6
+    graph_min_members = 2
+    graph_proposal_budget = 64
+    graph_geometry_update_limit = 4.0
+    graph_candidate_expiry = 50
+    graph_candidate_memory_budget = 512
+    graph_member_remove_reliability = 0.25
+
 
 # =============================
 # Controller State Machine
@@ -342,6 +375,7 @@ class RelationEdge:
     confidence: float = 1.0
     span: float = 0.0
     area: float = 0.0
+    evidence: Any = field(default_factory=lambda: EvidenceStats())
 
     def distance_to(self, rho_offset: float, theta_offset: float) -> float:
         dr = rho_offset - self.rho_offset
@@ -449,6 +483,9 @@ class SemanticNode:
     def __init__(self, node_id: int, anchor_id: int):
         self.node_id = node_id
         self.anchor_id = anchor_id
+        self.kind = 'region'
+        self.version = 0
+        self.evidence = EvidenceStats()
         # Legacy first-edge view kept for older callers. Full topology is in relation_edges.
         self.peripheral_links: Dict[int, Dict[str, float]] = {}
         self.child_node_ids: Set[int] = {anchor_id}
@@ -517,6 +554,13 @@ class EntityNode:
         self.component_edges: Dict[int, Dict[str, float]] = {}
         self.component_edges_by_semantic: Dict[int, List[int]] = defaultdict(list)
         self.next_component_edge_id = 0
+        self.root_slot = None
+        self.relation_edges = {}
+        self.evidence = EvidenceStats()
+        self.status = 'candidate'
+        self.version = 0
+        self.last_observed = 0
+        self.pending_members = {}
         
         self.activation_level = 0.0
         self.state_flag = NeuronState.CALM
@@ -577,6 +621,8 @@ class GmemoryII:
         self.semantic_nodes: Dict[int, SemanticNode] = {}
         self.next_node_id = 0
         self.next_relation_edge_id = 0
+        self.parent_entities = defaultdict(set)
+        self.region_relations = {}
 
     def add_semantic_node(self, anchor_id: int) -> SemanticNode:
         nid = self.next_node_id
@@ -650,6 +696,7 @@ class GmemoryIII:
         self.cfg = cfg
         self.entity_nodes: Dict[int, EntityNode] = {}
         self.next_node_id = 0
+        self.observations = 0
         
     def add_entity_node(self) -> EntityNode:
         nid = self.next_node_id
@@ -661,11 +708,15 @@ class GmemoryIII:
     def add_component(self, entity_node: EntityNode, sem_id: int, dx: float, dy: float):
         edge_id = entity_node.next_component_edge_id
         entity_node.next_component_edge_id += 1
-        component = {'sem_id': sem_id, 'dx': dx, 'dy': dy, 'count': 1}
+        component = {'sem_id': sem_id, 'dx': float(dx), 'dy': float(dy), 'count': 1,
+                     'slot_id': edge_id, 'scale': 1.0, 'angle': 0.0,
+                     'evidence': EvidenceStats()}
         entity_node.component_edges[edge_id] = component
         entity_node.component_edges_by_semantic[sem_id].append(edge_id)
         # Legacy representative component for older consumers.
         entity_node.components.setdefault(sem_id, {'dx': dx, 'dy': dy})
+        if entity_node.root_slot is None:
+            entity_node.root_slot = edge_id
         return component
 
 
@@ -995,64 +1046,49 @@ class Gposition:
         grid = torch.stack((grid_x, grid_y), dim=-1).unsqueeze(0)
         return grid
 
-    def _generalized_distance_transform(self, S_LP: torch.Tensor, rho_offset: float, theta_offset: float, 
-                                        lambda_rho: float, gamma_theta: float) -> torch.Tensor:
-        _, C, theta_bins, rho_bins = S_LP.shape
-        padding = (2, 2, 2, 2)
-        S_padded = F.pad(S_LP, padding, mode='replicate')
-        kernel = torch.ones(1, 1, 5, 5, device=self.device) / 25
-        D_map = F.conv2d(S_padded, kernel)
-        return D_map
+    @torch.no_grad()
+    def l2_structure_synthesis(self, S_maps, semantic_node, gmem_i=None, valid_mask=None):
+        """Full fixed-pose response plus verified multi-peak hypotheses.
 
-    def l2_structure_synthesis(self, S_maps: Dict[int, torch.Tensor], semantic_node: SemanticNode):
-        S_anc = S_maps.get(semantic_node.anchor_id)
-        if S_anc is None:
+        Pass gmem_i to remove the known modality weights from legacy GposI maps.
+        Returns the historical x/y/score keys as well as diagnostics and response.
+        """
+        if not S_maps:
             return None
-        
-        B, C, H, W = S_anc.shape
-        pooled = F.max_pool2d(S_anc, kernel_size=7, stride=1, padding=3)
-        peaks = (S_anc == pooled) & (S_anc > 0.1)
-        
-        peak_indices = torch.nonzero(peaks[0, 0])
-        if peak_indices.numel() == 0:
+        provider = _StoredMapProvider(S_maps, gmem_i.nodes if gmem_i else None,
+                                      self.cfg if gmem_i else None, valid_mask)
+        view = region_view(semantic_node, self.cfg)
+        missing = {s['node_id'] for s in view.slots} - set(provider.nodes)
+        if missing:
+            from types import SimpleNamespace
+            provider.nodes = dict(provider.nodes)
+            provider.nodes.update({nid: SimpleNamespace(modality_id=nid) for nid in missing})
+        h, w = provider.shape
+        centers = [(x, y) for y in range(h) for x in range(w)]
+        matcher = SpatialStructureMatcher(self.cfg)
+        matches = matcher.evaluate(view, provider, centers)
+        if not matches:
             return None
-            
-        best_idx = torch.argmax(S_anc[0, 0, peak_indices[:, 0], peak_indices[:, 1]])
-        yc, xc = int(peak_indices[best_idx, 0]), int(peak_indices[best_idx, 1])
+        peaks = matcher.nms(matches)
+        best = peaks[0] if peaks else max(matches, key=lambda m: m.score)
+        reference = next(iter(S_maps.values()))
+        response = torch.tensor([m.score for m in matches], device=reference.device,
+                                dtype=reference.dtype).reshape(1, 1, h, w)
+        return {'x': best.point[0], 'y': best.point[1], 's_star': 1., 'theta_star': 0.,
+                'score': best.score, 'accepted': best.accepted, 'response': response,
+                'matches': peaks, 'diagnostics': best.summary()}
 
-        grid = self._create_log_polar_grid(H, W, xc, yc)
-        D_maps_sum = torch.zeros((1, 1, self.cfg.lp_theta_bins, self.cfg.lp_rho_bins), device=self.device)
-        
-        for edge in semantic_node.iter_relation_edges():
-            if edge.src_id == edge.dst_id:
-                continue
-            S_peri = S_maps.get(edge.dst_id)
-            if S_peri is not None:
-                S_LP_peri = F.grid_sample(S_peri, grid, mode='bilinear', padding_mode='zeros', align_corners=True)
-                D_n = self._generalized_distance_transform(
-                    S_LP_peri, edge.rho_offset, edge.theta_offset,
-                    edge.lambda_rho, edge.gamma_theta
-                )
-                D_maps_sum += D_n
-
-        best_resonance = torch.max(D_maps_sum)
-        max_idx = torch.argmax(D_maps_sum)
-        
-        theta_idx = max_idx // self.cfg.lp_rho_bins
-        rho_idx = max_idx % self.cfg.lp_rho_bins
-        
-        delta_rho = float(rho_idx) / self.cfg.lp_rho_bins * 2.0 - 1.0  
-        delta_theta = float(theta_idx) / self.cfg.lp_theta_bins * math.pi
-        
-        s_star = math.exp(delta_rho)
-        theta_star = delta_theta
-        
-        return {
-            'x': xc, 'y': yc,
-            's_star': s_star,
-            'theta_star': theta_star,
-            'score': float(S_anc[0, 0, yc, xc].item() + best_resonance.item())
-        }
+    @torch.no_grad()
+    def l3_structure_synthesis(self, features, entity, gmem_i, gmem_ii,
+                              valid_mask=None, centers=None):
+        provider = FeatureResponseCache(features, gmem_i, self.cfg, valid_mask)
+        if not provider.inputs:
+            return []
+        h, w = provider.shape
+        if centers is None:
+            centers = [(x, y) for y in range(h) for x in range(w)]
+        matcher = SpatialStructureMatcher(self.cfg)
+        return matcher.nms(matcher.evaluate(entity_view(entity, gmem_ii, self.cfg), provider, centers))
 
 
 # =============================
@@ -1912,6 +1948,7 @@ class GraphWriteAdapter:
                 c.written = True  # Already joined by one shared instance.
                 continue
             sem = staged_ii.add_semantic_node(report.sample_nodes[ka])
+            sem.kind = 'contact'
             write_edge(sem, ka[0], ka[1], kb[0], kb[1], c.kind)
             sem.is_completed = True
             sem.max_span = c.distance
@@ -2050,23 +2087,31 @@ class Controller:
 
     @torch.no_grad()
     def run_step(self, X_subspaces, gmem_i, gmem_ii, gmem_iii=None, gpos=None,
-                 valid_mask=None, H_orig=None, W_orig=None):
-        """Append one observation; GmemIII and Gpos are accepted for compatibility.
+                 valid_mask=None, H_orig=None, W_orig=None, source_id=None, episode_id=None,
+                 learn=True):
+        """One observation. With GmemIII, query first and consolidate long-term memory.
 
-        Querying is explicitly separate and never writes memory. GmemIII and
-        neuron activation states are left untouched during construction.
+        learn=False retains the raw BuildReport interface for segmentation diagnostics.
+        LearningResult keeps observation pools separate from persistent template ids.
         """
-        report = self.optimizer.build_once(X_subspaces, gmem_i, gmem_ii, valid_mask,
-                                          H_orig, W_orig, self.current_step + 1)
+        if learn and gmem_iii is not None:
+            result = GraphConsolidationOptimizer(self.cfg).learn(
+                X_subspaces, gmem_i, gmem_ii, gmem_iii, valid_mask, source_id, episode_id,
+                H_orig, W_orig)
+            report = result.observation
+        else:
+            result = self.optimizer.build_once(X_subspaces, gmem_i, gmem_ii, valid_mask,
+                                               H_orig, W_orig, self.current_step + 1)
+            report = result
         self.current_step += 1
-        self.last_report = report
-        self.debug_optimizer = report.summary()
+        self.last_report = result
+        self.debug_optimizer = result.summary()
         self.matrix1 = {m: s.quality for m, s in report.supports.items()}
         self.matrix2 = report.labels
         self.matrix3 = {r.region_id: r.samples for r in report.regions}
         self.matrix4 = report.edge_observations
         self.current_interest_map = self.matrix1
-        return report
+        return result
 
 
 class MultilevelCoordinator:
@@ -2076,11 +2121,56 @@ class MultilevelCoordinator:
         self.gpos, self.controller = Gposition(cfg), Controller(cfg)
         self.last_report = None
 
-    def handle_new_view(self, features, H_orig=None, W_orig=None, valid_mask=None):
+    def handle_new_view(self, features, H_orig=None, W_orig=None, valid_mask=None,
+                        source_id=None, episode_id=None, learn=True):
         self.last_report = self.controller.run_step(
             features, self.gmem_i, self.gmem_ii, self.gmem_iii, self.gpos,
-            valid_mask=valid_mask, H_orig=H_orig, W_orig=W_orig)
+            valid_mask=valid_mask, H_orig=H_orig, W_orig=W_orig,
+            source_id=source_id, episode_id=episode_id, learn=learn)
         return self.last_report
+
+    def learn_view(self, features, source_id=None, episode_id=None, valid_mask=None):
+        return self.handle_new_view(features, source_id=source_id, episode_id=episode_id,
+                                    valid_mask=valid_mask, learn=True)
+
+    def create_entity(self, components):
+        """Explicit retrieval fixture: [(semantic_id, dx, dy), ...], not learned evidence."""
+        values = [(int(sid), float(dx), float(dy)) for sid, dx, dy in components]
+        if len(values) < 2 or not all(math.isfinite(x) and math.isfinite(y) for _, x, y in values):
+            raise ValueError('An entity fixture needs at least two finite component placements.')
+        for sid, _, _ in values:
+            if sid not in self.gmem_ii.semantic_nodes or self.gmem_ii.semantic_nodes[sid].kind != 'region':
+                raise ValueError('Entity members must reference existing region hypernodes.')
+        entity = self.gmem_iii.add_entity_node()
+        _, ox, oy = values[0]
+        for sid, x, y in values:
+            member = self.gmem_iii.add_component(entity, sid, x - ox, y - oy)
+            self.gmem_ii.parent_entities[sid].add(entity.node_id)
+            if member['slot_id'] != entity.root_slot:
+                entity.relation_edges[(entity.root_slot, member['slot_id'])] = {
+                    'delta': (x - ox, y - oy), 'evidence': EvidenceStats()}
+        return entity
+
+    @torch.no_grad()
+    def query_hierarchy(self, features, valid_mask=None, exact=False):
+        return HierarchyRetriever(self.cfg).query(features, self.gmem_i, self.gmem_ii,
+                                                  self.gmem_iii, valid_mask, exact)
+
+    def state_dict(self):
+        """Versioned pools include incidence, role geometry and evidence provenance."""
+        return copy.deepcopy({'schema_version': 1, 'gmem_i': self.gmem_i,
+                              'gmem_ii': self.gmem_ii, 'gmem_iii': self.gmem_iii,
+                              'feature_contract': self.cfg.feature_specs,
+                              'geometry_mode': 'translation'})
+
+    def load_state_dict(self, state):
+        if state.get('schema_version') != 1:
+            raise ValueError('Unsupported memory schema; old raw pools need explicit migration.')
+        if state.get('feature_contract') != self.cfg.feature_specs:
+            raise ValueError('Stored feature contract differs from the current configuration.')
+        staged = copy.deepcopy(state)
+        self.gmem_i, self.gmem_ii, self.gmem_iii = staged['gmem_i'], staged['gmem_ii'], staged['gmem_iii']
+        self.last_report = None
 
     @torch.no_grad()
     def query_l1(self, features, node_ids=None, valid_mask=None):
@@ -2151,3 +2241,1242 @@ def reference_star_response(S_maps, semantic_node, tolerance=1):
         sampled = F.grid_sample(value, grid, mode='bilinear', padding_mode='zeros', align_corners=True)
         logs.append(sampled.clamp_min(1e-8).log())
     return anchor if not logs else anchor * torch.exp(torch.stack(logs).mean(dim=0))
+
+
+# ---------------------------------------------------------------------------
+# Persistent evidence and query-only hypergraph views.
+# A slot identifies an occurrence; equal feature vectors do not merge slots.
+# ---------------------------------------------------------------------------
+@dataclass
+class EvidenceStats:
+    raw_hits: int = 0
+    support: float = 0.0
+    opportunities: float = 0.0
+    episodes: Dict[str, Tuple[float, float]] = field(default_factory=dict)
+    mean: Optional[Tuple[float, float]] = None
+    m2: Tuple[float, float] = (0.0, 0.0)
+    geometry_weight: float = 0.0
+
+    def observe(self, episode, success, opportunity=True, delta=None):
+        if not opportunity:
+            return False
+        success = float(np.clip(success, 0., 1.))
+        self.raw_hits += int(success > 0)
+        key = str(episode)
+        old_op, old_hit = self.episodes.get(key, (0., 0.))
+        # Correlated views of one episode have at most one opportunity/support.
+        new_hit = max(old_hit, success)
+        self.opportunities += 1. - old_op
+        self.support += new_hit - old_hit
+        self.episodes[key] = (1., new_hit)
+        added = new_hit - old_hit
+        if delta is not None and added > 0:
+            value = np.asarray(delta, dtype=float)
+            if value.shape != (2,) or not np.isfinite(value).all():
+                raise ValueError('Geometry evidence must be a finite 2D displacement.')
+            previous = value if self.mean is None else np.asarray(self.mean)
+            total = self.geometry_weight + added
+            updated = previous + added / total * (value - previous)
+            self.m2 = tuple(np.asarray(self.m2) + added * (value - previous) * (value - updated))
+            self.mean = tuple(updated)
+            self.geometry_weight = total
+        return added > 0
+
+    def reliability(self, prior=1.):
+        return (self.support + prior) / (self.opportunities + 2 * prior)
+
+    def weight(self, cfg):
+        mature = 1. - math.exp(-self.support / cfg.graph_maturity_support)
+        return max(.05, self.reliability(cfg.graph_evidence_prior) * mature)
+
+    def variance(self):
+        return tuple(v / max(self.geometry_weight, 1.) for v in self.m2)
+
+    def summary(self):
+        return {'raw_hits': self.raw_hits, 'effective_support': self.support,
+                'opportunities': self.opportunities, 'reliability': self.reliability(),
+                'mean': self.mean, 'variance': self.variance()}
+
+    def merge_equivalent(self, other):
+        """Union provenance for geometry-identical records; never sum episode credit."""
+        self.raw_hits += other.raw_hits
+        for episode, (op, hit) in other.episodes.items():
+            a, b = self.episodes.get(episode, (0., 0.))
+            self.episodes[episode] = (max(a, op), max(b, hit))
+        self.opportunities = sum(v[0] for v in self.episodes.values())
+        self.support = sum(v[1] for v in self.episodes.values())
+        # No per-episode geometry samples are retained: use the more conservative
+        # variance envelope instead of pretending duplicate moments are independent.
+        variance = np.maximum(self.variance(), other.variance())
+        self.geometry_weight = max(self.geometry_weight, other.geometry_weight)
+        self.m2 = tuple(variance * self.geometry_weight)
+        if self.mean is None:
+            self.mean = other.mean
+
+
+@dataclass
+class StructureView:
+    template_id: int
+    level: int
+    slots: List[dict]
+    constraints: List[dict]
+    version: int = 0
+
+
+@dataclass
+class StructureMatch:
+    template_id: int
+    level: int
+    point: Tuple[float, float]
+    score: float
+    evaluable_coverage: float
+    matched_coverage: float
+    geometry_error: float
+    assignments: Dict[Any, dict]
+    member_positions: Dict[Any, Tuple[float, float]]
+    missing_evidence: List[Any]
+    version: int
+    accepted: bool
+    role_bits: int = 0
+    evaluated_bits: int = 0
+
+    def summary(self):
+        return {'template_id': self.template_id, 'level': self.level,
+                'point': self.point, 'score': self.score,
+                'evaluable_coverage': self.evaluable_coverage,
+                'matched_coverage': self.matched_coverage,
+                'geometry_error': self.geometry_error, 'accepted': self.accepted,
+                'matched_roles': self.role_bits.bit_count(),
+                'evaluated_roles': self.evaluated_bits.bit_count(),
+                'role_bits_hex': hex(self.role_bits), 'evaluated_bits_hex': hex(self.evaluated_bits),
+                'version': self.version}
+
+
+@dataclass
+class HierarchyQuery:
+    regions: List[StructureMatch] = field(default_factory=list)
+    entities: List[StructureMatch] = field(default_factory=list)
+    diagnostics: dict = field(default_factory=dict)
+    activation: dict = field(default_factory=dict)
+
+    def summary(self):
+        return {'region_instances': len(self.regions), 'entity_instances': len(self.entities),
+                **self.diagnostics}
+
+
+@dataclass
+class LearningResult:
+    observation: BuildReport
+    observation_i: Any
+    observation_ii: Any
+    prior_query: HierarchyQuery
+    region_mapping: dict = field(default_factory=dict)
+    entity_ids: List[int] = field(default_factory=list)
+    diagnostics: dict = field(default_factory=dict)
+
+    def summary(self):
+        return {**self.observation.summary(), **self.diagnostics,
+                'matched_regions': len(self.region_mapping),
+                'learned_entities': len(self.entity_ids)}
+
+
+def _edge_delta(edge):
+    return np.array([math.exp(edge.rho_offset) * math.cos(edge.theta_offset),
+                     math.exp(edge.rho_offset) * math.sin(edge.theta_offset)])
+
+
+def region_view(sem, cfg):
+    """Resolve a connected graph in a fixed gauge; retain all cycle factors."""
+    adjacency = defaultdict(list)
+    for e in sem.relation_edges.values():
+        d = _edge_delta(e)
+        if e.src_id == e.dst_id:
+            if np.linalg.norm(d) > cfg.once_geometry_epsilon * 2:
+                raise ValueError('Collapsed occurrences require explicit slots; use sample_instance mode.')
+            continue
+        adjacency[e.src_id].append((e.dst_id, d))
+        adjacency[e.dst_id].append((e.src_id, -d))
+    positions = {sem.anchor_id: np.zeros(2)}
+    queue = deque([sem.anchor_id])
+    while queue:
+        source = queue.popleft()
+        for target, delta in adjacency[source]:
+            predicted = positions[source] + delta
+            if target not in positions:
+                positions[target] = predicted
+                queue.append(target)
+            elif np.linalg.norm(positions[target] - predicted) > cfg.graph_cycle_tolerance:
+                raise ValueError('Inconsistent geometry or alternative layout: split relation versions first.')
+    if set(sem.related_node_ids()) - set(positions):
+        raise ValueError('Disconnected structure has no common coordinate frame.')
+    weights = defaultdict(list)
+    constraints = []
+    for e in sem.relation_edges.values():
+        weights[e.dst_id].append(e.evidence.weight(cfg))
+        constraints.append({'source': e.src_id, 'target': e.dst_id,
+                            'delta': tuple(_edge_delta(e)), 'edge_id': e.edge_id})
+    slots = [{'key': nid, 'node_id': nid, 'xy': tuple(xy), 'group': 0,
+              'weight': max(weights.get(nid, [1.])), 'group_weight': 1.,
+              'anchor': nid == sem.anchor_id}
+             for nid, xy in sorted(positions.items())]
+    return StructureView(sem.node_id, 2, slots, constraints, sem.version)
+
+
+def entity_view(entity, gmem_ii, cfg):
+    """Query-only flattening: roles remain unique, component weights normalised."""
+    slots, constraints = [], []
+    for sid, member in sorted(entity.component_edges.items()):
+        if member.get('scale', 1.) != 1. or member.get('angle', 0.) != 0.:
+            raise ValueError('This implementation supports translation only, including appearance.')
+        sem = gmem_ii.semantic_nodes[member['sem_id']]
+        sub = region_view(sem, cfg)
+        offset = np.array([member['dx'], member['dy']])
+        for item in sub.slots:
+            slots.append({**item, 'key': (sid, item['key']), 'group': sid,
+                          'xy': tuple(offset + item['xy']),
+                          'member_xy': tuple(offset),
+                          'group_weight': member['evidence'].weight(cfg)})
+        for e in sub.constraints:
+            constraints.append({**e, 'source': (sid, e['source']), 'target': (sid, e['target'])})
+    for (a, b), relation in entity.relation_edges.items():
+        ma, mb = entity.component_edges[a], entity.component_edges[b]
+        constraints.append({'source': (a, gmem_ii.semantic_nodes[ma['sem_id']].anchor_id),
+                            'target': (b, gmem_ii.semantic_nodes[mb['sem_id']].anchor_id),
+                            'delta': relation['delta'], 'edge_id': (a, b)})
+    return StructureView(entity.node_id, 3, slots, constraints, entity.version)
+
+
+class FeatureResponseCache:
+    """Exact original metric; lazy LRU maps, shared equal descriptors, no peak renormalisation."""
+    def __init__(self, inputs, gmem_i, cfg, valid_mask=None):
+        self.cfg, self.nodes = cfg, gmem_i.nodes
+        self.inputs = prepare_feature_subspaces(inputs, cfg)
+        self.shape = next(iter(self.inputs.values())).shape[-2:] if self.inputs else (0, 0)
+        h, w = self.shape
+        device = next(iter(self.inputs.values())).device if self.inputs else cfg.device
+        if valid_mask is None:
+            self.valid = torch.ones((1, 1, h, w), dtype=torch.bool, device=device)
+        else:
+            mask = torch.as_tensor(valid_mask, device=device)
+            if tuple(mask.shape) not in {(h, w), (1, h, w), (1, 1, h, w)}:
+                raise ValueError('Query valid_mask must match the input spatial shape.')
+            self.valid = (torch.isfinite(mask) & (mask > 0)).reshape(1, 1, h, w)
+        self.finite = {m: torch.isfinite(x).all(1, keepdim=True) & self.valid
+                       for m, x in self.inputs.items()}
+        self.inputs = {m: torch.nan_to_num(x, nan=0., posinf=0., neginf=0.) for m, x in self.inputs.items()}
+        self.gates = {m: SimilarityEngine.compute_gate_map(x, cfg, m) for m, x in self.inputs.items()}
+        self.cache = OrderedDict()
+        self.map_computations = 0
+        self.signatures = {}
+
+    def signature(self, nid):
+        if nid not in self.signatures:
+            n = self.nodes[nid]
+            self.signatures[nid] = (n.modality_id, tuple(n.prototype.shape),
+                n.prototype.detach().cpu().contiguous().numpy().tobytes(),
+                n.mask.detach().cpu().contiguous().numpy().tobytes())
+        return self.signatures[nid]
+
+    def evaluable(self, nid):
+        node = self.nodes[nid]
+        x = self.inputs.get(node.modality_id)
+        if x is None or self.cfg.modality_weights.get(node.modality_id, 1.) <= 0:
+            return None
+        # Missing required metric channels are unknown, not a zero-valued match.
+        spec = self.cfg.feature_specs.get(node.modality_id, {})
+        common = min(x.shape[1], node.prototype.shape[0])
+        groups = spec.get('metric_groups', {})
+        if groups and not any(sum(float(node.mask[c].item()) > 0 for c in
+                              SimilarityEngine._group_channels(g.get('channels', 'all'), common))
+                              >= int(g.get('min_valid_channels', 1)) for g in groups.values()):
+            return None
+        return self.finite[node.modality_id]
+
+    def get(self, nid):
+        if self.evaluable(nid) is None:
+            return None
+        key = self.signature(nid)
+        if key in self.cache:
+            self.cache.move_to_end(key)
+            return self.cache[key]
+        n = self.nodes[nid]
+        x = self.inputs[n.modality_id]
+        response = SimilarityEngine.calculate_similarity(x, n.prototype.to(x.device).view(1, -1, 1, 1),
+                    self.cfg, n.modality_id, mask_W=n.mask.to(x.device).view(1, -1))
+        response = response * self.gates[n.modality_id] * self.finite[n.modality_id]
+        self.cache[key] = response.clamp(0., 1.)
+        self.map_computations += 1
+        while len(self.cache) > self.cfg.graph_response_cache:
+            self.cache.popitem(last=False)
+        return response
+
+
+class SpatialStructureMatcher:
+    """Translation search with common assignment, coverage and cycle checks."""
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    @staticmethod
+    def _sample(value, points):
+        h, w = value.shape[-2:]
+        p = torch.as_tensor(points, device=value.device, dtype=value.dtype).reshape(1, -1, 1, 2)
+        p = p.clone()
+        inside = (torch.isfinite(p).all(-1) & (p[..., 0] >= 0) & (p[..., 0] <= w - 1)
+                  & (p[..., 1] >= 0) & (p[..., 1] <= h - 1)).reshape(-1)
+        p[..., 0] = 2 * p[..., 0] / max(w - 1, 1) - 1 if w > 1 else 0
+        p[..., 1] = 2 * p[..., 1] / max(h - 1, 1) - 1 if h > 1 else 0
+        return F.grid_sample(value.float(), p.float(), align_corners=True,
+                             padding_mode='zeros').reshape(-1) * inside
+
+    def evaluate(self, view, provider, centers):
+        if not view.slots or not len(centers):
+            return []
+        centers = np.asarray(centers, dtype=float).reshape(-1, 2)
+        radius = self.cfg.graph_geometry_radius
+        shifts = np.array([(x, y) for y in range(-radius, radius + 1)
+                           for x in range(-radius, radius + 1)], dtype=float)
+        penalty = np.exp(-np.sum(shifts ** 2, axis=1) / (2 * self.cfg.graph_geometry_sigma ** 2))
+        groups = defaultdict(list)
+        for item in view.slots:
+            groups[item['group']].append(item)
+        group_weights = {g: items[0]['group_weight'] for g, items in groups.items()}
+        total_group = sum(group_weights.values())
+        slot_weights = {s['key']: group_weights[g] / total_group * s['weight'] /
+                       sum(i['weight'] for i in items) for g, items in groups.items() for s in items}
+        shared = Counter((s['node_id'], tuple(round(v, 6) for v in s['xy'])) for s in view.slots)
+        for item in view.slots:
+            slot_weights[item['key']] /= shared[(item['node_id'], tuple(round(v, 6) for v in item['xy']))]
+        norm = sum(slot_weights.values())
+        slot_weights = {key: value / norm for key, value in slot_weights.items()}
+        all_results = []
+        for start in range(0, len(centers), self.cfg.graph_query_chunk):
+            batch = centers[start:start + self.cfg.graph_query_chunk]
+            data = {}
+            for item in view.slots:
+                nid = item['node_id']
+                valid = provider.evaluable(nid)
+                response = provider.get(nid) if valid is not None else None
+                expected = batch + item['xy']
+                if response is None:
+                    data[item['key']] = (np.zeros(len(batch)), np.zeros(len(batch), bool), expected)
+                    continue
+                h, w = response.shape[-2:]
+                # Evaluable at the predicted point; response absence is negative evidence.
+                known = ((expected[:, 0] >= 0) & (expected[:, 0] <= w - 1) &
+                         (expected[:, 1] >= 0) & (expected[:, 1] <= h - 1))
+                known &= self._sample(valid.float(), expected).cpu().numpy() > .5
+                points = expected[:, None, :] + shifts[None, :, :]
+                values = self._sample(response, points.reshape(-1, 2)).reshape(len(batch), -1)
+                weighted = values * torch.as_tensor(penalty, device=values.device, dtype=values.dtype)
+                best, indices = weighted.max(dim=1)
+                chosen = expected + shifts[indices.cpu().numpy()]
+                data[item['key']] = (best.cpu().numpy(), known, chosen)
+            for k, center in enumerate(batch):
+                assignments, missing, member_positions = {}, [], {}
+                group_votes = defaultdict(list)
+                log_score = evaluable = matched = 0.
+                bits = evaluated_bits = 0
+                for bit, item in enumerate(view.slots):
+                    key = item['key']
+                    scores, known, chosen = data[key]
+                    weight = slot_weights[key]
+                    if not known[k]:
+                        missing.append(key)
+                        continue
+                    evaluated_bits |= 1 << bit
+                    evaluable += weight
+                    value = float(scores[k])
+                    log_score += weight * math.log(max(value, 1e-8))
+                    hit = value >= self.cfg.graph_recall_threshold
+                    if hit:
+                        matched += weight
+                        bits |= 1 << bit
+                        inferred = chosen[k] - item['xy'] + np.asarray(item.get('member_xy', (0., 0.)))
+                        group_votes[item['group']].append((value, inferred))
+                    assignments[key] = {'point': tuple(chosen[k]), 'score': value,
+                                        'supported': hit, 'node_id': item['node_id']}
+                    if item['anchor'] and hit:
+                        member_positions[item['group']] = tuple(chosen[k])
+                for group, votes in group_votes.items():
+                    if group not in member_positions:
+                        weights = np.asarray([v[0] for v in votes])
+                        member_positions[group] = tuple(np.average([v[1] for v in votes], axis=0, weights=weights))
+                geometry = []
+                for e in view.constraints:
+                    a, b = assignments.get(e['source']), assignments.get(e['target'])
+                    if a and b and a['supported'] and b['supported']:
+                        residual = np.asarray(b['point']) - a['point'] - e['delta']
+                        geometry.append(float(np.linalg.norm(residual)))
+                error = max(geometry, default=0.)
+                # Different predicted roles may not collapse to exactly the same evidence point.
+                occupied, conflict = {}, False
+                for item in view.slots:
+                    a = assignments.get(item['key'])
+                    if not a or not a['supported']:
+                        continue
+                    evidence_key = (provider.nodes[item['node_id']].modality_id,
+                                    tuple(round(x, 4) for x in a['point']))
+                    if evidence_key in occupied and math.dist(occupied[evidence_key], item['xy']) > .5:
+                        conflict = True
+                    occupied[evidence_key] = item['xy']
+                score = math.exp(log_score / evaluable) if evaluable > 0 else 0.
+                coverage = matched / evaluable if evaluable else 0.
+                accepted = (score >= self.cfg.graph_verify_threshold and
+                            evaluable >= self.cfg.graph_evaluable_min and
+                            coverage >= self.cfg.graph_coverage_min and not conflict and
+                            error <= 2 * radius + self.cfg.graph_cycle_tolerance)
+                all_results.append(StructureMatch(view.template_id, view.level, tuple(center), score,
+                    evaluable, coverage, error, assignments, member_positions, missing, view.version,
+                    accepted, bits, evaluated_bits))
+        return all_results
+
+    def nms(self, matches, accepted_only=True, limit=None):
+        result = []
+        for match in sorted(matches, key=lambda m: (-m.score, -m.matched_coverage, m.point)):
+            if accepted_only and not match.accepted:
+                continue
+            if any(math.dist(match.point, old.point) < self.cfg.graph_nms_radius for old in result):
+                continue
+            result.append(match)
+            if limit and len(result) >= limit:
+                break
+        return result
+
+
+class HypergraphIndex:
+    """Shared exact descriptor classes and reverse incidence; never replaces geometry."""
+    def __init__(self, gi, gii, giii, cfg, provider):
+        self.classes, self.node_class, self.parents = {}, {}, defaultdict(list)
+        self.region_bits, self.entity_bits = {}, {}
+        self.entity_parents = defaultdict(list)
+        self.views, self.invalid = {}, {}
+        signature_ids = {}
+        for nid in sorted(gi.nodes):
+            signature = provider.signature(nid)
+            if signature not in signature_ids:
+                signature_ids[signature] = len(signature_ids)
+                self.classes[signature_ids[signature]] = nid
+            self.node_class[nid] = signature_ids[signature]
+        for sid, sem in sorted(gii.semantic_nodes.items()):
+            if sem.kind != 'region':
+                continue
+            try:
+                view = region_view(sem, cfg)
+            except ValueError as exc:
+                self.invalid[sid] = str(exc)
+                continue
+            self.views[sid] = view
+            bits = 0
+            for slot in view.slots:
+                cls = self.node_class[slot['node_id']]
+                bits |= 1 << cls
+                self.parents[cls].append((sid, slot['key'], slot['xy']))
+            self.region_bits[sid] = bits
+        for eid, entity in sorted(giii.entity_nodes.items()):
+            bits = 0
+            for role, member in entity.component_edges.items():
+                sid = member['sem_id']
+                bits |= 1 << sid
+                self.entity_parents[sid].append((eid, role, (member['dx'], member['dy'])))
+            self.entity_bits[eid] = bits
+
+    def feature_events(self, provider, cfg):
+        events, evaluated, truncated = [], 0, 0
+        stride = cfg.graph_query_stride
+        for cls, nid in self.classes.items():
+            valid = provider.evaluable(nid)
+            if valid is None:
+                continue
+            evaluated |= 1 << cls
+            node = provider.nodes[nid]
+            x = provider.inputs[node.modality_id][..., ::stride, ::stride]
+            # Same metric at sampled points, not an unrelated ANN distance.
+            values = SimilarityEngine.calculate_similarity(x,
+                node.prototype.to(x.device).view(1, -1, 1, 1), cfg, node.modality_id,
+                mask_W=node.mask.to(x.device).view(1, -1))
+            values *= provider.gates[node.modality_id][..., ::stride, ::stride]
+            values *= valid[..., ::stride, ::stride]
+            ys, xs = torch.where(values[0, 0] >= cfg.graph_recall_threshold)
+            candidates = sorted([(float(values[0, 0, y, x]), int(x) * stride, int(y) * stride)
+                                 for y, x in zip(ys, xs)], key=lambda t: (-t[0], t[2], t[1]))
+            if cfg.graph_events_per_class and len(candidates) > cfg.graph_events_per_class:
+                truncated += len(candidates) - cfg.graph_events_per_class
+                candidates = candidates[:cfg.graph_events_per_class]
+            events.extend((cls, (x, y), score) for score, x, y in candidates)
+        # 'evaluated' means modality/descriptor evaluated at sampled sites, not proven absent globally.
+        return events, evaluated, truncated
+
+    @staticmethod
+    def _votes(events, parents, cfg, requirements=None):
+        buckets, visits = {}, 0
+        for key, point, score in events:
+            for parent, role, offset in parents.get(key, []):
+                visits += 1
+                center = np.asarray(point) - offset
+                bucket = (parent, round(center[0] / cfg.graph_pose_bin), round(center[1] / cfg.graph_pose_bin))
+                entry = buckets.setdefault(bucket, {'roles': {}, 'center': tuple(center), 'hits': 0})
+                entry['roles'][role] = max(score, entry['roles'].get(role, 0.))
+                entry['hits'] |= 1 << key
+        by_parent = defaultdict(list)
+        for (parent, _, _), entry in buckets.items():
+            required = requirements.get(parent, 0) if requirements is not None else entry['hits']
+            coverage = (required & entry['hits']).bit_count() / max(1, required.bit_count())
+            if coverage < cfg.graph_bit_coverage_min:
+                continue
+            rank = (coverage, len(entry['roles']), sum(entry['roles'].values()))
+            by_parent[parent].append((rank, entry['center']))
+        return by_parent, visits
+
+    def region_candidates(self, events, cfg):
+        ranked, visits = self._votes(events, self.parents, cfg, self.region_bits)
+        return self._limit(ranked, cfg), visits
+
+    @staticmethod
+    def _limit(ranked, cfg):
+        rows = []
+        for parent, values in ranked.items():
+            for rank, center in sorted(values, reverse=True)[:cfg.graph_poses_per_node]:
+                rows.append((rank, parent, center))
+        rows.sort(reverse=True)
+        truncated = max(0, len(rows) - cfg.graph_candidate_budget) if cfg.graph_candidate_budget else 0
+        if cfg.graph_candidate_budget:
+            rows = rows[:cfg.graph_candidate_budget]
+        result = defaultdict(list)
+        for _, parent, center in rows:
+            result[parent].append(center)
+        return result, truncated
+
+
+class HierarchyRetriever:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.matcher = SpatialStructureMatcher(cfg)
+        self.validate()
+
+    def validate(self):
+        for name in ('graph_geometry_sigma', 'graph_maturity_support', 'graph_pose_bin',
+                     'graph_member_radius', 'graph_nms_radius', 'graph_evidence_prior',
+                     'graph_geometry_update_limit', 'graph_stable_support'):
+            value = float(getattr(self.cfg, name))
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(name + ' must be finite and positive.')
+        for name in ('graph_query_stride', 'graph_poses_per_node', 'graph_response_cache',
+                     'graph_query_chunk', 'graph_max_members', 'graph_min_members'):
+            value = getattr(self.cfg, name)
+            if int(value) != value or value < 1:
+                raise ValueError(name + ' must be a positive integer.')
+        for name in ('graph_geometry_radius', 'graph_candidate_budget', 'graph_events_per_class',
+                     'graph_proposal_budget', 'graph_candidate_expiry', 'graph_candidate_memory_budget'):
+            value = getattr(self.cfg, name)
+            if int(value) != value or value < 0:
+                raise ValueError(name + ' must be a nonnegative integer.')
+        for name in ('graph_recall_threshold', 'graph_bit_coverage_min', 'graph_verify_threshold', 'graph_learn_threshold',
+                     'graph_evaluable_min', 'graph_coverage_min', 'graph_match_margin',
+                     'graph_member_remove_reliability'):
+            if not 0 <= float(getattr(self.cfg, name)) <= 1:
+                raise ValueError(name + ' must be in [0,1].')
+        if not self.cfg.graph_recall_threshold <= self.cfg.graph_verify_threshold <= self.cfg.graph_learn_threshold:
+            raise ValueError('Require recall <= verification <= learning thresholds.')
+        if self.cfg.graph_min_members > self.cfg.graph_max_members:
+            raise ValueError('Minimum members must not exceed maximum members.')
+
+    @torch.no_grad()
+    def query(self, features, gi, gii, giii, valid_mask=None, exact=False):
+        start = time.perf_counter()
+        provider = FeatureResponseCache(features, gi, self.cfg, valid_mask)
+        result = HierarchyQuery()
+        if not provider.inputs or not gi.nodes:
+            result.diagnostics = {'search_complete': True, 'mode': 'empty', 'elapsed': time.perf_counter() - start}
+            return result
+        index = HypergraphIndex(gi, gii, giii, self.cfg, provider)
+        h, w = provider.shape
+        events, evaluated, event_drop = ([], 0, 0) if exact else index.feature_events(provider, self.cfg)
+        (candidates, dropped), visits = index.region_candidates(events, self.cfg)
+        dense = [(x, y) for y in range(h) for x in range(w)] if exact else None
+        if exact:
+            candidates = {sid: dense for sid in index.views}
+        weak_regions, refinements = [], 0
+        for sid, centers in candidates.items():
+            matches = self.matcher.evaluate(index.views[sid], provider, centers)
+            refinements += len(matches)
+            weak = self.matcher.nms([m for m in matches if m.score >= self.cfg.graph_recall_threshold],
+                                    accepted_only=False, limit=None if exact else self.cfg.graph_poses_per_node)
+            weak_regions.extend(weak)
+            result.regions.extend(m for m in weak if m.accepted)
+        parent_events = [(m.template_id, m.point, m.score) for m in weak_regions]
+        entity_ranked, entity_visits = index._votes(parent_events, index.entity_parents, self.cfg, index.entity_bits)
+        entity_candidates, entity_drop = index._limit(entity_ranked, self.cfg)
+        if exact:
+            entity_candidates = {eid: dense for eid in giii.entity_nodes}
+        invalid_entities = {}
+        for eid, centers in entity_candidates.items():
+            entity = giii.entity_nodes[eid]
+            try:
+                view = entity_view(entity, gii, self.cfg)
+            except (ValueError, KeyError) as exc:
+                invalid_entities[eid] = str(exc)
+                continue
+            matches = self.matcher.evaluate(view, provider, centers)
+            refinements += len(matches)
+            # Leaf evidence is decisive, while root roles must remain spatially distinct.
+            for match in matches:
+                positions = list(match.member_positions.values())
+                if len(positions) < min(self.cfg.graph_min_members, len(entity.component_edges)):
+                    match.accepted = False
+                if len(set(positions)) != len(positions):
+                    # Co-located DIFFERENT modalities are valid; repeated semantic roles are not.
+                    seen = set()
+                    for role, point in match.member_positions.items():
+                        key = (entity.component_edges[role]['sem_id'], point)
+                        if key in seen:
+                            match.accepted = False
+                        seen.add(key)
+            result.entities.extend(self.matcher.nms(matches, limit=None if exact else self.cfg.graph_poses_per_node))
+        hit_bits = 0
+        for cls, _, _ in events:
+            hit_bits |= 1 << cls
+        result.activation = {eid: max(m.score for m in result.entities if m.template_id == eid)
+                             for eid in {m.template_id for m in result.entities}}
+        result.diagnostics = {'mode': 'dense_translation' if exact else 'sparse_translation',
+            'search_complete': bool(exact and not index.invalid and not invalid_entities),
+            'assignment_search_complete': False,
+            'classes': len(index.classes), 'feature_events': len(events),
+            'event_budget_dropped': event_drop, 'candidate_budget_dropped': dropped + entity_drop,
+            'posting_visits': visits + entity_visits, 'geometry_evaluations': refinements,
+            'response_maps_computed': provider.map_computations,
+            'static_region_bits': index.region_bits, 'static_entity_bits': index.entity_bits,
+            'query_hit_bits': hit_bits, 'sampled_evaluated_bits': evaluated,
+            'invalid_regions': index.invalid, 'invalid_entities': invalid_entities,
+            'elapsed': time.perf_counter() - start,
+            'limitations': ['Translation only; sparse search is approximate.',
+                           'Deterministic local assignment rejects conflicts; no combinatorial backtracking.']}
+        return result
+
+
+class _StoredMapProvider:
+    """Compatibility adapter for callers already holding GposI response maps."""
+    def __init__(self, maps, nodes=None, cfg=None, valid_mask=None):
+        from types import SimpleNamespace
+        self.maps = maps
+        self.nodes = nodes if nodes is not None else {nid: SimpleNamespace(modality_id=nid) for nid in maps}
+        self.cfg = cfg
+        self.shape = next(iter(maps.values())).shape[-2:] if maps else (0, 0)
+        self.valid = valid_mask
+
+    def get(self, nid):
+        value = self.maps.get(nid)
+        if value is None:
+            return None
+        weight = self.cfg.modality_weights.get(self.nodes[nid].modality_id, 1.) if self.cfg else 1.
+        return (value / weight).clamp(0, 1) if weight > 0 else None
+
+    def evaluable(self, nid):
+        value = self.get(nid)
+        if value is None:
+            return None
+        if self.valid is None:
+            return torch.ones_like(value, dtype=torch.bool)
+        mask = torch.as_tensor(self.valid, device=value.device)
+        return (torch.isfinite(mask) & (mask > 0)).reshape_as(value)
+
+
+class GraphConsolidationOptimizer:
+    """Bounded overlapping compositions, persistent roles and episode-aware evidence.
+
+    Translation-only, conservative: ambiguous matches do not update or create a
+    competing memory. Incompatible layouts remain separate candidate entities.
+    """
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.retriever = HierarchyRetriever(cfg)
+        self.builder = OnceGraphBuilder(cfg)
+        self.work_counts = Counter()
+
+    @staticmethod
+    def source_digest(inputs):
+        digest = hashlib.sha256()
+        for mid, value in sorted(inputs.items()):
+            tensor = value.detach().cpu().contiguous()
+            digest.update(str((mid, tuple(tensor.shape), str(tensor.dtype))).encode())
+            digest.update(tensor.numpy().tobytes())
+        return digest.hexdigest()
+
+    def _region_match(self, region, report, gi, gii, provider, prior):
+        if not gi.nodes:
+            return None, False
+        # Exhaustive local translation fallback: a sparse global miss is not novelty.
+        h, w = report.shape
+        mask = np.zeros((h, w), bool)
+        mask.flat[region.pixels] = True
+        local = FeatureResponseCache(provider.inputs, gi, self.cfg, mask & report.valid_mask)
+        centers = [(int(p % w), int(p // w)) for p in region.pixels]
+        choices = []
+        unresolved = False
+        sparse_centers = defaultdict(list)
+        for match in prior.regions:
+            x, y = map(lambda v: int(round(v)), match.point)
+            if 0 <= x < w and 0 <= y < h and mask[y, x]:
+                sparse_centers[match.template_id].append(match.point)
+        for sid, sem in sorted(gii.semantic_nodes.items()):
+            if sem.kind != 'region' or gi.nodes[sem.anchor_id].modality_id != region.modality_id:
+                continue
+            try:
+                view = region_view(sem, self.cfg)
+            except ValueError:
+                unresolved = True
+                continue
+            self.work_counts['region_template_pairs'] += 1
+            self.work_counts['sparse_centers'] += len(sparse_centers.get(sid, []))
+            candidates = self.retriever.matcher.evaluate(view, local, sparse_centers.get(sid, []))
+            if not any(m.accepted and m.score >= self.cfg.graph_learn_threshold for m in candidates):
+                self.work_counts['dense_fallback_templates'] += 1
+                self.work_counts['dense_fallback_centers'] += len(centers)
+                self.work_counts['dense_slot_centers'] += len(centers) * len(view.slots)
+                candidates = self.retriever.matcher.evaluate(view, local, centers)
+            accepted = [m for m in candidates if m.accepted and m.score >= self.cfg.graph_learn_threshold]
+            if accepted:
+                best = max(accepted, key=lambda m: (m.score, m.matched_coverage, -m.geometry_error))
+                # Reverse extent check prevents a tiny same-colour fragment claiming a large region.
+                observed_span = max((math.dist((p % w, p // w), best.point) for p in region.samples), default=0.)
+                template_span = max((math.hypot(*s['xy']) for s in view.slots), default=0.)
+                if abs(observed_span - template_span) <= max(self.cfg.graph_geometry_update_limit,
+                                                             .2 * max(observed_span, template_span)):
+                    choices.append(best)
+        self.work_counts['local_response_maps_computed'] += local.map_computations
+        choices.sort(key=lambda m: (-m.score, m.template_id))
+        if len(choices) > 1 and choices[0].score - choices[1].score < self.cfg.graph_match_margin:
+            return None, True
+        return (choices[0], False) if choices else (None, unresolved)
+
+    @staticmethod
+    def _copy_region(sem, source_i, gi, gii, node_mapping):
+        copied = gii.add_semantic_node(-1)
+        copied.kind = 'region'
+        for nid in sorted(sem.related_node_ids()):
+            if nid not in node_mapping:
+                n = copy.deepcopy(source_i.nodes[nid])
+                n.node_id = gi.next_node_id
+                gi.next_node_id += 1
+                gi.nodes[n.node_id] = n
+                node_mapping[nid] = n.node_id
+        copied.anchor_id = node_mapping[sem.anchor_id]
+        copied.child_node_ids = {node_mapping[n] for n in sem.related_node_ids()}
+        copied.is_completed = sem.is_completed
+        copied.is_closed_contour = sem.is_closed_contour
+        copied.max_span = sem.max_span
+        for e in sem.relation_edges.values():
+            gii.add_relation_edge(copied, node_mapping[e.src_id], node_mapping[e.dst_id],
+                e.rho_offset, e.theta_offset, e.lambda_rho, e.gamma_theta, e.role, e.span, e.area)
+        return copied
+
+    def _update_region(self, sem, match, episode):
+        changed = sem.evidence.observe(episode, True)
+        for e in sem.relation_edges.values():
+            a = match.assignments.get(e.src_id) if match else None
+            b = match.assignments.get(e.dst_id) if match else None
+            if match is None:
+                delta, success, opportunity = _edge_delta(e), True, True
+            else:
+                opportunity = a is not None and b is not None
+                success = opportunity and a['supported'] and b['supported']
+                delta = np.asarray(b['point']) - a['point'] if success else None
+                if success and np.linalg.norm(delta - _edge_delta(e)) > self.cfg.graph_geometry_update_limit:
+                    success, delta = False, None
+            if e.evidence.observe(episode, success, opportunity, delta):
+                mean = e.evidence.mean
+                if mean is not None:
+                    e.rho_offset = math.log(max(math.hypot(*mean), self.cfg.once_geometry_epsilon))
+                    e.theta_offset = math.atan2(mean[1], mean[0])
+                changed = True
+            e.count = e.evidence.raw_hits
+            e.confidence = e.evidence.reliability(self.cfg.graph_evidence_prior)
+        if changed:
+            sem.version += 1
+            # Rebuild legacy representative links after updates.
+            sem.peripheral_links = {}
+            for e in sem.relation_edges.values():
+                sem.peripheral_links.setdefault(e.dst_id, e.as_legacy_link())
+        return changed
+
+    def _merge_identical_regions(self, gi, gii, giii):
+        """Only merge losslessly equivalent attributed hypergraphs, never raw id sets."""
+        signatures, remap, slot_remap = {}, {}, {}
+        for sid, sem in sorted(gii.semantic_nodes.items()):
+            if sem.kind != 'region':
+                continue
+            try:
+                view = region_view(sem, self.cfg)
+            except ValueError:
+                continue
+            descriptors = {}
+            for slot in view.slots:
+                n = gi.nodes[slot['node_id']]
+                descriptors[slot['key']] = (n.modality_id, tuple(n.prototype.shape),
+                    n.prototype.detach().cpu().contiguous().numpy().tobytes(),
+                    n.mask.detach().cpu().contiguous().numpy().tobytes(), tuple(slot['xy']))
+            edge_keys = {(descriptors[e.src_id], descriptors[e.dst_id], e.role,
+                          e.lambda_rho, e.gamma_theta): e for e in sem.relation_edges.values()}
+            if len(edge_keys) != len(sem.relation_edges):
+                continue  # Different edge identities cannot silently collapse.
+            signature = (descriptors[sem.anchor_id], tuple(sorted(descriptors.values())),
+                         tuple(sorted(edge_keys)))
+            if signature not in signatures:
+                signatures[signature] = (sid, edge_keys, descriptors)
+                continue
+            canonical, old_edges, old_descriptors = signatures[signature]
+            inverse = {description: nid for nid, description in old_descriptors.items()}
+            for nid, description in descriptors.items():
+                slot_remap[(sid, nid)] = (canonical, inverse[description])
+            target = gii.semantic_nodes[canonical]
+            target.evidence.merge_equivalent(sem.evidence)
+            for key, edge in edge_keys.items():
+                old_edges[key].evidence.merge_equivalent(edge.evidence)
+                old_edges[key].count = old_edges[key].evidence.raw_hits
+                old_edges[key].confidence = old_edges[key].evidence.reliability()
+            target.version += 1
+            remap[sid] = canonical
+        for entity in giii.entity_nodes.values():
+            entity.component_edges_by_semantic = defaultdict(list)
+            entity.components = {}
+            for role, member in entity.component_edges.items():
+                member['sem_id'] = remap.get(member['sem_id'], member['sem_id'])
+                entity.component_edges_by_semantic[member['sem_id']].append(role)
+                entity.components.setdefault(member['sem_id'], {'dx': member['dx'], 'dy': member['dy']})
+            for pending in entity.pending_members.values():
+                pending['sem_id'] = remap.get(pending['sem_id'], pending['sem_id'])
+        for relation in gii.region_relations.values():
+            relation['source'] = remap.get(relation['source'], relation['source'])
+            relation['target'] = remap.get(relation['target'], relation['target'])
+            if relation['source'] > relation['target']:
+                relation['source'], relation['target'] = relation['target'], relation['source']
+                relation['delta'] = tuple(-v for v in relation['delta'])
+                if relation['evidence'].mean is not None:
+                    relation['evidence'].mean = tuple(-v for v in relation['evidence'].mean)
+            witnesses = {}
+            for witness in relation.get('contact_witnesses', {}).values():
+                witness['source'] = slot_remap.get(witness['source'], witness['source'])
+                witness['target'] = slot_remap.get(witness['target'], witness['target'])
+                if witness['source'][0] > witness['target'][0]:
+                    witness['source'], witness['target'] = witness['target'], witness['source']
+                    witness['source_local'], witness['target_local'] = witness['target_local'], witness['source_local']
+                key = (witness['source'], witness['target'])
+                if key in witnesses:
+                    witnesses[key]['evidence'].merge_equivalent(witness['evidence'])
+                else:
+                    witnesses[key] = witness
+            relation['contact_witnesses'] = witnesses
+        for sid in remap:
+            del gii.semantic_nodes[sid]
+        gii.parent_entities = defaultdict(set)
+        for eid, entity in giii.entity_nodes.items():
+            for m in entity.component_edges.values():
+                gii.parent_entities[m['sem_id']].add(eid)
+        return remap
+
+    def _merge_identical_entities(self, gii, giii):
+        signatures, remap = {}, {}
+        for eid, entity in sorted(giii.entity_nodes.items()):
+            if entity.pending_members:
+                continue
+            members = sorted(((m['sem_id'], m['dx'], m['dy']), role)
+                             for role, m in entity.component_edges.items())
+            root = entity.component_edges[entity.root_slot]
+            signature = ((root['sem_id'], root['dx'], root['dy']), tuple(key for key, _ in members))
+            if signature not in signatures:
+                signatures[signature] = (eid, members)
+                continue
+            old_id, old_members = signatures[signature]
+            target = giii.entity_nodes[old_id]
+            role_map = {role: old_role for (_, role), (_, old_role) in zip(members, old_members)}
+            if {(role_map[a], role_map[b]) for a, b in entity.relation_edges} != set(target.relation_edges):
+                continue
+            if any(entity.relation_edges[p]['delta'] != target.relation_edges[(role_map[p[0]], role_map[p[1]])]['delta']
+                   for p in entity.relation_edges):
+                continue
+            target.evidence.merge_equivalent(entity.evidence)
+            for role, old_role in role_map.items():
+                target.component_edges[old_role]['evidence'].merge_equivalent(entity.component_edges[role]['evidence'])
+            for (a, b), rel in entity.relation_edges.items():
+                target.relation_edges[(role_map[a], role_map[b])]['evidence'].merge_equivalent(rel['evidence'])
+            target.version += 1
+            target.last_observed = max(target.last_observed, entity.last_observed)
+            if entity.status == 'stable':
+                target.status = 'stable'
+            remap[eid] = old_id
+        for eid in remap:
+            del giii.entity_nodes[eid]
+        for parents in gii.parent_entities.values():
+            for eid in list(parents):
+                if eid in remap:
+                    parents.remove(eid)
+                    parents.add(remap[eid])
+        return remap
+
+    def _relations_and_proposals(self, report, mapped, positions, gii, episode):
+        adjacency = defaultdict(set)
+        observed_layouts = defaultdict(list)
+        contacts = defaultdict(list)
+        for c in report.contacts:
+            if c.written:
+                contacts[tuple(sorted((c.region_a, c.region_b)))].append(c)
+        supported_pairs = {tuple(sorted((c.region_a, c.region_b))) for c in report.contacts if c.written}
+        ids = sorted(mapped)
+        for ai, a in enumerate(ids):
+            for b in ids[ai + 1:]:
+                delta = np.asarray(positions[b]) - positions[a]
+                distance = np.linalg.norm(delta)
+                contact = (a, b) in supported_pairs
+                if not contact and distance > self.cfg.graph_member_radius:
+                    continue
+                sa, sb = mapped[a], mapped[b]
+                # Canonical template orientation, preserving the sign of relative position.
+                if sa > sb:
+                    sa, sb, delta = sb, sa, -delta
+                observed_layouts[(sa, sb)].append(tuple(delta))
+                variants = [(key, rel) for key, rel in gii.region_relations.items()
+                            if rel['source'] == sa and rel['target'] == sb]
+                chosen = next((rel for _, rel in variants if math.dist(rel['delta'], delta)
+                               <= self.cfg.graph_geometry_update_limit), None)
+                if chosen is None:
+                    key = max(gii.region_relations, default=-1) + 1
+                    chosen = {'source': sa, 'target': sb, 'delta': tuple(delta),
+                              'evidence': EvidenceStats(), 'contact': contact}
+                    gii.region_relations[key] = chosen
+                chosen['contact'] |= contact
+                witnesses = chosen.setdefault('contact_witnesses', {})
+                for c in contacts.get((a, b), [])[:self.cfg.once_contacts_per_pair]:
+                    # Resolve contact endpoints to persistent feature slots. Coordinates
+                    # below are relative to member anchors, never query-time ground truth.
+                    ra, rb = c.region_a, c.region_b
+                    points = [(c.source % report.shape[1], c.source // report.shape[1]),
+                              (c.target % report.shape[1], c.target // report.shape[1])]
+                    resolved = []
+                    for rid, point in zip((ra, rb), points):
+                        view = region_view(gii.semantic_nodes[mapped[rid]], self.cfg)
+                        local = np.asarray(point) - positions[rid]
+                        slot = min(view.slots, key=lambda s: math.dist(s['xy'], local))
+                        if math.dist(slot['xy'], local) > self.cfg.graph_geometry_update_limit:
+                            break
+                        resolved.append((mapped[rid], slot['node_id'], tuple(local)))
+                    if len(resolved) != 2:
+                        continue
+                    if resolved[0][0] > resolved[1][0]:
+                        resolved.reverse()
+                    key = tuple((item[0], item[1]) for item in resolved)
+                    witness = witnesses.setdefault(key, {'source': resolved[0][:2],
+                        'target': resolved[1][:2], 'source_local': resolved[0][2],
+                        'target_local': resolved[1][2], 'evidence': EvidenceStats()})
+                    witness['evidence'].observe(episode, True)
+                adjacency[a].add(b)
+                adjacency[b].add(a)
+        # Check alternatives once per observation, not once per sampled contact pair.
+        for relation in gii.region_relations.values():
+            layouts = observed_layouts.get((relation['source'], relation['target']), [])
+            if not layouts:
+                continue  # No jointly observed pair: unknown, not a failed relation.
+            best = min(layouts, key=lambda d: math.dist(d, relation['delta']))
+            supported = math.dist(best, relation['delta']) <= self.cfg.graph_geometry_update_limit
+            relation['evidence'].observe(episode, supported, delta=best if supported else None)
+            if relation['evidence'].mean is not None:
+                relation['delta'] = relation['evidence'].mean
+        proposals, seen = [], set()
+        for root in ids:
+            group, frontier = [root], set(adjacency[root])
+            while frontier and len(group) < self.cfg.graph_max_members:
+                nxt = min(frontier, key=lambda rid: (math.dist(positions[root], positions[rid]), rid))
+                frontier.remove(nxt)
+                if math.dist(positions[root], positions[nxt]) > self.cfg.graph_member_radius:
+                    continue
+                group.append(nxt)
+                frontier.update(adjacency[nxt] - set(group))
+                key = tuple(sorted(group))
+                if len(key) >= self.cfg.graph_min_members and key not in seen:
+                    proposals.append(key)
+                    seen.add(key)
+                    if self.cfg.graph_proposal_budget and len(proposals) >= self.cfg.graph_proposal_budget:
+                        return proposals, True
+        return proposals, False
+
+    def _align_entity(self, entity, proposal, mapped, positions):
+        members = entity.component_edges
+        if not members:
+            return None
+        choices = []
+        centers = {tuple(np.asarray(positions[rid]) - [m['dx'], m['dy']])
+                   for rid in proposal for m in members.values() if mapped[rid] == m['sem_id']}
+        for candidate in sorted(centers):
+            center = np.asarray(candidate)
+            assignment, used, errors = {}, set(), []
+            # Exact semantic identity after GmemII alignment; occurrences stay distinct.
+            for role, member in sorted(members.items()):
+                target = center + [member['dx'], member['dy']]
+                options = sorted((math.dist(positions[r], target), r) for r in proposal
+                                 if r not in used and mapped[r] == member['sem_id'])
+                if options and options[0][0] <= self.cfg.graph_geometry_update_limit:
+                    error, region = options[0]
+                    assignment[role] = region
+                    used.add(region)
+                    errors.append(error)
+            coverage = len(assignment) / len(members)
+            reverse = len(assignment) / len(proposal)
+            if coverage >= self.cfg.graph_coverage_min and reverse >= self.cfg.graph_coverage_min:
+                score = min(coverage, reverse) * math.exp(-max(errors, default=0.) ** 2 /
+                                                        (2 * self.cfg.graph_geometry_sigma ** 2))
+                choices.append((score, tuple(center), assignment))
+        return max(choices, key=lambda x: x[0]) if choices else None
+
+    def _update_entity(self, entity, alignment, proposal, mapped, positions, provider, episode, step):
+        score, center, assignment = alignment
+        entity.evidence.observe(episode, True)
+        entity.last_observed = step
+        for role, member in entity.component_edges.items():
+            rid = assignment.get(role)
+            point = tuple(np.asarray(center) + [member['dx'], member['dy']])
+            h, w = provider.shape
+            opportunity = (0 <= point[0] < w and 0 <= point[1] < h and
+                           bool(provider.valid[0, 0, int(point[1]), int(point[0])]))
+            anchor_id = self._working_ii.semantic_nodes[member['sem_id']].anchor_id
+            opportunity &= provider.evaluable(anchor_id) is not None
+            delta = tuple(np.asarray(positions[rid]) - center) if rid is not None else None
+            # Other matched roles are necessary before treating a missing member as a failure.
+            opportunity &= len(assignment) >= self.cfg.graph_min_members
+            changed = member['evidence'].observe(episode, rid is not None, opportunity, delta)
+            if changed and role != entity.root_slot and member['evidence'].mean is not None:
+                member['dx'], member['dy'] = member['evidence'].mean
+            member['count'] = member['evidence'].raw_hits
+        for (a, b), rel in entity.relation_edges.items():
+            ra, rb = assignment.get(a), assignment.get(b)
+            delta = tuple(np.asarray(positions[rb]) - positions[ra]) if ra is not None and rb is not None else None
+            rel['evidence'].observe(episode, delta is not None,
+                                    opportunity=ra is not None and rb is not None, delta=delta)
+            if rel['evidence'].mean is not None:
+                rel['delta'] = rel['evidence'].mean
+        # Repeated unexplained members are probationary, not immediate structural edits.
+        used = set(assignment.values())
+        observed_pending = set()
+        for rid in proposal:
+            if rid in used:
+                continue
+            delta = tuple(np.asarray(positions[rid]) - center)
+            pending_key = next((key for key, item in entity.pending_members.items()
+                                if item['sem_id'] == mapped[rid] and
+                                math.dist(item['delta'], delta) <= self.cfg.graph_geometry_update_limit), None)
+            if pending_key is None:
+                pending_key = max(entity.pending_members, default=-1) + 1
+                entity.pending_members[pending_key] = {'sem_id': mapped[rid], 'delta': delta,
+                                                       'evidence': EvidenceStats()}
+            item = entity.pending_members[pending_key]
+            item['evidence'].observe(episode, True, delta=delta)
+            item['delta'] = item['evidence'].mean or delta
+            observed_pending.add(pending_key)
+        for key, item in list(entity.pending_members.items()):
+            if key not in observed_pending:
+                p = np.asarray(center) + item['delta']
+                h, w = provider.shape
+                nid = self._working_ii.semantic_nodes[item['sem_id']].anchor_id
+                known = (0 <= p[0] < w and 0 <= p[1] < h and
+                         bool(provider.valid[0, 0, int(p[1]), int(p[0])]) and
+                         provider.evaluable(nid) is not None)
+                item['evidence'].observe(episode, False, known)
+            if (item['evidence'].support >= self.cfg.graph_stable_support and
+                    item['evidence'].reliability() >= self.cfg.graph_coverage_min and
+                    len(entity.component_edges) < self.cfg.graph_max_members):
+                member = self._working_iii.add_component(entity, item['sem_id'], *item['delta'])
+                member['evidence'] = copy.deepcopy(item['evidence'])
+                member['count'] = member['evidence'].raw_hits
+                self._working_ii.parent_entities[item['sem_id']].add(entity.node_id)
+                entity.relation_edges[(entity.root_slot, member['slot_id'])] = {
+                    'delta': item['delta'], 'evidence': copy.deepcopy(item['evidence'])}
+                del entity.pending_members[key]
+        removable = [role for role, member in entity.component_edges.items()
+                     if role != entity.root_slot and
+                     member['evidence'].opportunities >= self.cfg.graph_stable_support and
+                     member['evidence'].reliability() < self.cfg.graph_member_remove_reliability]
+        for role in removable:
+            if len(entity.component_edges) <= self.cfg.graph_min_members:
+                break
+            member = entity.component_edges.pop(role)
+            entity.component_edges_by_semantic[member['sem_id']].remove(role)
+            if not entity.component_edges_by_semantic[member['sem_id']]:
+                self._working_ii.parent_entities[member['sem_id']].discard(entity.node_id)
+            entity.relation_edges = {pair: rel for pair, rel in entity.relation_edges.items() if role not in pair}
+        # The representative compatibility view must follow role changes.
+        entity.components = {}
+        for member in entity.component_edges.values():
+            entity.components.setdefault(member['sem_id'], {'dx': member['dx'], 'dy': member['dy']})
+        entity.version += 1
+        variances = [max(m['evidence'].variance()) for m in entity.component_edges.values()]
+        if entity.evidence.support >= self.cfg.graph_stable_support and max(variances, default=0.) <= self.cfg.graph_stable_variance:
+            entity.status = 'stable'
+
+    def _new_entity(self, proposal, mapped, positions, gii, giii, episode, step):
+        entity = giii.add_entity_node()
+        root = proposal[0]
+        root_xy = np.asarray(positions[root])
+        for rid in proposal:
+            delta = tuple(np.asarray(positions[rid]) - root_xy)
+            member = giii.add_component(entity, mapped[rid], *delta)
+            member['evidence'].observe(episode, True, delta=delta)
+            gii.parent_entities[mapped[rid]].add(entity.node_id)
+        roles = sorted(entity.component_edges)
+        for role in roles[1:]:
+            member = entity.component_edges[role]
+            stat = EvidenceStats()
+            stat.observe(episode, True, delta=(member['dx'], member['dy']))
+            entity.relation_edges[(entity.root_slot, role)] = {
+                'delta': (member['dx'], member['dy']), 'evidence': stat}
+        entity.evidence.observe(episode, True)
+        entity.last_observed = step
+        return entity
+
+    def _prune_candidates(self, gii, giii):
+        candidates = [e for e in giii.entity_nodes.values() if e.status == 'candidate']
+        candidates.sort(key=lambda e: (e.evidence.support, e.last_observed, e.node_id))
+        excess = max(0, len(candidates) - self.cfg.graph_candidate_memory_budget)
+        remove = {e.node_id for e in candidates[:excess]}
+        remove.update(e.node_id for e in candidates
+                      if giii.observations - e.last_observed > self.cfg.graph_candidate_expiry)
+        for eid in remove:
+            entity = giii.entity_nodes.pop(eid)
+            for member in entity.component_edges.values():
+                gii.parent_entities[member['sem_id']].discard(eid)
+        return sorted(remove)
+
+    @torch.no_grad()
+    def learn(self, features, gi, gii, giii, valid_mask=None, source_id=None, episode_id=None,
+              H_orig=None, W_orig=None):
+        # Stage timings include completed CUDA work, not only asynchronous launches.
+        stage_seconds = {}
+        self.work_counts = Counter()
+        device = torch.device(self.cfg.device)
+        def clock():
+            if device.type == 'cuda':
+                torch.cuda.synchronize(device)
+            return time.perf_counter()
+        last_stage = clock()
+        def mark(name):
+            nonlocal last_stage
+            now = clock()
+            stage_seconds[name] = now - last_stage
+            last_stage = now
+
+        inputs = prepare_feature_subspaces(features, self.cfg)
+        fingerprint = self.source_digest(inputs)
+        source = str(source_id) if source_id is not None else fingerprint
+        episode = str(episode_id) if episode_id is not None else fingerprint
+        if valid_mask is None and inputs and H_orig is not None and W_orig is not None:
+            h, w = next(iter(inputs.values())).shape[-2:]
+            valid_mask = np.zeros((h, w), bool)
+            y, x = max(0, h // 2 - int(H_orig) // 2), max(0, w // 2 - int(W_orig) // 2)
+            valid_mask[y:min(h, y + int(H_orig)), x:min(w, x + int(W_orig))] = True
+        mark('prepare_and_digest')
+        prior = self.retriever.query(inputs, gi, gii, giii, valid_mask)
+        mark('prior_query')
+        oi, oii = GmemoryI(), GmemoryII(self.cfg)
+        # Geometry-preserving occurrence mode is compulsory for long-term learning.
+        if self.cfg.once_node_reuse_mode != 'sample_instance':
+            raise ValueError('Hierarchy learning requires sample_instance; prototype mode remains a raw-build comparison.')
+        report = self.builder.build_once(inputs, oi, oii, valid_mask, H_orig, W_orig, giii.observations + 1)
+        mark('observation_build')
+        result = LearningResult(report, oi, oii, prior)
+        if not inputs:
+            result.diagnostics = {'source_id': source, 'episode_id': episode, 'empty_input': True,
+                                  'stage_seconds': stage_seconds, 'work_counts': dict(self.work_counts)}
+            return result
+        original_provider = FeatureResponseCache(inputs, gi, self.cfg, report.valid_mask)
+        decisions, ambiguous = {}, []
+        # Every match sees the same frozen original pools, even within this observation.
+        for region in report.regions:
+            if region.semantic_id is None:
+                continue
+            match, uncertain = self._region_match(region, report, gi, gii, original_provider, prior)
+            if uncertain:
+                ambiguous.append(region.region_id)
+            else:
+                decisions[region.region_id] = match
+        mark('region_matching')
+        # Stage updates, including indexes and evidence, before touching persistent pools.
+        wi, wii, wiii = copy.deepcopy(gi), copy.deepcopy(gii), copy.deepcopy(giii)
+        mark('pool_deepcopy')
+        self._working_ii = wii
+        self._working_iii = wiii
+        wiii.observations += 1
+        mapped, positions, node_mapping = {}, {}, {}
+        by_region = {r.region_id: r for r in report.regions}
+        new_regions = updated_regions = 0
+        for rid, match in decisions.items():
+            region = by_region[rid]
+            if match is None:
+                sem = self._copy_region(oii.semantic_nodes[region.semantic_id], oi, wi, wii, node_mapping)
+                position = (region.anchor % report.shape[1], region.anchor // report.shape[1])
+                new_regions += 1
+            else:
+                sem = wii.semantic_nodes[match.template_id]
+                position = match.point
+                updated_regions += 1
+            self._update_region(sem, match, episode)
+            mapped[rid], positions[rid] = sem.node_id, position
+        region_remap = self._merge_identical_regions(wi, wii, wiii)
+        mapped = {rid: region_remap.get(sid, sid) for rid, sid in mapped.items()}
+        mark('region_update_and_merge')
+        proposals, truncated = self._relations_and_proposals(report, mapped, positions, wii, episode)
+        mark('relations_and_proposals')
+        provider = FeatureResponseCache(inputs, wi, self.cfg, report.valid_mask)
+        new_entities, updated_entities, unresolved_entities = 0, 0, 0
+        entity_instances = []
+        frozen_entities = copy.deepcopy(wiii.entity_nodes)
+        mark('entity_snapshot')
+        # New candidates do not become evidence for themselves in this observation.
+        updated_occurrences = set()
+        for proposal in proposals:
+            choices = []
+            for eid, entity in sorted(frozen_entities.items()):
+                aligned = self._align_entity(entity, proposal, mapped, positions)
+                if aligned and aligned[0] >= self.cfg.graph_learn_threshold:
+                    choices.append((aligned[0], eid, aligned))
+            choices.sort(key=lambda x: (-x[0], x[1]))
+            if len(choices) > 1 and choices[0][0] - choices[1][0] < self.cfg.graph_match_margin:
+                unresolved_entities += 1
+                continue
+            if choices:
+                _, eid, aligned = choices[0]
+                entity = wiii.entity_nodes[eid]
+                occurrence = (eid, tuple(round(v, 3) for v in aligned[1]))
+                if occurrence in updated_occurrences:
+                    continue
+                updated_occurrences.add(occurrence)
+                self._update_entity(entity, aligned, proposal, mapped, positions, provider, episode, wiii.observations)
+                updated_entities += 1
+                instance_point = aligned[1]
+            else:
+                entity = self._new_entity(proposal, mapped, positions, wii, wiii, episode, wiii.observations)
+                new_entities += 1
+                instance_point = positions[proposal[0]]
+            result.entity_ids.append(entity.node_id)
+            entity_instances.append({'entity_id': entity.node_id, 'point': tuple(instance_point)})
+        mark('entity_alignment_and_update')
+        entity_remap = self._merge_identical_entities(wii, wiii)
+        removed = self._prune_candidates(wii, wiii)
+        # One commit; observations and their truth coordinates remain separate.
+        gi.__dict__.update(wi.__dict__)
+        gii.__dict__.update(wii.__dict__)
+        giii.__dict__.update(wiii.__dict__)
+        result.region_mapping = {rid: {'semantic_id': sid, 'point': positions[rid]} for rid, sid in mapped.items()}
+        result.entity_ids = sorted({entity_remap.get(eid, eid) for eid in result.entity_ids} - set(removed))
+        mark('entity_merge_prune_commit')
+        result.diagnostics = {'source_id': source, 'episode_id': episode,
+            'stage_seconds': stage_seconds, 'work_counts': dict(self.work_counts),
+            'new_regions': new_regions, 'updated_regions': updated_regions,
+            'ambiguous_regions': ambiguous, 'new_entities': new_entities,
+            'updated_entities': updated_entities, 'ambiguous_entity_proposals': unresolved_entities,
+            'proposal_budget_truncated': truncated, 'pruned_candidates': removed,
+            'merged_region_ids': region_remap, 'merged_entity_ids': entity_remap,
+            'entity_instances': [{'entity_id': entity_remap.get(item['entity_id'], item['entity_id']),
+                                  'point': item['point']} for item in entity_instances
+                                 if entity_remap.get(item['entity_id'], item['entity_id']) not in removed],
+            'memory_counts': (len(gi.nodes), len(gii.semantic_nodes), len(giii.entity_nodes)),
+            'learning_match_mode': 'dense_local_translation',
+            'limitations': ['Bounded spatial/contact proposals; no semantic object labels.',
+                           'Conservative ambiguity handling; no automatic shared-template reanchoring.',
+                           'Distinct incompatible layouts are retained instead of averaging their geometry.']}
+        return result

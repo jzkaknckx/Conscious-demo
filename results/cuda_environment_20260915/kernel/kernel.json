@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "/home/p/anaconda3/envs/consciousLinux/bin/python",
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
+  ],
+  "display_name": "consciousLinux (CUDA 12.8)",
+  "language": "python",
+  "env": {
+    "LD_LIBRARY_PATH": "/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/torch/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cublas/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cuda_cupti/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cuda_nvrtc/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cudnn/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cufft/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cufile/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/curand/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cusolver/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cusparse/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/cusparselt/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/nccl/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/nvjitlink/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/nvshmem/lib:/home/p/anaconda3/envs/consciousLinux/lib/python3.11/site-packages/nvidia/nvtx/lib"
+  },
+  "metadata": {
+    "debugger": true
+  }
+}

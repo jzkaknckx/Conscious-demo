@@ -1,0 +1,41 @@
+{
+  "status": "interrupted",
+  "completed_train": 8,
+  "planned_train": 593,
+  "completed_evaluations": 0,
+  "baseline": {
+    "rss_mib": 1262.46875,
+    "process_lifetime_peak_mib": 1497.515625,
+    "host_available_mib": 18844.390625,
+    "host_total_mib": 31928.58203125
+  },
+  "final": {
+    "rss_mib": 1316.75,
+    "process_lifetime_peak_mib": 1497.515625,
+    "host_available_mib": 18899.31640625,
+    "host_total_mib": 31928.58203125
+  },
+  "run_sampled_peak_rss_mib": 1480.01171875,
+  "peak_rss_increment_from_baseline_mib": 217.54296875,
+  "minimum_host_available_mib": 18645.28515625,
+  "sampler_error": null,
+  "gmem_i": 7073,
+  "gmem_ii": 641,
+  "gmem_iii": 512,
+  "ii_relations": 34982,
+  "iii_memberships": 2034,
+  "iii_relations": 1522,
+  "stable_entities": 0,
+  "entity_raw_hits": 540,
+  "entity_support": 512.0,
+  "replay": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  },
+  "heldout": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  }
+}

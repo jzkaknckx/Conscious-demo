@@ -1,0 +1,81 @@
+{
+  "python": "/home/p/anaconda3/envs/consciousLinux/bin/python",
+  "torch": "2.10.0+cu128",
+  "torchvision": "0.25.0+cu128",
+  "cuda_build": "12.8",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "capability": [
+    12,
+    0
+  ],
+  "arches": [
+    "sm_70",
+    "sm_75",
+    "sm_80",
+    "sm_86",
+    "sm_90",
+    "sm_100",
+    "sm_120"
+  ],
+  "total_memory_mib": 15840.3125,
+  "status": "passed",
+  "checks": [
+    "matmul",
+    "Retina CNN",
+    "grid_sample",
+    "32x32 first/repeated learning",
+    "hierarchy query",
+    "persistent CUDA tensors"
+  ],
+  "steps": [
+    {
+      "memory_counts": [
+        41,
+        5,
+        13
+      ],
+      "stage_seconds": {
+        "prepare_and_digest": 0.02029221598058939,
+        "prior_query": 0.002978162025101483,
+        "observation_build": 0.05077546997927129,
+        "region_matching": 0.00039189495146274567,
+        "pool_deepcopy": 7.14410562068224e-05,
+        "region_update_and_merge": 0.003300776006653905,
+        "relations_and_proposals": 0.0022969850106164813,
+        "entity_snapshot": 0.00033919198904186487,
+        "entity_alignment_and_update": 0.00072437000926584,
+        "entity_merge_prune_commit": 4.840991459786892e-05
+      },
+      "work_counts": {}
+    },
+    {
+      "memory_counts": [
+        65,
+        5,
+        13
+      ],
+      "stage_seconds": {
+        "prepare_and_digest": 0.00016492605209350586,
+        "prior_query": 0.20350003498606384,
+        "observation_build": 0.03212597290985286,
+        "region_matching": 0.16572668310254812,
+        "pool_deepcopy": 0.0035410718992352486,
+        "region_update_and_merge": 0.00312254810705781,
+        "relations_and_proposals": 0.0022417429136112332,
+        "entity_snapshot": 0.0013540510553866625,
+        "entity_alignment_and_update": 0.0036297800252214074,
+        "entity_merge_prune_commit": 6.750598549842834e-05
+      },
+      "work_counts": {
+        "region_template_pairs": 17,
+        "sparse_centers": 4,
+        "dense_fallback_templates": 13,
+        "dense_fallback_centers": 1232,
+        "dense_slot_centers": 17248,
+        "local_response_maps_computed": 17
+      }
+    }
+  ],
+  "query_entities": 5,
+  "peak_allocated_mib": 9.087890625
+}
