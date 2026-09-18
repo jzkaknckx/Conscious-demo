@@ -2,6 +2,9 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-18_voc2007_training_results_review.md | 审查 20 图 34 目标：55.88% 提交、实体零复用、17/19 纯 RGB；分析弃写、规模成本与连续扩容入口限制 | chatgpt | 2026-09-18 |
+| 2026-09-18_voc2007_supervised_notebook.md | 接入 VOC2007 官方划分，增加同类两图分割/实体/检索演示、独立批量学习及资源曲线和中断保存；仅静态编译 | chatgpt | 2026-09-18 |
+| 2026-09-18_supervised_graph_learning_implementation.md | 实现框监督实体事务、外观角色对应、固定类别读出/训练、滑窗检测与独立 Notebook；仅静态编译 | chatgpt | 2026-09-18 |
 | 2026-09-18_supervised_graph_learning_plan.md | 核对 1518 个目标框，设计标注确认实体、框监督学习、增长图分类读出及无框检测/视频扩展完整方案 | chatgpt | 2026-09-18 |
 | 2026-09-18_index_parallelism_growing_graph_classifier.md | 复查 38 图运行、42.53% 粗筛与关系瓶颈；审查自适应编码树、多核方案及增长图分类头生命周期 | chatgpt | 2026-09-18 |
 | 2026-09-18_grad_bound_edge_attributes.md | aps/ori 默认继承 grad 分区、邻接与有效锚点；增加父区域图示和分区合同，21 项回归及真实单图构图通过 | chatgpt | 2026-09-18 |

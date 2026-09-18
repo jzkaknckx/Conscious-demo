@@ -577,6 +577,7 @@ class EntityNode:
         self.version = 0
         self.last_observed = 0
         self.pending_members = {}
+        self.supervision = None  # optional annotation provenance; independent of visual support
         
         self.activation_level = 0.0
         self.state_flag = NeuronState.CALM
@@ -2607,6 +2608,7 @@ def region_view(sem, cfg):
 def entity_view(entity, gmem_ii, cfg):
     """Query-only flattening: roles remain unique, component weights normalised."""
     slots, constraints = [], []
+    family_sizes = Counter(m.get('family_id', role) for role, m in entity.component_edges.items())
     for sid, member in sorted(entity.component_edges.items()):
         if member.get('scale', 1.) != 1. or member.get('angle', 0.) != 0.:
             raise ValueError('This implementation supports translation only, including appearance.')
@@ -2617,7 +2619,8 @@ def entity_view(entity, gmem_ii, cfg):
             slots.append({**item, 'key': (sid, item['key']), 'group': sid,
                           'xy': tuple(offset + item['xy']),
                           'member_xy': tuple(offset),
-                          'group_weight': member['evidence'].weight(cfg)})
+                          'group_weight': member['evidence'].weight(cfg) /
+                              family_sizes[member.get('family_id', sid)]})
         for e in sub.constraints:
             constraints.append({**e, 'source': (sid, e['source']), 'target': (sid, e['target'])})
     for (a, b), relation in entity.relation_edges.items():
@@ -3634,7 +3637,9 @@ class GraphConsolidationOptimizer:
     def _merge_identical_entities(self, gii, giii):
         signatures, remap = {}, {}
         for eid, entity in sorted(giii.entity_nodes.items()):
-            if entity.pending_members:
+            # Labelled entities have an observation ledger and role provenance.
+            # They are merged only through the supervised transaction, never by ID-blind compaction.
+            if entity.pending_members or getattr(entity, 'supervision', None):
                 continue
             members = sorted(((m['sem_id'], m['dx'], m['dy']), role)
                              for role, m in entity.component_edges.items())
@@ -3670,7 +3675,7 @@ class GraphConsolidationOptimizer:
                     parents.add(remap[eid])
         return remap
 
-    def _relations_and_proposals(self, report, mapped, positions, gii, episode):
+    def _relations_and_proposals(self, report, mapped, positions, gii, episode, generate_proposals=True):
         adjacency = defaultdict(set)
         observed_layouts = defaultdict(list)
         contacts = defaultdict(list)
@@ -3737,6 +3742,8 @@ class GraphConsolidationOptimizer:
             relation['evidence'].observe(episode, supported, delta=best if supported else None)
             if relation['evidence'].mean is not None:
                 relation['delta'] = relation['evidence'].mean
+        if not generate_proposals:
+            return [], False
         proposals, seen = [], set()
         for root in ids:
             group, frontier = [root], set(adjacency[root])
@@ -3888,7 +3895,8 @@ class GraphConsolidationOptimizer:
         return entity
 
     def _prune_candidates(self, gii, giii):
-        candidates = [e for e in giii.entity_nodes.values() if e.status == 'candidate']
+        candidates = [e for e in giii.entity_nodes.values() if e.status == 'candidate'
+                      and not (getattr(e, 'supervision', None) or {}).get('protected', False)]
         candidates.sort(key=lambda e: (e.evidence.support, e.last_observed, e.node_id))
         excess = max(0, len(candidates) - self.cfg.graph_candidate_memory_budget)
         remove = {e.node_id for e in candidates[:excess]}
@@ -4009,6 +4017,8 @@ class GraphConsolidationOptimizer:
         for proposal in proposals:
             choices = []
             for eid, entity in sorted(frozen_entities.items()):
+                if getattr(entity, 'supervision', None):
+                    continue
                 aligned = self._align_entity(entity, proposal, mapped, positions)
                 if aligned and aligned[0] >= self.cfg.graph_learn_threshold:
                     choices.append((aligned[0], eid, aligned))

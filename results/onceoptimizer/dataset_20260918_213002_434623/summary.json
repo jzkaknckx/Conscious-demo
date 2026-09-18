@@ -1,0 +1,90 @@
+{
+  "status": "interrupted",
+  "completed_train": 0,
+  "planned_train": 593,
+  "completed_evaluations": 0,
+  "baseline": {
+    "rss_mib": 5886.41796875,
+    "process_lifetime_peak_mib": 7037.171875,
+    "host_available_mib": 13676.9453125,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 33.34716796875,
+    "cuda_reserved_mib": 174.0,
+    "cuda_peak_allocated_mib": 33.34716796875,
+    "cuda_peak_reserved_mib": 174.0,
+    "cuda_free_mib": 14608.3125,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_elapsed_seconds": 37.289179646002594,
+  "cuda_environment": {
+    "python": "/home/p/anaconda3/envs/consciousLinux/bin/python",
+    "torch": "2.10.0+cu128",
+    "cuda_build": "12.8",
+    "cudnn_version": 91002,
+    "device": "cuda:0",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "compiled_arches": [
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+    ],
+    "total_memory_mib": 15840.3125
+  },
+  "final": {
+    "rss_mib": 5886.51171875,
+    "process_lifetime_peak_mib": 7037.171875,
+    "host_available_mib": 13619.68359375,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 36.29541015625,
+    "cuda_reserved_mib": 174.0,
+    "cuda_peak_allocated_mib": 109.5615234375,
+    "cuda_peak_reserved_mib": 174.0,
+    "cuda_free_mib": 14640.75,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_sampled_peak_rss_mib": 5886.51171875,
+  "peak_rss_increment_from_baseline_mib": 0.09375,
+  "minimum_host_available_mib": 13607.83203125,
+  "sampler_error": null,
+  "gmem_i_by_modality": {
+    "0": 797,
+    "3": 578,
+    "4": 575,
+    "1": 441,
+    "2": 628
+  },
+  "gmem_ii_by_modality": {
+    "0": 52,
+    "3": 52,
+    "4": 52,
+    "1": 50,
+    "2": 50
+  },
+  "gmem_i": 3019,
+  "gmem_ii": 256,
+  "gmem_iii": 64,
+  "ii_relations": 15621,
+  "iii_memberships": 254,
+  "iii_relations": 190,
+  "stable_entities": 0,
+  "entity_raw_hits": 64,
+  "entity_support": 64.0,
+  "replay": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  },
+  "heldout": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  }
+}
