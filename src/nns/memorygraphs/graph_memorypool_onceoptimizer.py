@@ -34,11 +34,11 @@ class MemoryConfig:
     
     # 模态权重平衡 (Modality Normalization)
     modality_weights = {
-        0: 0.7,
-        1: 0.6,
-        2: 0.3,
-        3: 0.3,
-        4: 0.3,
+        0: 1.0,
+        1: 1.0,
+        2: 1.0,
+        3: 1.0,
+        4: 1.0,
     }
     
     feature_types = {
@@ -77,6 +77,8 @@ class MemoryConfig:
     tau_curv = 0.05
     tau_aps = 0.05
     tau_ori_coh = 0.6
+    tau_ori_confidence = 0.05
+    ori_angle_channels = 0  # 0: legacy angles only; S: [S angles, S confidence]
     ori_coh_radius = 1
     ori_axis_k = 2
     gamma_ori = 2.0
@@ -122,6 +124,7 @@ class MemoryConfig:
         },
         2: {
             'name': 'Curv',
+            'encoding_version': 'stable_structure_v2',
             'topology': 'Trace_1D',
             'channels': {},
             'metric_groups': {
@@ -136,6 +139,7 @@ class MemoryConfig:
         },
         3: {
             'name': 'aps',
+            'encoding_version': 'stable_structure_v2',
             'topology': 'Surface_2D',
             'channels': {},
             'metric_groups': {
@@ -150,6 +154,7 @@ class MemoryConfig:
         },
         4: {
             'name': 'ori',
+            'encoding_version': 'stable_structure_v2',
             'topology': 'Trace_1D',
             'channels': {},
             'metric_groups': {
@@ -271,8 +276,10 @@ class MemoryConfig:
     boundary_coverage_suppression = 0.35
 
     # OnceGraphBuilder: distances are measured in feature-map pixels.
+    once_bind_edge_attributes = True  # aps/ori inherit grad partitions, never split independently
     once_support_threshold = {0: 0.05, 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.05}
-    once_seed_threshold = 0.6
+    once_seed_threshold = {0: .6, 1: .6, 2: .6, 3: .6, 4: .6}
+    once_surface_variance = {1: .02, 3: .02}
     once_seed_nms_radius = 4
     once_similarity_min = {0: 0.75, 1: 0.85, 2: 0.8, 3: 0.8, 4: 0.75}
     once_affinity_min = 0.01
@@ -287,7 +294,7 @@ class MemoryConfig:
     once_range_max = {1: 2.0, 3: 2.0}
     once_min_support = {0: 4, 1: 16, 2: 3, 3: 8, 4: 4}
     once_region_budget = 256
-    once_sample_budget = {0: 1024, 1: 1024, 2: 512, 3: 512, 4: 512}
+    once_sample_budget = {0: 1024, 1: 1024, 2: 1024, 3: 1024, 4: 1024}
     once_samples_per_region = 64
     once_curve_spacing = 8.0
     once_curve_error = 1.5
@@ -322,6 +329,9 @@ class MemoryConfig:
     graph_shared_response_cache_bytes = 256 * 1024 * 1024  # one observation, shared unmasked maps
     graph_response_cache = 32
     graph_query_chunk = 2048
+    graph_binary_coarse = True
+    graph_coarse_bin_width = {0: .25, 1: .125, 2: .125, 3: .125, 4: math.pi / 8}
+    graph_coarse_tolerance = 1e-5  # outward bounds and threshold rounding guard
     graph_progressive_matching = True
     graph_slot_batch = 8
     graph_local_response_fraction = 0.25  # sparse request: compute only needed pixel rectangle
@@ -959,17 +969,18 @@ class SimilarityEngine:
             return (X.abs() > cfg.tau_aps).any(dim=1, keepdim=True).to(dtype=X.dtype)
 
         if mod_id == 4:
-            weight = torch.ones_like(X[:, 0:1])
+            angles, confidence = orientation_channels(X, cfg)
             gates = []
-            for c in range(C):
+            for c in range(angles.shape[1]):
                 coh = SimilarityEngine._circular_coherence_map(
-                    X[:, c:c+1],
-                    weight,
-                    getattr(cfg, 'ori_coh_radius', 1),
-                    getattr(cfg, 'ori_axis_k', 2),
-                )
+                    angles[:, c:c+1], confidence[:, c:c+1],
+                    getattr(cfg, 'ori_coh_radius', 1), getattr(cfg, 'ori_axis_k', 2))
                 gates.append(coh > cfg.tau_ori_coh)
-            return torch.cat(gates, dim=1).any(dim=1, keepdim=True).to(dtype=X.dtype)
+            gate = torch.cat(gates, dim=1).any(dim=1, keepdim=True)
+            # All scale angles enter this descriptor's metric. Do not treat an
+            # undefined scale's placeholder angle zero as real evidence.
+            reliable = (confidence > cfg.tau_ori_confidence).all(dim=1, keepdim=True)
+            return (gate & reliable).to(dtype=X.dtype)
 
         return torch.ones((B, 1, H, W), device=X.device, dtype=X.dtype)
 
@@ -1202,6 +1213,7 @@ class Region:
     closed: bool = False
     completed: bool = False
     reasons: List[str] = field(default_factory=list)
+    parent_region_id: Optional[int] = None  # observation-local grad region, not a Gmem ID
 
 
 @dataclass
@@ -1249,12 +1261,36 @@ class BuildReport:
             'referenced_nodes': len(self.node_ids),
             'region_containers': len(self.region_semantic_ids),
             'contact_containers': len(self.contact_semantic_ids),
+            'edge_attribute_regions': sum(r.parent_region_id is not None for r in self.regions),
             'completed_regions': sum(r.completed for r in self.regions),
             'truncated_regions': sum(r.budget_truncated for r in self.regions),
             'edge_observations': len(self.edge_observations),
             'rejected': dict(self.rejected), 'timings': dict(self.timings),
             'warnings': list(self.warnings),
         }
+
+
+def configure_orientation_contract(cfg, scales):
+    """Opt into explicit confidence channels without changing legacy angle-only pools."""
+    if not isinstance(scales, int) or scales < 1:
+        raise ValueError('Orientation scale count must be a positive integer.')
+    cfg.ori_angle_channels = scales
+    cfg.feature_specs = copy.deepcopy(cfg.feature_specs)
+    spec = cfg.feature_specs[4]
+    spec['layout'] = {'angle_channels': scales, 'confidence_channels': scales, 'angle_unit': 'radians'}
+    spec['channels'] = {c: {'role': 'sim_only' if c < scales else 'gate_only'}
+                        for c in range(2 * scales)}
+    spec['metric_groups']['ori']['channels'] = list(range(scales))
+    return cfg
+
+
+def orientation_channels(value, cfg):
+    scales = cfg.ori_angle_channels
+    if scales:
+        if value.shape[1] != 2 * scales:
+            raise ValueError('Orientation contract expects S angle and S confidence channels; rebuild old memory.')
+        return value[:, :scales], value[:, scales:].clamp(0., 1.)
+    return value, torch.ones_like(value)
 
 
 def prepare_feature_subspaces(features, cfg):
@@ -1270,7 +1306,7 @@ def prepare_feature_subspaces(features, cfg):
         entries = features.items()
     else:
         aliases = {0: ('grad',), 1: ('rgb', 'RGB', 'image', 'x', 'cropped', 'hue'),
-                   2: ('curvature',), 3: ('aspect',), 4: ('orientation',)}
+                   2: ('curvature', 'curv'), 3: ('aspect', 'aps', 'asp'), 4: ('orientation', 'ori')}
         entries = []
         for mid, names in aliases.items():
             value = next((features[n] for n in names if features.get(n) is not None), None)
@@ -1288,8 +1324,15 @@ def prepare_feature_subspaces(features, cfg):
                 if dx is not None:
                     value = torch.cat((torch.sqrt(dx.square() + dy.square() + 1e-6),
                                        torch.atan2(dy, dx), dx, dy), dim=1)
-            if mid == 4 and value.numel() and value.detach().abs().max().item() <= 1.05:
+            if mid == 4:  # Named CNN banks are ALWAYS normalized by pi/2; integer inputs use radians.
                 value = value * (math.pi / 2)
+                confidence = features.get('orientation_confidence')
+                if cfg.ori_angle_channels:
+                    if confidence is None or confidence.shape != value.shape:
+                        raise ValueError('Named orientation requires a matching orientation_confidence bank.')
+                    value = torch.cat((value, confidence), dim=1)
+                elif confidence is not None:
+                    raise ValueError('Call configure_orientation_contract before supplying confidence.')
             entries.append((mid, value))
     shape = None
     for mid, value in entries:
@@ -1312,6 +1355,8 @@ def prepare_feature_subspaces(features, cfg):
         if shape is not None and shape != tuple(value.shape[-2:]):
             raise ValueError('All feature maps must use the same coordinates and shape.')
         shape = tuple(value.shape[-2:])
+        if mid == 4:
+            orientation_channels(value, cfg)  # enforce explicit channel layout early
         result[mid] = value.detach().to(device=cfg.device, dtype=torch.float32)
     return dict(sorted(result.items()))
 
@@ -1372,14 +1417,19 @@ class FeatureSupportBuilder:
             elif dim == 1:
                 if mid == 4:
                     # ori is an unoriented axis; coherence is computed in doubled angle.
-                    c = torch.cos(2 * value).mean(dim=1, keepdim=True)
-                    s = torch.sin(2 * value).mean(dim=1, keepdim=True)
+                    angles, confidence = orientation_channels(value, self.cfg)
+                    mass = confidence.sum(dim=1, keepdim=True).clamp_min(1e-8)
+                    c = (torch.cos(2 * angles) * confidence).sum(dim=1, keepdim=True) / mass
+                    s = (torch.sin(2 * angles) * confidence).sum(dim=1, keepdim=True) / mass
                     axis = 0.5 * torch.atan2(s, c)
                     coherence = torch.sqrt(c.square() + s.square())[0, 0]
-                    tx, ty = torch.cos(axis)[0, 0], torch.sin(axis)[0, 0]
+                    # Structure-tensor axes are gradient normals; Trace_1D
+                    # follows the contour tangent, perpendicular to that normal.
+                    tx, ty = -torch.sin(axis)[0, 0], torch.cos(axis)[0, 0]
                 else:
                     # Principal axis of local support coordinates for scalar trace banks.
                     strength = value.abs().amax(dim=1, keepdim=True)
+                    strength = strength * torch.as_tensor(writable, device=value.device)[None, None]
                     coords = torch.arange(-2, 3, device=value.device, dtype=value.dtype)
                     yy, xx = torch.meshgrid(coords, coords, indexing='ij')
                     def moment(kernel):
@@ -1396,7 +1446,7 @@ class FeatureSupportBuilder:
             else:
                 mean = SimilarityEngine._mean_filter(value, getattr(self.cfg, 'rgb_gate_radius', 1))
                 variance = SimilarityEngine._mean_filter((value - mean).square(), 1).mean(dim=1)[0]
-                quality = torch.exp(-variance / max(float(self.cfg.tau_rgb_var), 1e-8))
+                quality = torch.exp(-variance / max(float(_setting(self.cfg.once_surface_variance, mid, self.cfg.tau_rgb_var)), 1e-8))
                 tx, ty = torch.ones_like(quality), torch.zeros_like(quality)
                 directional = torch.zeros_like(quality, dtype=torch.bool)
                 context['local_variance'] = variance.cpu().numpy()
@@ -1422,9 +1472,10 @@ class FeatureSupportBuilder:
             directions = directional.cpu().numpy() & active
             # Reject low-confidence directional connections; retain these pixels as events.
             events = active & ~directions if dim == 1 else np.zeros_like(active)
-            maxima = F.max_pool2d(quality[None, None], 2 * self.cfg.once_seed_nms_radius + 1,
+            eligible_quality = quality.masked_fill(~torch.as_tensor(active, device=value.device), -float('inf'))
+            maxima = F.max_pool2d(eligible_quality[None, None], 2 * self.cfg.once_seed_nms_radius + 1,
                                   stride=1, padding=self.cfg.once_seed_nms_radius)[0, 0].cpu().numpy()
-            peaks = active & (q >= self.cfg.once_seed_threshold) & (q == maxima)
+            peaks = active & (q >= _setting(self.cfg.once_seed_threshold, mid, .6)) & (q == maxima)
             depth = _distance_to_boundary(active) if dim == 2 else np.zeros_like(q)
             seeds = [min(group, key=lambda p: (-depth.flat[p], -q.flat[p], p))
                      for group in _components(np.flatnonzero(peaks), active.shape[1])]
@@ -1443,7 +1494,8 @@ class FeatureSupportBuilder:
         return FeatureDescriptor(
             support.modality_id, values, sim, gate, context,
             {'gate': 1.0, **{key: float(v[y, x]) for key, v in support.gate_context.items()}},
-            {'topology': self.cfg.feature_specs[support.modality_id].get('topology', 'Surface_2D')},
+            {'topology': ('Trace_1D' if self.cfg.once_bind_edge_attributes and support.modality_id in (3, 4)
+                          else self.cfg.feature_specs[support.modality_id].get('topology', 'Surface_2D'))},
             threshold,
         )
 
@@ -1686,6 +1738,61 @@ class RegionContactBuilder:
         return contacts
 
 
+class EdgeAttributeRegionAssembler:
+    """Project each grad partition into an attribute's valid pixels, without re-segmentation."""
+    def bind_support(self, support, edge):
+        support.support_dim = 1
+        if edge is None:
+            support.writable[:] = False
+            support.support[:] = False
+            support.quality[:] = 0.
+            support.directional[:] = False
+            support.events[:] = False
+            support.seeds = []
+            return
+        # Appearance validity can make holes, but cannot create new partitions.
+        support.writable &= edge.support
+        support.support = support.writable.copy()
+        support.quality = np.where(support.support, edge.quality, 0.)
+        support.tangent = edge.tangent.copy()
+        support.directional = edge.directional & support.support
+        support.events = edge.events & support.support
+        support.seeds = [p for p in edge.seeds if support.support.flat[p]]
+        if len(edge.edges):
+            keep = support.support.flat[edge.edges[:, 0]] & support.support.flat[edge.edges[:, 1]]
+            support.edges = edge.edges[keep].copy()
+            support.edge_scores = edge.edge_scores[keep].copy()
+
+    def assemble(self, support, parents, report, budget):
+        labels = np.full(report.shape, -1, dtype=np.int32)
+        regions = []
+        for parent in parents:
+            pixels = parent.pixels[support.support.flat[parent.pixels]]
+            if not len(pixels):
+                report.reject('edge_attribute_no_valid_pixels', example={
+                    'modality': support.modality_id, 'parent_region': parent.region_id})
+                continue
+            if len(regions) >= budget:
+                report.reject('edge_attribute_region_budget', example={'modality': support.modality_id})
+                continue
+            rid = len(report.regions) + len(regions)
+            labels.flat[pixels] = rid
+            points = set(map(int, pixels))
+            adjacency = {p: [(q, d) for q, d in parent.adjacency.get(p, []) if q in points]
+                         for p in points}
+            seeds = [p for p in parent.seeds if p in points]
+            if not seeds:
+                seeds = [min(points, key=lambda p: (-support.quality.flat[p], p))]
+            region = Region(rid, support.modality_id, parent.support_dim, pixels.copy(),
+                            np.flatnonzero(_boundary(labels == rid)), seeds,
+                            adjacency=adjacency, view_truncated=parent.view_truncated,
+                            parent_region_id=parent.region_id)
+            if len(pixels) != len(parent.pixels):
+                region.reasons.append('edge_attribute_validity_holes')
+            regions.append(region)
+        return regions, labels
+
+
 class RegionSampler:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -1776,6 +1883,7 @@ class RegionSampler:
         remaining = {mid: int(_setting(self.cfg.once_sample_budget, mid, 512)) for mid in supports}
         # Reserve one anchor per region before spending any budget on dense regions.
         paths = {}
+        by_region = {r.region_id: r for r in regions}
         for r in regions:
             support = supports[r.modality_id]
             if r.support_dim == 1:
@@ -1795,6 +1903,10 @@ class RegionSampler:
                                     (p // w - cy) ** 2 + (p % w - cx) ** 2, p))
             else:
                 r.anchor = min(map(int, r.pixels), key=lambda p: (-support.quality.flat[p], p))
+            if r.parent_region_id is not None:
+                parent = by_region[r.parent_region_id]
+                if parent.anchor is not None and parent.anchor in r.pixels:
+                    r.anchor = parent.anchor
             if remaining[r.modality_id] > 0:
                 r.samples = [r.anchor]
                 remaining[r.modality_id] -= 1
@@ -1999,6 +2111,14 @@ class OnceGraphBuilder:
             raise ValueError('At least one sample slot per region is required.')
         if self.cfg.once_node_reuse_mode not in {'sample_instance', 'prototype'}:
             raise ValueError('Unknown once_node_reuse_mode.')
+        for name in ('once_seed_threshold', 'once_support_threshold', 'once_similarity_min', 'tau_ori_confidence'):
+            setting = getattr(self.cfg, name)
+            for value in setting.values() if isinstance(setting, dict) else [setting]:
+                if not math.isfinite(float(value)) or not 0 <= float(value) <= 1:
+                    raise ValueError(name + ' must contain probabilities in [0,1].')
+        for value in self.cfg.once_surface_variance.values():
+            if not math.isfinite(float(value)) or float(value) <= 0:
+                raise ValueError('once_surface_variance must be positive.')
         for name in ('once_min_support', 'once_sample_budget'):
             values = getattr(self.cfg, name)
             for value in values.values() if isinstance(values, dict) else [values]:
@@ -2049,16 +2169,33 @@ class OnceGraphBuilder:
             edge = report.supports[0]
             barrier = np.where(valid, edge.values[0, 0].abs().cpu().numpy(), 0)
         t = time.perf_counter()
-        support_items = list(report.supports.items())
-        for index, (mid, support) in enumerate(support_items):
+        bound = [m for m in (3, 4) if m in report.supports] if self.cfg.once_bind_edge_attributes else []
+        roots = [(m, support) for m, support in report.supports.items() if m not in bound]
+        attributes = EdgeAttributeRegionAssembler()
+        if bound and 0 not in report.supports:
+            report.warnings.append('aps/ori binding requires grad; no independent attribute partitions were created.')
+            for mid in bound:
+                attributes.bind_support(report.supports[mid], None)
+                report.labels[mid] = np.full(report.shape, -1, dtype=np.int32)
+                report.reject('edge_attribute_missing_grad', example={'modality': mid})
+        for index, (mid, support) in enumerate(roots):
             self.affinity_builder.build(support, barrier, report)
-            # Reserve a share for remaining modalities so dense edge noise does
-            # not consume every region slot before the RGB pass.
             slots = max(0, self.cfg.once_region_budget - len(report.regions))
-            quota = math.ceil(slots / (len(support_items) - index))
+            cost = 1 + len(bound) if mid == 0 else 1
+            remaining_cost = sum(1 + len(bound) if m == 0 else 1 for m, _ in roots[index:])
+            # Reserve space for the entire grad/aps/ori family and other roots.
+            quota = min(math.ceil(slots / remaining_cost), max(1, slots // cost)) if slots else 0
             regions, labels = self.region_builder.assemble(support, valid, len(report.regions), report, quota)
             report.regions.extend(regions)
             report.labels[mid] = labels
+            if mid == 0:
+                for child in bound:
+                    child_support = report.supports[child]
+                    attributes.bind_support(child_support, support)
+                    children, child_labels = attributes.assemble(child_support, regions, report,
+                        max(0, self.cfg.once_region_budget - len(report.regions)))
+                    report.regions.extend(children)
+                    report.labels[child] = child_labels
         report.timings['regions'] = time.perf_counter() - t
         t = time.perf_counter()
         report.contacts = self.contact_builder.build(report.regions, report.labels, barrier, report)
@@ -2167,6 +2304,7 @@ class MultilevelCoordinator:
         return copy.deepcopy({'schema_version': 1, 'gmem_i': self.gmem_i,
                               'gmem_ii': self.gmem_ii, 'gmem_iii': self.gmem_iii,
                               'feature_contract': self.cfg.feature_specs,
+                              'segmentation_contract': {'edge_attributes': 'grad' if self.cfg.once_bind_edge_attributes else 'independent'},
                               'geometry_mode': 'translation'})
 
     def load_state_dict(self, state):
@@ -2174,6 +2312,9 @@ class MultilevelCoordinator:
             raise ValueError('Unsupported memory schema; old raw pools need explicit migration.')
         if state.get('feature_contract') != self.cfg.feature_specs:
             raise ValueError('Stored feature contract differs from the current configuration.')
+        expected = {'edge_attributes': 'grad' if self.cfg.once_bind_edge_attributes else 'independent'}
+        if state.get('segmentation_contract', {'edge_attributes': 'independent'}) != expected:
+            raise ValueError('Stored segmentation contract differs; rebuild or explicitly select independent attributes.')
         staged = copy.deepcopy(state)
         self.gmem_i, self.gmem_ii, self.gmem_iii = staged['gmem_i'], staged['gmem_ii'], staged['gmem_iii']
         self.last_report = None
@@ -2651,6 +2792,143 @@ class FeatureResponseCache:
         return SpatialStructureMatcher._sample(canvas, points)
 
 
+class BinaryCoarseIndex:
+    """Observation-local, conservative quantized descriptor index.
+
+    Bits encode descriptor boxes, not semantic labels. Query boxes cover ALL
+    finite region pixels; unknown metrics keep bits. No stride/top-k truncation.
+    """
+    def __init__(self, provider, gii):
+        self.cfg, self.provider = provider.cfg, provider
+        self.node_bits, self.groups, self.views, self.invalid = {}, {}, {}, set()
+        self.inputs = {m: x[0].detach().cpu().numpy().astype(np.float64)
+                       for m, x in provider.inputs.items()}
+        classes = {}
+        rows = defaultdict(list)
+        for nid, node in provider.nodes.items():
+            proto = node.prototype.detach().cpu().numpy().reshape(-1).astype(np.float64)
+            mask = node.mask.detach().cpu().numpy().reshape(-1).astype(np.float64)
+            width = float(_setting(self.cfg.graph_coarse_bin_width, node.modality_id, .125))
+            bins = np.floor(proto / width)
+            key = (node.modality_id, tuple(bins), tuple(mask), len(proto))
+            if key not in classes:
+                bit = len(classes)
+                classes[key] = bit
+                rows[(node.modality_id, len(proto), len(mask))].append(
+                    (bit, bins * width, (bins + 1) * width, mask))
+            self.node_bits[nid] = classes[key]
+        for key, values in rows.items():
+            self.groups[key] = (np.array([v[0] for v in values]),
+                                np.stack([v[1] for v in values]),
+                                np.stack([v[2] for v in values]),
+                                np.stack([v[3] for v in values]))
+        self.class_count = len(classes)
+        for sid, sem in gii.semantic_nodes.items():
+            if sem.kind != 'region':
+                continue
+            try:
+                view = region_view(sem, self.cfg)
+                weights = np.array([s['weight'] for s in view.slots], dtype=float)
+                weights /= weights.sum()
+                bits, weighted = 0, defaultdict(float)
+                for slot, weight in zip(view.slots, weights):
+                    bit = self.node_bits[slot['node_id']]
+                    bits |= 1 << bit
+                    weighted[bit] += float(weight)
+                self.views[sid] = (view, bits, dict(weighted))
+            except ValueError:
+                self.invalid.add(sid)
+        provider.stats['coarse_classes'] = self.class_count
+
+    @staticmethod
+    def _parameter(value, channels):
+        values = list(value) if isinstance(value, (list, tuple)) else [float(value)]
+        return np.asarray((values + [values[-1] if values else 1.] * channels)[:channels])
+
+    def _upper(self, mid, lo, hi, mask, xmin, xmax):
+        channels = min(lo.shape[1], len(xmin))
+        lo, hi = lo[:, :channels], hi[:, :channels]
+        xmin, xmax = xmin[:channels], xmax[:channels]
+        padded = np.zeros_like(lo)
+        padded[:, :min(channels, mask.shape[1])] = mask[:, :channels]
+        groups = self.cfg.feature_specs.get(mid, {}).get('metric_groups', {})
+        # Unsupported contracts are unknown, never certified absent.
+        if not groups or not np.isfinite(lo).all() or not np.isfinite(hi).all() or not np.isfinite(padded).all() or (padded < 0).any():
+            return np.ones(len(lo))
+        logs, alphas = np.zeros(len(lo)), np.zeros(len(lo))
+        for group in groups.values():
+            cs = SimilarityEngine._group_channels(group.get('channels', 'all'), channels)
+            if any(c < 0 for c in cs):
+                return np.ones(len(lo))
+            m = np.zeros_like(lo); m[:, cs] = padded[:, cs]
+            available = m.sum(1).astype(int) >= int(group.get('min_valid_channels', self.cfg.min_valid_sim_channels))
+            alpha = float(group.get('weight', 1.))
+            if not math.isfinite(alpha) or alpha < 0:
+                return np.ones(len(lo))
+            metric = group.get('metric', 'Vector_Occupancy')
+            upper = np.ones(len(lo))
+            if metric == 'Euclidean_Absolute':
+                sigma = np.maximum(self._parameter(group.get('sigma', .05), channels), 1e-6)
+                weights = self._parameter(group.get('weights', 1.), channels)
+                if not np.isfinite(sigma).all() or not np.isfinite(weights).all() or (weights < 0).any():
+                    return np.ones(len(lo))
+                distance = np.maximum(np.maximum(xmin - hi, lo - xmax), 0.)
+                mw = m * weights
+                upper = np.exp(-.5 * ((distance / sigma) ** 2 * mw).sum(1) / np.maximum(mw.sum(1), 1e-6))
+            elif metric == 'Periodic_Property':
+                k = float(group.get('k', group.get('period', 2.)))
+                gamma = float(group.get('gamma', 2.))
+                if not math.isfinite(k) or not math.isfinite(gamma) or gamma < 0:
+                    return np.ones(len(lo))
+                a, b = k * (xmin - hi), k * (xmax - lo)
+                a, b = np.minimum(a, b), np.maximum(a, b)
+                maximum = np.maximum(np.cos(a), np.cos(b))
+                maximum = np.where(np.ceil(a / (2 * math.pi)) <= np.floor(b / (2 * math.pi)), 1., maximum)
+                upper = ((((1 + maximum) * .5).clip(0, 1) ** gamma) * m).sum(1) / np.maximum(m.sum(1), 1e-6)
+            # Vector metrics retain an upper bound of one; box norms are too
+            # loose near zero to justify extra work. They remain first-class candidates.
+            logs += np.where(available, alpha * np.log(np.maximum(upper, 1e-6)), 0.)
+            alphas += available * alpha
+        return np.where(alphas > 0, np.exp(logs / np.maximum(alphas, 1e-300)), 0.)
+
+    def query(self, region):
+        possible = 0
+        mid = region.modality_id
+        # A manually supplied mixed-modality template is legal to the verifier.
+        # This region summary says nothing about its other modalities.
+        for (other, _, _), (bits, _, _, _) in self.groups.items():
+            if other != mid:
+                for bit in bits:
+                    possible |= 1 << int(bit)
+        x = self.inputs.get(mid)
+        if x is None:
+            return possible
+        values = x.reshape(x.shape[0], -1)[:, region.pixels]
+        values = values[:, np.isfinite(values).all(0)]
+        if not values.shape[1]:
+            return possible
+        # Gates and spatial correlations are deliberately ignored: this can
+        # only enlarge the response upper bound. Include all interpolation pixels
+        # with nonzero local response, not merely stride samples.
+        xmin, xmax = values.min(1), values.max(1)
+        margin = self.cfg.graph_coarse_tolerance
+        for (modality, _, _), (bits, lo, hi, mask) in self.groups.items():
+            if modality != mid:
+                continue
+            upper = self._upper(mid, lo - margin, hi + margin, mask, xmin - margin, xmax + margin)
+            for bit in bits[upper >= self.cfg.graph_recall_threshold - margin]:
+                possible |= 1 << int(bit)
+        return possible
+
+    def keep(self, sid, possible):
+        _, required, weights = self.views[sid]
+        if required & possible == required:
+            return True
+        weight = sum(w for bit, w in weights.items() if possible & (1 << bit))
+        return weight >= (self.cfg.graph_evaluable_min * self.cfg.graph_coverage_min
+                          - self.cfg.graph_coarse_tolerance)
+
+
 class SpatialStructureMatcher:
     """Translation search with common assignment, coverage and cycle checks."""
     def __init__(self, cfg):
@@ -3012,6 +3290,12 @@ class HierarchyRetriever:
         self.validate()
 
     def validate(self):
+        for value in (self.cfg.graph_coarse_bin_width.values() if isinstance(self.cfg.graph_coarse_bin_width, dict)
+                      else [self.cfg.graph_coarse_bin_width]):
+            if not math.isfinite(float(value)) or float(value) <= 0:
+                raise ValueError('graph_coarse_bin_width must be positive.')
+        if not math.isfinite(self.cfg.graph_coarse_tolerance) or self.cfg.graph_coarse_tolerance < 1e-7:
+            raise ValueError('graph_coarse_tolerance must be finite and >= 1e-7.')
         for name in ('graph_geometry_sigma', 'graph_maturity_support', 'graph_pose_bin',
                      'graph_member_radius', 'graph_nms_radius', 'graph_evidence_prior',
                      'graph_geometry_update_limit', 'graph_stable_support'):
@@ -3160,7 +3444,7 @@ class GraphConsolidationOptimizer:
             digest.update(tensor.numpy().tobytes())
         return digest.hexdigest()
 
-    def _region_match(self, region, report, gi, gii, provider, prior, budget=None):
+    def _region_match(self, region, report, gi, gii, provider, prior, budget=None, coarse=None):
         if not gi.nodes:
             return None, False
         # Exhaustive local translation fallback: a sparse global miss is not novelty.
@@ -3169,6 +3453,7 @@ class GraphConsolidationOptimizer:
         mask.flat[region.pixels] = True
         local = provider.restricted(mask & report.valid_mask)
         centers = [(int(p % w), int(p // w)) for p in region.pixels]
+        possible = coarse.query(region) if coarse is not None else None
         choices = []
         unresolved = False
         sparse_centers = defaultdict(list)
@@ -3180,7 +3465,17 @@ class GraphConsolidationOptimizer:
             if sem.kind != 'region' or gi.nodes[sem.anchor_id].modality_id != region.modality_id:
                 continue
             try:
-                view = region_view(sem, self.cfg)
+                if coarse is not None:
+                    if sid in coarse.invalid:
+                        raise ValueError('Invalid coarse template geometry.')
+                    self.work_counts['coarse_template_checks'] += 1
+                    if not coarse.keep(sid, possible):
+                        self.work_counts['coarse_templates_rejected'] += 1
+                        continue
+                    self.work_counts['coarse_templates_kept'] += 1
+                    view = coarse.views[sid][0]
+                else:
+                    view = region_view(sem, self.cfg)
             except ValueError:
                 unresolved = True
                 continue
@@ -3647,6 +3942,7 @@ class GraphConsolidationOptimizer:
                                   'stage_seconds': stage_seconds, 'work_counts': dict(self.work_counts)}
             return result
         original_provider = FeatureResponseCache(inputs, gi, self.cfg, report.valid_mask)
+        coarse = BinaryCoarseIndex(original_provider, gii) if self.cfg.graph_binary_coarse else None
         decisions, ambiguous = {}, []
         # Every match sees the same frozen original pools, even within this observation.
         if search_budget is None and (self.cfg.graph_search_budget_seconds is not None or
@@ -3660,7 +3956,7 @@ class GraphConsolidationOptimizer:
                     continue
                 if search_budget is not None:
                     search_budget.check()
-                match, uncertain = self._region_match(region, report, gi, gii, original_provider, prior, search_budget)
+                match, uncertain = self._region_match(region, report, gi, gii, original_provider, prior, search_budget, coarse)
                 if uncertain:
                     ambiguous.append(region.region_id)
                 else:

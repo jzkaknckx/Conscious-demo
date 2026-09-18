@@ -57,15 +57,15 @@ class OneShotDerivativeExtractor(nn.Module):
         kernel_size = max(3, int(2 * math.ceil(3 * sigma) + 1))
         gauss = make_gaussian_kernel(kernel_size, sigma, device=device, dtype=dtype)
         padding = kernel_size // 2
-        x_smooth = F.conv2d(x_lum, gauss, padding=padding, groups=1)
+        x_smooth = F.conv2d(F.pad(x_lum, (padding,) * 4, mode='replicate'), gauss, groups=1)
 
         sobel_x = self.sobel_x.to(device=device, dtype=dtype)
         sobel_y = self.sobel_y.to(device=device, dtype=dtype)
-        dx = F.conv2d(x_smooth, sobel_x, padding=1, groups=1)
-        dy = F.conv2d(x_smooth, sobel_y, padding=1, groups=1)
-        dxx = F.conv2d(dx, sobel_x, padding=1, groups=1)
-        dyy = F.conv2d(dy, sobel_y, padding=1, groups=1)
-        dxy = F.conv2d(dx, sobel_y, padding=1, groups=1)
+        dx = F.conv2d(F.pad(x_smooth, (1,) * 4, mode='replicate'), sobel_x, groups=1)
+        dy = F.conv2d(F.pad(x_smooth, (1,) * 4, mode='replicate'), sobel_y, groups=1)
+        dxx = F.conv2d(F.pad(dx, (1,) * 4, mode='replicate'), sobel_x, groups=1)
+        dyy = F.conv2d(F.pad(dy, (1,) * 4, mode='replicate'), sobel_y, groups=1)
+        dxy = F.conv2d(F.pad(dx, (1,) * 4, mode='replicate'), sobel_y, groups=1)
 
         return {
             'x_lum': x_lum,
@@ -80,36 +80,72 @@ class OneShotDerivativeExtractor(nn.Module):
 
 # ---------- feature computations given pooled derivative maps ----------
 
+def _finite_feature(value):
+    """Sanitize locally BEFORE spatial normalization; never turn Inf into maxfloat."""
+    if value.dtype in (torch.float16, torch.bfloat16):
+        value = value.float()
+    return torch.nan_to_num(value, nan=0., posinf=0., neginf=0.)
+
+
+def _normalize_feature(value, floor=1e-6):
+    value = _finite_feature(value)
+    maximum = value.abs().flatten(1).amax(1).view(-1, 1, 1, 1)
+    return value / maximum.clamp_min(floor)
+
+
 def curvature_from_prepooled(dxx, dyy, dxy, eps=1e-8):
-    curv = torch.sqrt(dxx * dxx + 2.0 * (dxy * dxy) + dyy * dyy + eps)
-    B = curv.shape[0]
-    flat = curv.view(B, -1)
-    maxv = torch.clamp(flat.max(dim=1)[0], min=1e-6).view(B, 1, 1, 1)
-    return curv / maxv
+    valid = torch.isfinite(dxx) & torch.isfinite(dyy) & torch.isfinite(dxy)
+    dxx, dyy, dxy = map(_finite_feature, (dxx, dyy, dxy))
+    # Adding epsilon under sqrt created a positive constant on a flat image,
+    # which imagewise normalization then promoted to maximum curvature.
+    curv = torch.hypot(torch.hypot(dxx, dyy), math.sqrt(2.) * dxy)
+    curv = torch.where(valid & (curv > eps), curv, 0.)
+    return _normalize_feature(curv)
 
 
-def aspect_from_prepooled_J(Jxx, Jyy, Jxy):
-    trace = Jxx + Jyy
-    disc = torch.clamp((trace * trace) * 0.25 - (Jxx * Jyy - Jxy * Jxy), min=0.0)
-    # sqrt_disc = torch.sqrt(disc + _EPS)
-    sqrt_disc = torch.sqrt(disc)
-    lambda1 = 0.5 * trace + sqrt_disc
-    lambda2 = 0.5 * trace - sqrt_disc
-    ratio = torch.sqrt((lambda1 + _EPS) / (lambda2 + _EPS))
-    theta = 0.5 * torch.atan2(2.0 * Jxy, (Jxx - Jyy) + _EPS)
-    sin_t = torch.sin(theta)
-    cos_t = torch.cos(theta)
-    verticalness = torch.abs(sin_t) - torch.abs(cos_t)
-    sign = torch.sign(verticalness)
-    val = sign * torch.log(ratio + 1e-6)
-    B = val.shape[0]
-    maxv = val.view(B, -1).abs().max(dim=1)[0].view(B, 1, 1, 1) + 1e-6
-    return val / maxv
+def _structure_axes(Jxx, Jyy, Jxy, energy_floor=1e-8):
+    valid = torch.isfinite(Jxx) & torch.isfinite(Jyy) & torch.isfinite(Jxy)
+    xx, yy, xy = map(_finite_feature, (Jxx, Jyy, Jxy))
+    xx, yy = xx.clamp_min(0.), yy.clamp_min(0.)
+    # Scale before squaring: stable for rank-one, nearly isotropic and large tensors.
+    scale = torch.maximum(torch.maximum(xx, yy), xy.abs()).clamp_min(energy_floor)
+    a, b, c = xx / scale, yy / scale, xy / scale
+    trace = a + b
+    gap = torch.hypot(a - b, 2 * c)
+    high = ((trace + gap) * .5).clamp_min(0.)
+    low = ((trace - gap) * .5).clamp_min(0.)
+    energetic = valid & (scale * trace > energy_floor)
+    anisotropy = (gap / trace.clamp_min(torch.finfo(trace.dtype).eps)).clamp(0., 1.)
+    confidence = torch.where(energetic, anisotropy, 0.)
+    theta = .5 * torch.atan2(2 * c, a - b)
+    theta = torch.where(confidence > torch.finfo(theta.dtype).eps, theta, 0.)
+    return high, low, theta, confidence
 
 
-def orientation_from_prepooled_J(Jxx, Jyy, Jxy):
-    theta = 0.5 * torch.atan2(2.0 * Jxy, (Jxx - Jyy) + _EPS)
-    return theta / (math.pi / 2.0)
+def aspect_from_prepooled_J(Jxx, Jyy, Jxy, energy_floor=1e-8):
+    high, low, theta, confidence = _structure_axes(Jxx, Jyy, Jxy, energy_floor)
+    # Nonnegative eigenvalues + dtype-relative regularizer prevent negative sqrt
+    # and unbounded rank-one ratios. Difference of logs avoids division overflow.
+    floor = (high * (8 * torch.finfo(high.dtype).eps)).clamp_min(torch.finfo(high.dtype).eps)
+    log_ratio = .5 * (torch.log(high + floor) - torch.log(low + floor))
+    sign = torch.sign(torch.sin(theta).abs() - torch.cos(theta).abs())
+    value = torch.where(confidence > torch.finfo(high.dtype).eps, sign * log_ratio, 0.)
+    return _normalize_feature(value)
+
+
+def orientation_from_prepooled_J(Jxx, Jyy, Jxy, energy_floor=1e-8):
+    return _structure_axes(Jxx, Jyy, Jxy, energy_floor)[2] / (math.pi / 2.)
+
+
+def resize_axial_orientation(orientation, confidence, size):
+    """Interpolate an axis on its doubled-angle circle, never interpolate angles."""
+    angle = orientation * math.pi  # normalized theta/(pi/2) -> 2 theta
+    c = F.interpolate(torch.cos(angle) * confidence, size=size, mode='bilinear', align_corners=False)
+    s = F.interpolate(torch.sin(angle) * confidence, size=size, mode='bilinear', align_corners=False)
+    magnitude = torch.hypot(c, s).clamp(0., 1.)
+    output = torch.atan2(s, c) / math.pi
+    output = torch.where(magnitude > torch.finfo(output.dtype).eps, output, 0.)
+    return output, magnitude
 
 
 # ---------- unified bank that computes derivatives once and returns 3 banks ----------
@@ -121,7 +157,11 @@ class MultiScaleFeatureBank(nn.Module):
     forward(x[, precomputed_derivs]) -> returns tuple of three tensors:
       curvature_bank: [B, S, H, W]
       aspect_bank:    [B, S, H, W]
-      orient_bank:    [B, S, H, W]
+      orient_bank:    [B, S, H, W], theta/(pi/2), gradient-normal axis
+
+    With return_confidence=True a fourth [B,S,H,W] bank contains energy-gated
+    anisotropy (and interpolation resultant magnitude). Zero means undefined
+    direction, NOT a measured zero angle. The default three-output API is retained.
 
     If `precomputed_derivs` is provided it should be a dict containing either:
       - 'grad': tensor [...,2] where last dim holds (dx,dy) in shape [B,1,H,W,2]
@@ -130,13 +170,18 @@ class MultiScaleFeatureBank(nn.Module):
     This allows reusing derivatives computed by an upstream Retina (to avoid
     duplicate conv operations). If not provided, OneShotDerivativeExtractor is used.
     """
-    def __init__(self, scales: List[float], base_sigma: float = 1.0):
+    def __init__(self, scales: List[float], base_sigma: float = 1.0, energy_floor: float = 1e-8):
         super().__init__()
-        assert len(scales) > 0
+        if not scales or any(not math.isfinite(float(s)) or s <= 0 for s in scales):
+            raise ValueError('Feature scales must be positive and finite.')
+        if not math.isfinite(energy_floor) or energy_floor <= 0:
+            raise ValueError('Structure energy_floor must be positive and finite.')
+        self.energy_floor = energy_floor
         self.scales = scales
         self.extractor = OneShotDerivativeExtractor(base_sigma=base_sigma)
 
-    def forward(self, x: torch.Tensor, precomputed_derivs: Optional[dict] = None) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, precomputed_derivs: Optional[dict] = None,
+                return_confidence: bool = False):
         # x: [B,C,H,W]
         B, C, H, W = x.shape
 
@@ -172,11 +217,11 @@ class MultiScaleFeatureBank(nn.Module):
             sobel_x = self.extractor.sobel_x.to(device=device, dtype=dtype)
             sobel_y = self.extractor.sobel_y.to(device=device, dtype=dtype)
             if dxx is None:
-                dxx = F.conv2d(dx, sobel_x, padding=1, groups=1)
+                dxx = F.conv2d(F.pad(dx, (1,) * 4, mode='replicate'), sobel_x, groups=1)
             if dyy is None:
-                dyy = F.conv2d(dy, sobel_y, padding=1, groups=1)
+                dyy = F.conv2d(F.pad(dy, (1,) * 4, mode='replicate'), sobel_y, groups=1)
             if dxy is None:
-                dxy = F.conv2d(dx, sobel_y, padding=1, groups=1)
+                dxy = F.conv2d(F.pad(dx, (1,) * 4, mode='replicate'), sobel_y, groups=1)
 
         else:
             derivs = self.extractor(x)
@@ -189,9 +234,10 @@ class MultiScaleFeatureBank(nn.Module):
         curvature_outs = []
         aspect_outs = []
         orient_outs = []
+        confidence_outs = []
 
         for s in self.scales:
-            pf = max(1, int(math.ceil(s)))
+            pf = min(H, W, max(1, int(math.ceil(s))))
             if pf > 1:
                 # pool derivatives (note: pool of squared quantities for structure tensor)
                 dx_p = F.avg_pool2d(dx, kernel_size=pf, stride=pf)
@@ -210,26 +256,30 @@ class MultiScaleFeatureBank(nn.Module):
 
             # compute features from pooled derivatives
             curv = curvature_from_prepooled(dxx_p, dyy_p, dxy_p)  # [B,1,h_p,w_p]
-            asp = aspect_from_prepooled_J(Jxx_p, Jyy_p, Jxy_p)
-            ori = orientation_from_prepooled_J(Jxx_p, Jyy_p, Jxy_p)
+            asp = aspect_from_prepooled_J(Jxx_p, Jyy_p, Jxy_p, self.energy_floor)
+            _, _, theta, confidence = _structure_axes(Jxx_p, Jyy_p, Jxy_p, self.energy_floor)
+            ori = theta / (math.pi / 2.)
 
             # upsample to original size
             if curv.shape[-2:] != (H, W):
                 curv_up = F.interpolate(curv, size=(H, W), mode='bilinear', align_corners=False)
                 asp_up = F.interpolate(asp, size=(H, W), mode='bilinear', align_corners=False)
-                ori_up = F.interpolate(ori, size=(H, W), mode='bilinear', align_corners=False)
+                ori_up, confidence = resize_axial_orientation(ori, confidence, (H, W))
             else:
                 curv_up, asp_up, ori_up = curv, asp, ori
 
             curvature_outs.append(curv_up)
             aspect_outs.append(asp_up)
             orient_outs.append(ori_up)
+            confidence_outs.append(confidence)
 
         # concat along scale dimension -> [B, S, H, W]
         curvature_bank = torch.cat(curvature_outs, dim=1)
         aspect_bank = torch.cat(aspect_outs, dim=1)
         orient_bank = torch.cat(orient_outs, dim=1)
 
+        if return_confidence:
+            return curvature_bank, aspect_bank, orient_bank, torch.cat(confidence_outs, dim=1)
         return curvature_bank, aspect_bank, orient_bank
 
 

@@ -1,0 +1,2940 @@
+{
+  "image": "/home/p/code/ILSVRC/Data/DET/train/ILSVRC2014_train_0006/ILSVRC2014_train_00060030.JPEG",
+  "device": "cpu",
+  "raw": {
+    "curv": [
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.00473744934424758,
+          0.23893367499113083,
+          0.6343126237392429,
+          1.0
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.005000221310183406,
+          0.2445678934454918,
+          0.6232202023267747,
+          0.9941161870956421
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.004471425665542483,
+          0.3217209577560425,
+          0.6838484406471252,
+          0.9882436990737915
+        ]
+      }
+    ],
+    "aps": [
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          -1.0,
+          -0.9999999403953552,
+          0.9972544014453888,
+          0.9999999403953552,
+          0.9999999403953552,
+          1.0
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          -0.9855796098709106,
+          -0.6802109956741333,
+          0.10266789048910141,
+          0.42226341366767883,
+          0.9787066608667374,
+          1.0
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          -0.8921414017677307,
+          -0.6526614427566528,
+          0.08491192013025284,
+          0.338002473115921,
+          0.8809607475996022,
+          0.9733471870422363
+        ]
+      }
+    ],
+    "ori": [
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          -0.9999985694885254,
+          -0.999283167719841,
+          0.0,
+          0.8835168480873108,
+          0.9988539218902588,
+          0.9999988079071045
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          -0.9999980330467224,
+          -0.9996187210083007,
+          0.0,
+          0.9212128221988678,
+          0.999514353275299,
+          0.9999997019767761
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          -0.9999983310699463,
+          -0.9996861219406128,
+          0.0,
+          0.943139910697937,
+          0.9995637536048889,
+          0.9999996423721313
+        ]
+      }
+    ],
+    "confidence": [
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.7366767525672913,
+          0.9870761930942535,
+          0.9999981909990311,
+          1.0
+        ]
+      },
+      {
+        "shape": [
+          1,
+          1,
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.6188223958015442,
+          0.9489876329898834,
+          0.9999797731637955,
+          0.9999983906745911
+        ]
+      }
+    ]
+  },
+  "supports": {
+    "0": {
+      "writable": 6713,
+      "support": 2207,
+      "seeds": 25,
+      "events": 11,
+      "quality": {
+        "shape": [
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          3.0878807137924014e-06,
+          0.00012570350445457735,
+          0.004218126414343715,
+          0.12216275185346603,
+          0.6839914172887804,
+          0.9977520108222961
+        ]
+      },
+      "regions": 52,
+      "nodes": 472
+    },
+    "1": {
+      "writable": 48561,
+      "support": 48561,
+      "seeds": 486,
+      "events": 0,
+      "quality": {
+        "shape": [
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.07464578747749329,
+          0.21885514706373216,
+          0.9994456768035889,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "regions": 50,
+      "nodes": 470
+    },
+    "2": {
+      "writable": 19214,
+      "support": 14401,
+      "seeds": 76,
+      "events": 10841,
+      "quality": {
+        "shape": [
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.0,
+          0.46304093301296234,
+          1.0,
+          1.0
+        ]
+      },
+      "regions": 50,
+      "nodes": 515
+    },
+    "3": {
+      "writable": 2207,
+      "support": 2207,
+      "seeds": 25,
+      "events": 11,
+      "quality": {
+        "shape": [
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.45102680027485,
+          0.9977520108222961
+        ]
+      },
+      "regions": 52,
+      "nodes": 344
+    },
+    "4": {
+      "writable": 2203,
+      "support": 2203,
+      "seeds": 25,
+      "events": 11,
+      "quality": {
+        "shape": [
+          256,
+          256
+        ],
+        "nan": 0,
+        "inf": 0,
+        "finite_fraction": 1.0,
+        "quantiles": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.45102680027485,
+          0.9977520108222961
+        ]
+      },
+      "regions": 52,
+      "nodes": 343
+    }
+  },
+  "rejected": {
+    "nonfinite_pixels": 0,
+    "local_similarity": 42001,
+    "direction_conflict": 21863,
+    "junction_connections": 28,
+    "small_region": 7301,
+    "region_budget": 10977,
+    "surface_barrier": 16550,
+    "region_range": 2695,
+    "contact_pair_budget": 547,
+    "contact_budget": 1425
+  },
+  "bindings": [
+    {
+      "id": 0,
+      "modality": 0,
+      "parent": null,
+      "pixels": 192,
+      "samples": 36,
+      "reasons": []
+    },
+    {
+      "id": 1,
+      "modality": 0,
+      "parent": null,
+      "pixels": 192,
+      "samples": 42,
+      "reasons": []
+    },
+    {
+      "id": 2,
+      "modality": 0,
+      "parent": null,
+      "pixels": 127,
+      "samples": 35,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 3,
+      "modality": 0,
+      "parent": null,
+      "pixels": 130,
+      "samples": 34,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 4,
+      "modality": 0,
+      "parent": null,
+      "pixels": 132,
+      "samples": 31,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 5,
+      "modality": 0,
+      "parent": null,
+      "pixels": 56,
+      "samples": 14,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 6,
+      "modality": 0,
+      "parent": null,
+      "pixels": 29,
+      "samples": 11,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 7,
+      "modality": 0,
+      "parent": null,
+      "pixels": 42,
+      "samples": 12,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 8,
+      "modality": 0,
+      "parent": null,
+      "pixels": 20,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 9,
+      "modality": 0,
+      "parent": null,
+      "pixels": 17,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 10,
+      "modality": 0,
+      "parent": null,
+      "pixels": 35,
+      "samples": 11,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 11,
+      "modality": 0,
+      "parent": null,
+      "pixels": 23,
+      "samples": 9,
+      "reasons": []
+    },
+    {
+      "id": 12,
+      "modality": 0,
+      "parent": null,
+      "pixels": 15,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 13,
+      "modality": 0,
+      "parent": null,
+      "pixels": 31,
+      "samples": 11,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 14,
+      "modality": 0,
+      "parent": null,
+      "pixels": 23,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 15,
+      "modality": 0,
+      "parent": null,
+      "pixels": 12,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 16,
+      "modality": 0,
+      "parent": null,
+      "pixels": 19,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 17,
+      "modality": 0,
+      "parent": null,
+      "pixels": 29,
+      "samples": 10,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 18,
+      "modality": 0,
+      "parent": null,
+      "pixels": 13,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 19,
+      "modality": 0,
+      "parent": null,
+      "pixels": 8,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 20,
+      "modality": 0,
+      "parent": null,
+      "pixels": 25,
+      "samples": 11,
+      "reasons": []
+    },
+    {
+      "id": 21,
+      "modality": 0,
+      "parent": null,
+      "pixels": 18,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 22,
+      "modality": 0,
+      "parent": null,
+      "pixels": 16,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 23,
+      "modality": 0,
+      "parent": null,
+      "pixels": 24,
+      "samples": 10,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 24,
+      "modality": 0,
+      "parent": null,
+      "pixels": 23,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 25,
+      "modality": 0,
+      "parent": null,
+      "pixels": 6,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 26,
+      "modality": 0,
+      "parent": null,
+      "pixels": 20,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 27,
+      "modality": 0,
+      "parent": null,
+      "pixels": 6,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 28,
+      "modality": 0,
+      "parent": null,
+      "pixels": 15,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 29,
+      "modality": 0,
+      "parent": null,
+      "pixels": 5,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 30,
+      "modality": 0,
+      "parent": null,
+      "pixels": 9,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 31,
+      "modality": 0,
+      "parent": null,
+      "pixels": 12,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 32,
+      "modality": 0,
+      "parent": null,
+      "pixels": 5,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 33,
+      "modality": 0,
+      "parent": null,
+      "pixels": 5,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 34,
+      "modality": 0,
+      "parent": null,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 35,
+      "modality": 0,
+      "parent": null,
+      "pixels": 17,
+      "samples": 10,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 36,
+      "modality": 0,
+      "parent": null,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 37,
+      "modality": 0,
+      "parent": null,
+      "pixels": 15,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 38,
+      "modality": 0,
+      "parent": null,
+      "pixels": 20,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 39,
+      "modality": 0,
+      "parent": null,
+      "pixels": 9,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 40,
+      "modality": 0,
+      "parent": null,
+      "pixels": 12,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 41,
+      "modality": 0,
+      "parent": null,
+      "pixels": 9,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 42,
+      "modality": 0,
+      "parent": null,
+      "pixels": 4,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 43,
+      "modality": 0,
+      "parent": null,
+      "pixels": 19,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 44,
+      "modality": 0,
+      "parent": null,
+      "pixels": 8,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 45,
+      "modality": 0,
+      "parent": null,
+      "pixels": 12,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 46,
+      "modality": 0,
+      "parent": null,
+      "pixels": 8,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 47,
+      "modality": 0,
+      "parent": null,
+      "pixels": 19,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 48,
+      "modality": 0,
+      "parent": null,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 49,
+      "modality": 0,
+      "parent": null,
+      "pixels": 8,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 50,
+      "modality": 0,
+      "parent": null,
+      "pixels": 14,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 51,
+      "modality": 0,
+      "parent": null,
+      "pixels": 11,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 52,
+      "modality": 3,
+      "parent": 0,
+      "pixels": 192,
+      "samples": 26,
+      "reasons": []
+    },
+    {
+      "id": 53,
+      "modality": 3,
+      "parent": 1,
+      "pixels": 192,
+      "samples": 33,
+      "reasons": []
+    },
+    {
+      "id": 54,
+      "modality": 3,
+      "parent": 2,
+      "pixels": 127,
+      "samples": 21,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 55,
+      "modality": 3,
+      "parent": 3,
+      "pixels": 130,
+      "samples": 23,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 56,
+      "modality": 3,
+      "parent": 4,
+      "pixels": 132,
+      "samples": 23,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 57,
+      "modality": 3,
+      "parent": 5,
+      "pixels": 56,
+      "samples": 13,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 58,
+      "modality": 3,
+      "parent": 6,
+      "pixels": 29,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 59,
+      "modality": 3,
+      "parent": 7,
+      "pixels": 42,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 60,
+      "modality": 3,
+      "parent": 8,
+      "pixels": 20,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 61,
+      "modality": 3,
+      "parent": 9,
+      "pixels": 17,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 62,
+      "modality": 3,
+      "parent": 10,
+      "pixels": 35,
+      "samples": 8,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 63,
+      "modality": 3,
+      "parent": 11,
+      "pixels": 23,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 64,
+      "modality": 3,
+      "parent": 12,
+      "pixels": 15,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 65,
+      "modality": 3,
+      "parent": 13,
+      "pixels": 31,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 66,
+      "modality": 3,
+      "parent": 14,
+      "pixels": 23,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 67,
+      "modality": 3,
+      "parent": 15,
+      "pixels": 12,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 68,
+      "modality": 3,
+      "parent": 16,
+      "pixels": 19,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 69,
+      "modality": 3,
+      "parent": 17,
+      "pixels": 29,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 70,
+      "modality": 3,
+      "parent": 18,
+      "pixels": 13,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 71,
+      "modality": 3,
+      "parent": 19,
+      "pixels": 8,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 72,
+      "modality": 3,
+      "parent": 20,
+      "pixels": 25,
+      "samples": 8,
+      "reasons": []
+    },
+    {
+      "id": 73,
+      "modality": 3,
+      "parent": 21,
+      "pixels": 18,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 74,
+      "modality": 3,
+      "parent": 22,
+      "pixels": 16,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 75,
+      "modality": 3,
+      "parent": 23,
+      "pixels": 24,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 76,
+      "modality": 3,
+      "parent": 24,
+      "pixels": 23,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 77,
+      "modality": 3,
+      "parent": 25,
+      "pixels": 6,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 78,
+      "modality": 3,
+      "parent": 26,
+      "pixels": 20,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 79,
+      "modality": 3,
+      "parent": 27,
+      "pixels": 6,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 80,
+      "modality": 3,
+      "parent": 28,
+      "pixels": 15,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 81,
+      "modality": 3,
+      "parent": 29,
+      "pixels": 5,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 82,
+      "modality": 3,
+      "parent": 30,
+      "pixels": 9,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 83,
+      "modality": 3,
+      "parent": 31,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 84,
+      "modality": 3,
+      "parent": 32,
+      "pixels": 5,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 85,
+      "modality": 3,
+      "parent": 33,
+      "pixels": 5,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 86,
+      "modality": 3,
+      "parent": 34,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 87,
+      "modality": 3,
+      "parent": 35,
+      "pixels": 17,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 88,
+      "modality": 3,
+      "parent": 36,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 89,
+      "modality": 3,
+      "parent": 37,
+      "pixels": 15,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 90,
+      "modality": 3,
+      "parent": 38,
+      "pixels": 20,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 91,
+      "modality": 3,
+      "parent": 39,
+      "pixels": 9,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 92,
+      "modality": 3,
+      "parent": 40,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 93,
+      "modality": 3,
+      "parent": 41,
+      "pixels": 9,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 94,
+      "modality": 3,
+      "parent": 42,
+      "pixels": 4,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 95,
+      "modality": 3,
+      "parent": 43,
+      "pixels": 19,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 96,
+      "modality": 3,
+      "parent": 44,
+      "pixels": 8,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 97,
+      "modality": 3,
+      "parent": 45,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 98,
+      "modality": 3,
+      "parent": 46,
+      "pixels": 8,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 99,
+      "modality": 3,
+      "parent": 47,
+      "pixels": 19,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 100,
+      "modality": 3,
+      "parent": 48,
+      "pixels": 11,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 101,
+      "modality": 3,
+      "parent": 49,
+      "pixels": 8,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 102,
+      "modality": 3,
+      "parent": 50,
+      "pixels": 14,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 103,
+      "modality": 3,
+      "parent": 51,
+      "pixels": 11,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 104,
+      "modality": 4,
+      "parent": 0,
+      "pixels": 192,
+      "samples": 26,
+      "reasons": []
+    },
+    {
+      "id": 105,
+      "modality": 4,
+      "parent": 1,
+      "pixels": 192,
+      "samples": 33,
+      "reasons": []
+    },
+    {
+      "id": 106,
+      "modality": 4,
+      "parent": 2,
+      "pixels": 127,
+      "samples": 21,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 107,
+      "modality": 4,
+      "parent": 3,
+      "pixels": 130,
+      "samples": 23,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 108,
+      "modality": 4,
+      "parent": 4,
+      "pixels": 132,
+      "samples": 23,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 109,
+      "modality": 4,
+      "parent": 5,
+      "pixels": 56,
+      "samples": 12,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 110,
+      "modality": 4,
+      "parent": 6,
+      "pixels": 29,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 111,
+      "modality": 4,
+      "parent": 7,
+      "pixels": 42,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 112,
+      "modality": 4,
+      "parent": 8,
+      "pixels": 20,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 113,
+      "modality": 4,
+      "parent": 9,
+      "pixels": 17,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 114,
+      "modality": 4,
+      "parent": 10,
+      "pixels": 35,
+      "samples": 8,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 115,
+      "modality": 4,
+      "parent": 11,
+      "pixels": 23,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 116,
+      "modality": 4,
+      "parent": 12,
+      "pixels": 15,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 117,
+      "modality": 4,
+      "parent": 13,
+      "pixels": 31,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 118,
+      "modality": 4,
+      "parent": 14,
+      "pixels": 23,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 119,
+      "modality": 4,
+      "parent": 15,
+      "pixels": 12,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 120,
+      "modality": 4,
+      "parent": 16,
+      "pixels": 19,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 121,
+      "modality": 4,
+      "parent": 17,
+      "pixels": 29,
+      "samples": 7,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 122,
+      "modality": 4,
+      "parent": 18,
+      "pixels": 13,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 123,
+      "modality": 4,
+      "parent": 19,
+      "pixels": 8,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 124,
+      "modality": 4,
+      "parent": 20,
+      "pixels": 25,
+      "samples": 8,
+      "reasons": []
+    },
+    {
+      "id": 125,
+      "modality": 4,
+      "parent": 21,
+      "pixels": 18,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 126,
+      "modality": 4,
+      "parent": 22,
+      "pixels": 16,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 127,
+      "modality": 4,
+      "parent": 23,
+      "pixels": 24,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 128,
+      "modality": 4,
+      "parent": 24,
+      "pixels": 23,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 129,
+      "modality": 4,
+      "parent": 25,
+      "pixels": 6,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 130,
+      "modality": 4,
+      "parent": 26,
+      "pixels": 20,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 131,
+      "modality": 4,
+      "parent": 27,
+      "pixels": 6,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 132,
+      "modality": 4,
+      "parent": 28,
+      "pixels": 15,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 133,
+      "modality": 4,
+      "parent": 29,
+      "pixels": 5,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 134,
+      "modality": 4,
+      "parent": 30,
+      "pixels": 9,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 135,
+      "modality": 4,
+      "parent": 31,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 136,
+      "modality": 4,
+      "parent": 32,
+      "pixels": 5,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 137,
+      "modality": 4,
+      "parent": 33,
+      "pixels": 5,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 138,
+      "modality": 4,
+      "parent": 34,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 139,
+      "modality": 4,
+      "parent": 35,
+      "pixels": 17,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 140,
+      "modality": 4,
+      "parent": 36,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 141,
+      "modality": 4,
+      "parent": 37,
+      "pixels": 15,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 142,
+      "modality": 4,
+      "parent": 38,
+      "pixels": 20,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 143,
+      "modality": 4,
+      "parent": 39,
+      "pixels": 9,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 144,
+      "modality": 4,
+      "parent": 40,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 145,
+      "modality": 4,
+      "parent": 41,
+      "pixels": 9,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 146,
+      "modality": 4,
+      "parent": 42,
+      "pixels": 4,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 147,
+      "modality": 4,
+      "parent": 43,
+      "pixels": 19,
+      "samples": 5,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 148,
+      "modality": 4,
+      "parent": 44,
+      "pixels": 8,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 149,
+      "modality": 4,
+      "parent": 45,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 150,
+      "modality": 4,
+      "parent": 46,
+      "pixels": 8,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 151,
+      "modality": 4,
+      "parent": 47,
+      "pixels": 19,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 152,
+      "modality": 4,
+      "parent": 48,
+      "pixels": 11,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 153,
+      "modality": 4,
+      "parent": 49,
+      "pixels": 8,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 154,
+      "modality": 4,
+      "parent": 50,
+      "pixels": 14,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 155,
+      "modality": 4,
+      "parent": 51,
+      "pixels": 11,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 156,
+      "modality": 1,
+      "parent": null,
+      "pixels": 22933,
+      "samples": 64,
+      "reasons": [
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 157,
+      "modality": 1,
+      "parent": null,
+      "pixels": 4768,
+      "samples": 48,
+      "reasons": []
+    },
+    {
+      "id": 158,
+      "modality": 1,
+      "parent": null,
+      "pixels": 2389,
+      "samples": 29,
+      "reasons": []
+    },
+    {
+      "id": 159,
+      "modality": 1,
+      "parent": null,
+      "pixels": 1093,
+      "samples": 14,
+      "reasons": []
+    },
+    {
+      "id": 160,
+      "modality": 1,
+      "parent": null,
+      "pixels": 851,
+      "samples": 18,
+      "reasons": []
+    },
+    {
+      "id": 161,
+      "modality": 1,
+      "parent": null,
+      "pixels": 721,
+      "samples": 17,
+      "reasons": []
+    },
+    {
+      "id": 162,
+      "modality": 1,
+      "parent": null,
+      "pixels": 662,
+      "samples": 20,
+      "reasons": []
+    },
+    {
+      "id": 163,
+      "modality": 1,
+      "parent": null,
+      "pixels": 604,
+      "samples": 13,
+      "reasons": []
+    },
+    {
+      "id": 164,
+      "modality": 1,
+      "parent": null,
+      "pixels": 596,
+      "samples": 12,
+      "reasons": []
+    },
+    {
+      "id": 165,
+      "modality": 1,
+      "parent": null,
+      "pixels": 539,
+      "samples": 11,
+      "reasons": []
+    },
+    {
+      "id": 166,
+      "modality": 1,
+      "parent": null,
+      "pixels": 506,
+      "samples": 15,
+      "reasons": []
+    },
+    {
+      "id": 167,
+      "modality": 1,
+      "parent": null,
+      "pixels": 513,
+      "samples": 20,
+      "reasons": []
+    },
+    {
+      "id": 168,
+      "modality": 1,
+      "parent": null,
+      "pixels": 418,
+      "samples": 10,
+      "reasons": []
+    },
+    {
+      "id": 169,
+      "modality": 1,
+      "parent": null,
+      "pixels": 326,
+      "samples": 11,
+      "reasons": []
+    },
+    {
+      "id": 170,
+      "modality": 1,
+      "parent": null,
+      "pixels": 227,
+      "samples": 12,
+      "reasons": []
+    },
+    {
+      "id": 171,
+      "modality": 1,
+      "parent": null,
+      "pixels": 220,
+      "samples": 13,
+      "reasons": []
+    },
+    {
+      "id": 172,
+      "modality": 1,
+      "parent": null,
+      "pixels": 190,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 173,
+      "modality": 1,
+      "parent": null,
+      "pixels": 166,
+      "samples": 10,
+      "reasons": []
+    },
+    {
+      "id": 174,
+      "modality": 1,
+      "parent": null,
+      "pixels": 153,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 175,
+      "modality": 1,
+      "parent": null,
+      "pixels": 151,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 176,
+      "modality": 1,
+      "parent": null,
+      "pixels": 148,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 177,
+      "modality": 1,
+      "parent": null,
+      "pixels": 126,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 178,
+      "modality": 1,
+      "parent": null,
+      "pixels": 120,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 179,
+      "modality": 1,
+      "parent": null,
+      "pixels": 114,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 180,
+      "modality": 1,
+      "parent": null,
+      "pixels": 99,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 181,
+      "modality": 1,
+      "parent": null,
+      "pixels": 99,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 182,
+      "modality": 1,
+      "parent": null,
+      "pixels": 86,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 183,
+      "modality": 1,
+      "parent": null,
+      "pixels": 82,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 184,
+      "modality": 1,
+      "parent": null,
+      "pixels": 78,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 185,
+      "modality": 1,
+      "parent": null,
+      "pixels": 68,
+      "samples": 7,
+      "reasons": []
+    },
+    {
+      "id": 186,
+      "modality": 1,
+      "parent": null,
+      "pixels": 66,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 187,
+      "modality": 1,
+      "parent": null,
+      "pixels": 55,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 188,
+      "modality": 1,
+      "parent": null,
+      "pixels": 55,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 189,
+      "modality": 1,
+      "parent": null,
+      "pixels": 53,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 190,
+      "modality": 1,
+      "parent": null,
+      "pixels": 52,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 191,
+      "modality": 1,
+      "parent": null,
+      "pixels": 50,
+      "samples": 1,
+      "reasons": []
+    },
+    {
+      "id": 192,
+      "modality": 1,
+      "parent": null,
+      "pixels": 51,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 193,
+      "modality": 1,
+      "parent": null,
+      "pixels": 50,
+      "samples": 9,
+      "reasons": []
+    },
+    {
+      "id": 194,
+      "modality": 1,
+      "parent": null,
+      "pixels": 50,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 195,
+      "modality": 1,
+      "parent": null,
+      "pixels": 45,
+      "samples": 5,
+      "reasons": []
+    },
+    {
+      "id": 196,
+      "modality": 1,
+      "parent": null,
+      "pixels": 45,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 197,
+      "modality": 1,
+      "parent": null,
+      "pixels": 44,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 198,
+      "modality": 1,
+      "parent": null,
+      "pixels": 44,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 199,
+      "modality": 1,
+      "parent": null,
+      "pixels": 41,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 200,
+      "modality": 1,
+      "parent": null,
+      "pixels": 40,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 201,
+      "modality": 1,
+      "parent": null,
+      "pixels": 32,
+      "samples": 2,
+      "reasons": []
+    },
+    {
+      "id": 202,
+      "modality": 1,
+      "parent": null,
+      "pixels": 33,
+      "samples": 1,
+      "reasons": []
+    },
+    {
+      "id": 203,
+      "modality": 1,
+      "parent": null,
+      "pixels": 31,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 204,
+      "modality": 1,
+      "parent": null,
+      "pixels": 36,
+      "samples": 6,
+      "reasons": []
+    },
+    {
+      "id": 205,
+      "modality": 1,
+      "parent": null,
+      "pixels": 32,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 206,
+      "modality": 2,
+      "parent": null,
+      "pixels": 848,
+      "samples": 64,
+      "reasons": [
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 207,
+      "modality": 2,
+      "parent": null,
+      "pixels": 251,
+      "samples": 42,
+      "reasons": []
+    },
+    {
+      "id": 208,
+      "modality": 2,
+      "parent": null,
+      "pixels": 250,
+      "samples": 39,
+      "reasons": []
+    },
+    {
+      "id": 209,
+      "modality": 2,
+      "parent": null,
+      "pixels": 188,
+      "samples": 31,
+      "reasons": []
+    },
+    {
+      "id": 210,
+      "modality": 2,
+      "parent": null,
+      "pixels": 188,
+      "samples": 30,
+      "reasons": []
+    },
+    {
+      "id": 211,
+      "modality": 2,
+      "parent": null,
+      "pixels": 241,
+      "samples": 43,
+      "reasons": []
+    },
+    {
+      "id": 212,
+      "modality": 2,
+      "parent": null,
+      "pixels": 240,
+      "samples": 37,
+      "reasons": []
+    },
+    {
+      "id": 213,
+      "modality": 2,
+      "parent": null,
+      "pixels": 178,
+      "samples": 29,
+      "reasons": []
+    },
+    {
+      "id": 214,
+      "modality": 2,
+      "parent": null,
+      "pixels": 178,
+      "samples": 26,
+      "reasons": []
+    },
+    {
+      "id": 215,
+      "modality": 2,
+      "parent": null,
+      "pixels": 95,
+      "samples": 12,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 216,
+      "modality": 2,
+      "parent": null,
+      "pixels": 76,
+      "samples": 11,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 217,
+      "modality": 2,
+      "parent": null,
+      "pixels": 50,
+      "samples": 10,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 218,
+      "modality": 2,
+      "parent": null,
+      "pixels": 44,
+      "samples": 9,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 219,
+      "modality": 2,
+      "parent": null,
+      "pixels": 41,
+      "samples": 8,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 220,
+      "modality": 2,
+      "parent": null,
+      "pixels": 36,
+      "samples": 8,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 221,
+      "modality": 2,
+      "parent": null,
+      "pixels": 32,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 222,
+      "modality": 2,
+      "parent": null,
+      "pixels": 31,
+      "samples": 6,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 223,
+      "modality": 2,
+      "parent": null,
+      "pixels": 19,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 224,
+      "modality": 2,
+      "parent": null,
+      "pixels": 16,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 225,
+      "modality": 2,
+      "parent": null,
+      "pixels": 17,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 226,
+      "modality": 2,
+      "parent": null,
+      "pixels": 17,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 227,
+      "modality": 2,
+      "parent": null,
+      "pixels": 17,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 228,
+      "modality": 2,
+      "parent": null,
+      "pixels": 16,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 229,
+      "modality": 2,
+      "parent": null,
+      "pixels": 16,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 230,
+      "modality": 2,
+      "parent": null,
+      "pixels": 15,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 231,
+      "modality": 2,
+      "parent": null,
+      "pixels": 15,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 232,
+      "modality": 2,
+      "parent": null,
+      "pixels": 14,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 233,
+      "modality": 2,
+      "parent": null,
+      "pixels": 14,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 234,
+      "modality": 2,
+      "parent": null,
+      "pixels": 15,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 235,
+      "modality": 2,
+      "parent": null,
+      "pixels": 13,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 236,
+      "modality": 2,
+      "parent": null,
+      "pixels": 12,
+      "samples": 1,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 237,
+      "modality": 2,
+      "parent": null,
+      "pixels": 12,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 238,
+      "modality": 2,
+      "parent": null,
+      "pixels": 13,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 239,
+      "modality": 2,
+      "parent": null,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 240,
+      "modality": 2,
+      "parent": null,
+      "pixels": 12,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 241,
+      "modality": 2,
+      "parent": null,
+      "pixels": 11,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 242,
+      "modality": 2,
+      "parent": null,
+      "pixels": 11,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 243,
+      "modality": 2,
+      "parent": null,
+      "pixels": 10,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 244,
+      "modality": 2,
+      "parent": null,
+      "pixels": 9,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 245,
+      "modality": 2,
+      "parent": null,
+      "pixels": 10,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 246,
+      "modality": 2,
+      "parent": null,
+      "pixels": 10,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 247,
+      "modality": 2,
+      "parent": null,
+      "pixels": 10,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 248,
+      "modality": 2,
+      "parent": null,
+      "pixels": 8,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 249,
+      "modality": 2,
+      "parent": null,
+      "pixels": 9,
+      "samples": 4,
+      "reasons": []
+    },
+    {
+      "id": 250,
+      "modality": 2,
+      "parent": null,
+      "pixels": 9,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 251,
+      "modality": 2,
+      "parent": null,
+      "pixels": 8,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 252,
+      "modality": 2,
+      "parent": null,
+      "pixels": 8,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 253,
+      "modality": 2,
+      "parent": null,
+      "pixels": 9,
+      "samples": 2,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    },
+    {
+      "id": 254,
+      "modality": 2,
+      "parent": null,
+      "pixels": 7,
+      "samples": 3,
+      "reasons": []
+    },
+    {
+      "id": 255,
+      "modality": 2,
+      "parent": null,
+      "pixels": 7,
+      "samples": 4,
+      "reasons": [
+        "curve_order_unresolved",
+        "sampling_target_unmet"
+      ]
+    }
+  ],
+  "zero": {
+    "curv": {
+      "shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "nan": 0,
+      "inf": 0,
+      "finite_fraction": 1.0,
+      "quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "aps": {
+      "shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "nan": 0,
+      "inf": 0,
+      "finite_fraction": 1.0,
+      "quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "ori": {
+      "shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "nan": 0,
+      "inf": 0,
+      "finite_fraction": 1.0,
+      "quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "constant": {
+    "curv": {
+      "shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "nan": 0,
+      "inf": 0,
+      "finite_fraction": 1.0,
+      "quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "aps": {
+      "shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "nan": 0,
+      "inf": 0,
+      "finite_fraction": 1.0,
+      "quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "ori": {
+      "shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "nan": 0,
+      "inf": 0,
+      "finite_fraction": 1.0,
+      "quantiles": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  }
+}

@@ -1,3 +1,5 @@
+
+
 # OnceOptimizer 新一轮性能复查与判别任务模块需求
 
 日期：2026-09-17。范围：检查已有运行结果与代码，提出后续方案；本次不修改训练代码，不启动训练，不调整阈值或单步时间预算。
@@ -25,70 +27,70 @@
 
 ### 0.2 区域约束与模板候选遍历
 
-设当前区域像素集合为 \(\Omega_r\)，图片有效掩码为 \(V\)。代码构造整图大小的区域 mask，并建立 `provider.restricted(mask & report.valid_mask)`。局部响应只能使用该区域与有效图片范围内的证据，区域外响应为零。
+设当前区域像素集合为 $\Omega_r$，图片有效掩码为 $V$。代码构造整图大小的区域 mask，并建立 `provider.restricted(mask & report.valid_mask)`。局部响应只能使用该区域与有效图片范围内的证据，区域外响应为零。
 
 密集候选锚点集合是
 
-\[
+$$
 \mathcal C_r=\{(p\bmod W,\lfloor p/W\rfloor):p\in\Omega_r\}.
-\]
+$$
 
 这里遍历**区域所有像素**，不是只遍历 `region.samples`，也没有采用全局查询的 stride。样本点主要用于后续范围检查。
 
 代码从 `prior.regions` 中取出锚点四舍五入后落在当前区域内的匹配，按模板 ID 归为稀疏中心集合；实际传给评分器的仍是原匹配坐标。所有 GmemII 节点按“有该区域内先验中心的模板优先，其次 ID”排序，然后只保留 `kind == 'region'` 且 anchor 模态等于当前区域模态的模板。这里的先验用于排序和提供中心，不构成限制模板总数的 top-k 索引。
 
-对每个模板先评估稀疏中心；如果其中没有 `accepted` 且分数达到 `graph_learn_threshold` 的结果，就在 \(\mathcal C_r\) 上密集评估。若已有这样的稀疏结果，则跳过该模板的密集搜索，但继续检查其他模板，保留跨模板竞争。
+对每个模板先评估稀疏中心；如果其中没有 `accepted` 且分数达到 `graph_learn_threshold` 的结果，就在 $\mathcal C_r$ 上密集评估。若已有这样的稀疏结果，则跳过该模板的密集搜索，但继续检查其他模板，保留跨模板竞争。
 
 ### 0.3 将区域超节点展开为相对坐标模板
 
-`region_view` 从 GmemII 区域内部关系边恢复槽位坐标。将边的极坐标位移转换为二维向量 \(\Delta_{ab}\)，建立正向与反向邻接，把 anchor 设为原点，通过 BFS 传播
+`region_view` 从 GmemII 区域内部关系边恢复槽位坐标。将边的极坐标位移转换为二维向量 $\Delta_{ab}$，建立正向与反向邻接，把 anchor 设为原点，通过 BFS 传播
 
-\[
+$$
 \mathbf d_b=\mathbf d_a+\Delta_{ab}.
-\]
+$$
 
 已定位节点若由另一条路径得到的坐标差大于 `graph_cycle_tolerance`，模板被判为几何不一致；有节点不能从 anchor 到达时判为不连通；非零位移自环超出 `2 * once_geometry_epsilon` 时也拒绝展开。这些异常设置本区域的 `unresolved=True` 并跳过该模板。
 
-输出 `StructureView` 包含模板 ID/版本、全部槽位及全部边约束。每个区域槽位由一个 GmemI node ID 标识，记录原型、相对坐标 \(\mathbf d_i\)、anchor 标志等；区域内只有一个权重组。槽位原始权重取指向该节点的关系边 `evidence.weight(cfg)` 的最大值，无此类边时为 1。
+输出 `StructureView` 包含模板 ID/版本、全部槽位及全部边约束。每个区域槽位由一个 GmemI node ID 标识，记录原型、相对坐标 $\mathbf d_i$、anchor 标志等；区域内只有一个权重组。槽位原始权重取指向该节点的关系边 `evidence.weight(cfg)` 的最大值，无此类边时为 1。
 
-通用 `evaluate` 先在组内按槽位权重归一化，再按组权重归一化；相同 `(node_id, 四舍五入至六位小数的相对坐标)` 若出现多次，会除以重复次数，最后重新归一化。记最终权重为 \(w_i\)，满足 \(\sum_i w_i=1\)。在普通区域视图中槽位键唯一、只有一个组，主要体现为入边证据权重的归一化。
+通用 `evaluate` 先在组内按槽位权重归一化，再按组权重归一化；相同 `(node_id, 四舍五入至六位小数的相对坐标)` 若出现多次，会除以重复次数，最后重新归一化。记最终权重为 $w_i$，满足 $\sum_i w_i=1$。在普通区域视图中槽位键唯一、只有一个组，主要体现为入边证据权重的归一化。
 
 ### 0.4 单槽位的可评估性、特征响应与位移搜索
 
-对于候选中心 \(\mathbf c\)，槽位预测坐标为 \(\mathbf p_i=\mathbf c+\mathbf d_i\)。代码先检查节点模态是否存在、模态权重是否为正、原型掩码是否至少使一个相似度组满足最低有效通道数；随后查询该模态的有限值/区域有效 mask。定义
+对于候选中心 $\mathbf c$，槽位预测坐标为 $\mathbf p_i=\mathbf c+\mathbf d_i$。代码先检查节点模态是否存在、模态权重是否为正、原型掩码是否至少使一个相似度组满足最低有效通道数；随后查询该模态的有限值/区域有效 mask。定义
 
-\[
- k_i(\mathbf c)=\mathbf1[\text{静态通道可用，预测坐标在图内，插值得到的有效 mask}>0.5].
-\]
+$$
+k_i(\mathbf c)=\mathbf1[\text{静态通道可用，预测坐标在图内，插值得到的有效 mask}>0.5].
+$$
 
 **可评估性在预测坐标处判断，不是搜索到的最佳位移点处判断。** 当前先按模态批量插值这些 mask，再复制到 CPU，计算所有槽位的可评估标志。
 
 节点响应为
 
-\[
- R_i(\mathbf x)=\operatorname{clamp}_{[0,1]}
- \bigl(\operatorname{Similarity}(X_{m_i}(\mathbf x),W_i)
+$$
+R_i(\mathbf x)=\operatorname{clamp}_{[0,1]}
+\bigl(\operatorname{Similarity}(X_{m_i}(\mathbf x),W_i)
        G_{m_i}(\mathbf x)F_{m_i,r}(\mathbf x)\bigr),
-\]
+$$
 
-其中 \(G\) 是模态门控，\(F\) 包含有限值、图片有效范围和当前区域限制。相似度遵循 feature contract：有效 metric group 分别调用欧氏、周期属性或向量相似度，再按组权重对 `clamp(min=1e-6)` 后的组分数取加权几何平均；无可用组返回零。无组配置时走对应旧版模态相似度分支。
+其中 $G$ 是模态门控，$F$ 包含有限值、图片有效范围和当前区域限制。相似度遵循 feature contract：有效 metric group 分别调用欧氏、周期属性或向量相似度，再按组权重对 `clamp(min=1e-6)` 后的组分数取加权几何平均；无可用组返回零。无组配置时走对应旧版模态相似度分支。
 
 局部位移集合及惩罚为
 
-\[
- \mathcal D=\{-r,\ldots,r\}^2,\quad
- P(\boldsymbol\delta)=e^{-\|\boldsymbol\delta\|^2/(2\sigma^2)}.
-\]
+$$
+\mathcal D=\{-r,\ldots,r\}^2,\quad
+P(\boldsymbol\delta)=e^{-\|\boldsymbol\delta\|^2/(2\sigma^2)}.
+$$
 
 对可评估槽位，计算
 
-\[
- s_i(\mathbf c)=\max_{\boldsymbol\delta\in\mathcal D}
- \widetilde R_i(\mathbf p_i+\boldsymbol\delta)P(\boldsymbol\delta),\quad
- \mathbf q_i=\mathbf p_i+\arg\max_{\boldsymbol\delta\in\mathcal D}(\cdots).
-\]
+$$
+s_i(\mathbf c)=\max_{\boldsymbol\delta\in\mathcal D}
+\widetilde R_i(\mathbf p_i+\boldsymbol\delta)P(\boldsymbol\delta),\quad
+\mathbf q_i=\mathbf p_i+\arg\max_{\boldsymbol\delta\in\mathcal D}(\cdots).
+$$
 
-\(\widetilde R\) 是响应的双线性插值，使用 `align_corners=True`、图外置零。并列最大值由当前位移排列中的首个最大值决定。默认 \(r=2\)，每个槽位—中心最多比较 25 个位移，\(\sigma=2\)。该流程允许局部位置偏差，整体搜索仍是平移，不搜索整体缩放和旋转。
+$\widetilde R$ 是响应的双线性插值，使用 `align_corners=True`、图外置零。并列最大值由当前位移排列中的首个最大值决定。默认 $r=2$，每个槽位—中心最多比较 25 个位移，$\sigma=2$。该流程允许局部位置偏差，整体搜索仍是平移，不搜索整体缩放和旋转。
 
 `FeatureResponseCache.sample` 若已缓存该节点签名的响应则直接采样。否则以本批图内查询点构造带保护边界的矩形：下界 `floor(min)-2`，上界 `ceil(max)+3`，裁剪到图片范围。面积达到整图的 `graph_local_response_fraction=0.25` 时改用整图响应缓存；否则只计算矩形响应，写入新建的整图零画布，再按原坐标插值。ROI 分支没有保存供下次复用的矩形响应缓存。节点签名由模态、原型形状/数值及掩码组成，等价节点可共享整图响应；局部区域 mask 不写入父缓存。
 
@@ -98,24 +100,24 @@
 
 先确定本块每个中心的完整可评估分母
 
-\[
- E=\sum_i w_i k_i.
-\]
+$$
+E=\sum_i w_i k_i.
+$$
 
-若 \(E<\texttt{graph_evaluable_min}-10^{-12}\)，直接淘汰该中心。随后按权重降序评估槽位，权重相同时 anchor 优先；默认每批 8 个槽位，仅对仍存活且该槽位可评估的中心调用响应采样。每批 best score/argmax 拼接后回传 NumPy。
+若 $E<\texttt{graph_evaluable_min}-10^{-12}$，直接淘汰该中心。随后按权重降序评估槽位，权重相同时 anchor 优先；默认每批 8 个槽位，仅对仍存活且该槽位可评估的中心调用响应采样。每批 best score/argmax 拼接后回传 NumPy。
 
-设已处理槽位集合为 \(D\)，则分数与匹配覆盖率的乐观上界为
+设已处理槽位集合为 $D$，则分数与匹配覆盖率的乐观上界为
 
-\[
- U_S=\exp\left(\frac{\sum_{i\in D}w_i k_i\log\max(s_i,10^{-8})}{E}\right),
-\]
+$$
+U_S=\exp\left(\frac{\sum_{i\in D}w_i k_i\log\max(s_i,10^{-8})}{E}\right),
+$$
 
-\[
- U_C=\frac{\sum_{i\in D}w_i k_i\mathbf1[s_i\ge\tau_r]
+$$
+U_C=\frac{\sum_{i\in D}w_i k_i\mathbf1[s_i\ge\tau_r]
                   +\sum_{i\notin D}w_i k_i}{E},
-\]
+$$
 
-其中 \(\tau_r=\texttt{graph_recall_threshold}\)。未处理槽位暂按“相似度 1 且全部命中”处理，分母 \(E\) 始终是预先算好的最终可评估量。若 \(U_S<\tau_l-10^{-12}\) 或 \(U_C<\tau_c-10^{-12}\)，该中心无法达到学习分数/覆盖率要求，停止继续为它采样。实现对零分母使用极小正数保护；上式针对 \(E>0\) 的正常候选。
+其中 $\tau_r=\texttt{graph_recall_threshold}$。未处理槽位暂按“相似度 1 且全部命中”处理，分母 $E$ 始终是预先算好的最终可评估量。若 $U_S<\tau_l-10^{-12}$ 或 $U_C<\tau_c-10^{-12}$，该中心无法达到学习分数/覆盖率要求，停止继续为它采样。实现对零分母使用极小正数保护；上式针对 $E>0$ 的正常候选。
 
 当前每批都会重新遍历全部槽位构造上界，尚未增量维护；剩余槽位计算完成后，只有幸存中心进入逐中心完整校验。关闭渐进开关时，参考分支先算所有槽位响应，再按同样的最终分数、可评估性与覆盖率必要条件筛选，最后仍使用同一个完整校验器。
 
@@ -123,20 +125,20 @@
 
 对幸存中心，代码重新按原槽位顺序计算
 
-\[
- S=\exp\left(\frac{\sum_i w_i k_i\log\max(s_i,10^{-8})}{E}\right),\qquad
- C=\frac{\sum_i w_i k_i\mathbf1[s_i\ge\tau_r]}{E}.
-\]
+$$
+S=\exp\left(\frac{\sum_i w_i k_i\log\max(s_i,10^{-8})}{E}\right),\qquad
+C=\frac{\sum_i w_i k_i\mathbf1[s_i\ge\tau_r]}{E}.
+$$
 
 不可评估槽位进入 `missing`，不进入分母；可评估但低响应的槽位进入分母并降低分数/覆盖率。分数为零通过数值下限参与对数计算，并非直接导致整模板分数为零。
 
 完整校验还包括：
 
-1. **边几何约束**：仅当一条边两端都可评估且达到召回阈值时，计算 \(\|\mathbf q_b-\mathbf q_a-\Delta_{ab}\|\)；取参与边的最大残差为 `geometry_error`，没有参与边时默认 0。
+1. **边几何约束**：仅当一条边两端都可评估且达到召回阈值时，计算 $\|\mathbf q_b-\mathbf q_a-\Delta_{ab}\|$；取参与边的最大残差为 `geometry_error`，没有参与边时默认 0。
 2. **证据冲突**：两个受支持槽位若模态相同，选中坐标四舍五入至四位小数后相同，但模板内相对坐标距离大于 0.5，则判为冲突。不同模态可共址。
-3. **成员位置**：anchor 命中时使用其最佳点；否则用受支持槽位反推的组锚点做分数加权平均。返回的 `StructureMatch.point` 仍是被搜索的中心 \(\mathbf c\)，不是自动替换为上述推断位置。
+3. **成员位置**：anchor 命中时使用其最佳点；否则用受支持槽位反推的组锚点做分数加权平均。返回的 `StructureMatch.point` 仍是被搜索的中心 $\mathbf c$，不是自动替换为上述推断位置。
 
-`accepted` 要求：\(S\ge\tau_v\)、\(E\ge\tau_e\)、\(C\ge\tau_c\)、无冲突，且 `geometry_error <= 2*r + graph_cycle_tolerance`。默认阈值为 \(\tau_r=0.45\)、\(\tau_v=0.65\)、\(\tau_l=0.78\)、\(\tau_e=0.7\)、\(\tau_c=0.7\)，循环容差为 1，所以当前最大边残差容许量为 5 像素。区域学习还额外要求 \(S\ge\tau_l\)。
+`accepted` 要求：$S\ge\tau_v$、$E\ge\tau_e$、$C\ge\tau_c$、无冲突，且 `geometry_error <= 2*r + graph_cycle_tolerance`。默认阈值为 $\tau_r=0.45$、$\tau_v=0.65$、$\tau_l=0.78$、$\tau_e=0.7$、$\tau_c=0.7$，循环容差为 1，所以当前最大边残差容许量为 5 像素。区域学习还额外要求 $S\ge\tau_l$。
 
 这里每个槽位独立选自己的局部最大值，再做冲突和边几何检查；不会在冲突或边校验失败后尝试该槽位的第二佳位置。因此它不是全局最优图赋值求解器，即便枚举全部整数中心，也不保证找出所有可行槽位联合赋值。
 
@@ -144,12 +146,12 @@
 
 每个模板从已接受且达到学习阈值的结果中，按 `(score, matched_coverage, -geometry_error)` 取最佳中心。设
 
-\[
- L_o=\max_{p\in\text{region.samples}}\|p-\mathbf c_{best}\|,
- \quad L_t=\max_i\|\mathbf d_i\|.
-\]
+$$
+L_o=\max_{p\in\text{region.samples}}\|p-\mathbf c_{best}\|,
+\quad L_t=\max_i\|\mathbf d_i\|.
+$$
 
-只有 \(|L_o-L_t|\le\max(\texttt{graph_geometry_update_limit},0.2\max(L_o,L_t))\) 才加入跨模板候选，当前绝对容差为 4 像素。该检查用于抑制小模板覆盖大区域，但它比较的是采样点最远距离，不是精确区域轮廓重叠率。
+只有 $|L_o-L_t|\le\max(\texttt{graph_geometry_update_limit},0.2\max(L_o,L_t))$ 才加入跨模板候选，当前绝对容差为 4 像素。该检查用于抑制小模板覆盖大区域，但它比较的是采样点最远距离，不是精确区域轮廓重叠率。
 
 所有通过范围检查的模板按分数降序、模板 ID 升序排序；若前两名分数差严格小于 `graph_match_margin=0.04`，返回歧义，否则返回第一名。此路径没有对局部候选执行 NMS。
 
@@ -181,13 +183,13 @@ learn(features, old_memory):
 
 ### 0.8 计算复杂度与 CPU/GPU 分工
 
-设区域数为 \(R\)，区域 r 对应模态模板集合为 \(T_r\)，像素中心数为 \(P_r\)，模板槽位数为 \(K_t\)，每槽位位移数为 \(D=(2r+1)^2\)。忽略早退时，局部位置评分工作量可达
+设区域数为 $R$，区域 $r$ 对应模态模板集合为 $T_r$，像素中心数为 $P_r$，模板槽位数为 $K_t$，每槽位位移数为 $D=(2r+1)^2$。忽略早退时，局部位置评分工作量可达
 
-\[
- O\left(\sum_{r=1}^{R}\sum_{t\in T_r}P_rK_tD\right).
-\]
+$$
+O\left(\sum_{r=1}^{R}\sum_{t\in T_r}P_rK_tD\right).
+$$
 
-还需计入模板 BFS 展开、ROI 内实际响应像素计算、整图临时画布、可评估 mask 插值、完整赋值与边约束；所以这个式子不是全部运行成本的精确模型。每批槽位重新扫描全部槽位的上界逻辑，在无淘汰情形还会产生约 \(O(P_rK_t\lceil K_t/B\rceil)\) 的 CPU 数组处理，其中 \(B=8\)。
+还需计入模板 BFS 展开、ROI 内实际响应像素计算、整图临时画布、可评估 mask 插值、完整赋值与边约束；所以这个式子不是全部运行成本的精确模型。每批槽位重新扫描全部槽位的上界逻辑，在无淘汰情形还会产生约 $O(P_rK_t\lceil K_t/B\rceil)$ 的 CPU 数组处理，其中 $B=8$。
 
 当前 CPU 负责区域/模板循环、BFS、候选中心与槽位组织、NumPy 上界计算、逐中心冲突与几何校验及最终决策；GPU 负责特征相似度、响应插值和局部最大值。渐进筛选减少实际响应计算，但不减少外层同模态模板遍历，也仍需预先判断全部槽位的可评估性。这一实现结构解释了后文“采样量已减少，但单核调度和大量小 GPU 任务仍限制吞吐”的现象。
 

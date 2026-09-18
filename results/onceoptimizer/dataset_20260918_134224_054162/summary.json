@@ -1,0 +1,88 @@
+{
+  "status": "interrupted",
+  "completed_train": 0,
+  "planned_train": 593,
+  "completed_evaluations": 0,
+  "baseline": {
+    "rss_mib": 1985.5625,
+    "process_lifetime_peak_mib": 2097.2578125,
+    "host_available_mib": 20384.9609375,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 30.35205078125,
+    "cuda_reserved_mib": 56.0,
+    "cuda_peak_allocated_mib": 30.35205078125,
+    "cuda_peak_reserved_mib": 56.0,
+    "cuda_free_mib": 14639.0,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_elapsed_seconds": 56.71337279801082,
+  "cuda_environment": {
+    "python": "/home/p/anaconda3/envs/consciousLinux/bin/python",
+    "torch": "2.10.0+cu128",
+    "cuda_build": "12.8",
+    "cudnn_version": 91002,
+    "device": "cuda:0",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "compiled_arches": [
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+    ],
+    "total_memory_mib": 15840.3125
+  },
+  "final": {
+    "rss_mib": 2011.15234375,
+    "process_lifetime_peak_mib": 2097.2578125,
+    "host_available_mib": 20345.671875,
+    "host_total_mib": 31928.58203125,
+    "cuda_allocated_mib": 32.60205078125,
+    "cuda_reserved_mib": 102.0,
+    "cuda_peak_allocated_mib": 88.919921875,
+    "cuda_peak_reserved_mib": 102.0,
+    "cuda_free_mib": 14721.8125,
+    "cuda_total_mib": 15840.3125
+  },
+  "run_sampled_peak_rss_mib": 2035.796875,
+  "peak_rss_increment_from_baseline_mib": 50.234375,
+  "minimum_host_available_mib": 20226.4140625,
+  "sampler_error": null,
+  "gmem_i_by_modality": {
+    "0": 931,
+    "1": 513,
+    "2": 489,
+    "4": 371
+  },
+  "gmem_ii_by_modality": {
+    "0": 52,
+    "1": 51,
+    "2": 51,
+    "4": 102
+  },
+  "gmem_i": 2304,
+  "gmem_ii": 256,
+  "gmem_iii": 64,
+  "ii_relations": 13470,
+  "iii_memberships": 254,
+  "iii_relations": 190,
+  "stable_entities": 0,
+  "entity_raw_hits": 64,
+  "entity_support": 64.0,
+  "replay": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  },
+  "heldout": {
+    "images": 0,
+    "entity_activation_fraction": null,
+    "translation_within_2px_fraction": null
+  }
+}

@@ -2,6 +2,13 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-18_supervised_graph_learning_plan.md | 核对 1518 个目标框，设计标注确认实体、框监督学习、增长图分类读出及无框检测/视频扩展完整方案 | chatgpt | 2026-09-18 |
+| 2026-09-18_index_parallelism_growing_graph_classifier.md | 复查 38 图运行、42.53% 粗筛与关系瓶颈；审查自适应编码树、多核方案及增长图分类头生命周期 | chatgpt | 2026-09-18 |
+| 2026-09-18_grad_bound_edge_attributes.md | aps/ori 默认继承 grad 分区、邻接与有效锚点；增加父区域图示和分区合同，21 项回归及真实单图构图通过 | chatgpt | 2026-09-18 |
+| 2026-09-18_advanced_feature_stability_fix.md | 修复 aps NaN 与零输入偏置；引入方向置信度/轴向插值/切向合同，修复种子掩码；18 项回归及 CPU/CUDA 单图验证通过 | chatgpt | 2026-09-18 |
+| 2026-09-18_advanced_modality_input_diagnosis.md | 真实 CNN 单图复现 aps 首尺度全 NaN，定位特征值相消与归一化传播；审查 curv/ori 分区及零输入退化 | chatgpt | 2026-09-18 |
+| 2026-09-18_binary_coarse_multimodal_implementation.md | 接入保守区间位图粗筛与模板缓存；默认启用五模态、统一预算及投影权重，补充阈值诊断和 13 项回归 | chatgpt | 2026-09-18 |
+| 2026-09-18_binary_coarse_filter_review.md | 审查现有分层位图/倒排机制，区分近似召回与安全排除，推导加权覆盖必要条件及接入方案 | chatgpt | 2026-09-18 |
 | 2026-09-17_onceoptimizer_serial_bottleneck_discrimination_review.md | 新增第 0 章审查 region_matching 实际算法；复查 29 图单核瓶颈、后续优化及判别模块需求 | chatgpt | 2026-09-17 |
 | 2026-09-17_onceoptimizer_progressive_matching_implementation.md | 实现可评估性前移、逐批上界早退和局部响应；预留默认关闭的预算/未提交接口；CPU/GPU 回归与真实区域对照通过 | chatgpt | 2026-09-17 |
 | 2026-09-17_onceoptimizer_algorithm_revision_proposal.md | 评估不改双塔层级的 one_step 调度、区域候选搜索、保守上界早退与预算延期学习，区分等价加速和行为变更 | chatgpt | 2026-09-17 |
