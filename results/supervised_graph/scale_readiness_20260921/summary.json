@@ -1,0 +1,61 @@
+{
+  "source_run": "voc2007_20260921_231411_853393",
+  "device": "cpu",
+  "graph_version": 34,
+  "rows": [
+    {
+      "index": 0,
+      "image_id": "003671",
+      "object_id": "0",
+      "class": "dog",
+      "target": 0,
+      "hits": [
+        0
+      ],
+      "scores": [
+        0.9999856346688769
+      ],
+      "target_hit": true,
+      "prediction": "dog",
+      "status": "PREDICTED",
+      "fallback": true,
+      "seconds": 28.052128994022496
+    },
+    {
+      "index": 16,
+      "image_id": "005071",
+      "object_id": "8",
+      "class": "car",
+      "target": 16,
+      "hits": [
+        16
+      ],
+      "scores": [
+        0.9999882203683319
+      ],
+      "target_hit": true,
+      "prediction": "car",
+      "status": "PREDICTED",
+      "fallback": true,
+      "seconds": 28.70498331700219
+    },
+    {
+      "index": 33,
+      "image_id": "008169",
+      "object_id": "1",
+      "class": "car",
+      "target": 33,
+      "hits": [
+        33
+      ],
+      "scores": [
+        0.9999952683311146
+      ],
+      "target_hit": true,
+      "prediction": "car",
+      "status": "PREDICTED",
+      "fallback": true,
+      "seconds": 31.130981548980344
+    }
+  ]
+}

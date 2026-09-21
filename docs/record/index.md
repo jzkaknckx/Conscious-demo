@@ -2,6 +2,13 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-21_large_training_readiness_review.md | 最新 34/34 写入、25 次修复、31 个未决实体；冻结三点回查通过，审查待决退出、复用巩固、全体回查与扩容门槛 | chatgpt | 2026-09-21 |
+| 2026-09-21_admission_quality_implementation.md | 分离标注准入与区域复用，持续质量计权/family 覆盖、分支路径采样、提交前几何修复和冻结回查；22 项回归及三图顺序验证 | chatgpt | 2026-09-21 |
+| 2026-09-21_postcorrection_learning_review.md | 审查最新 CUDA 两图及 20 图批量：自检成功、五模态入图，但 19/34 因局部歧义弃写；提出新类准入、质量计权与 family 对应方案 | chatgpt | 2026-09-21 |
+| 2026-09-21_recall_family_correctness_implementation.md | 修复两图普通检索闭环，接入 grad 来源 family、质量分项与联合消歧；更新 Notebook 配置/诊断，18 项回归通过，暂缓性能优化 | chatgpt | 2026-09-21 |
+| 2026-09-21_notebook_retrieval_and_scaling_review.md | 审查最新 20 图：85.29% 写入但两图自检失败、实体零复用；核对旧分区/数据路径，提出候选诊断、成员质量及实体匹配优化细则 | chatgpt | 2026-09-21 |
+| 2026-09-21_refinement_shape_results.md | 审查 34 目标全未提交；实现 grad 父域内属性细分、截断候选替换和区域形状诊断，完整解压 VOC2007；两图实测及 9 项回归 | chatgpt | 2026-09-21 |
+| 2026-09-21_longterm_training_grad_gate.md | 新增长期训练算法报告；修正 curv/aps/ori 的 grad 连续性门控后独立分区，补齐诊断和连续窗口接口 | chatgpt | 2026-09-21 |
 | 2026-09-18_voc2007_training_results_review.md | 审查 20 图 34 目标：55.88% 提交、实体零复用、17/19 纯 RGB；分析弃写、规模成本与连续扩容入口限制 | chatgpt | 2026-09-18 |
 | 2026-09-18_voc2007_supervised_notebook.md | 接入 VOC2007 官方划分，增加同类两图分割/实体/检索演示、独立批量学习及资源曲线和中断保存；仅静态编译 | chatgpt | 2026-09-18 |
 | 2026-09-18_supervised_graph_learning_implementation.md | 实现框监督实体事务、外观角色对应、固定类别读出/训练、滑窗检测与独立 Notebook；仅静态编译 | chatgpt | 2026-09-18 |

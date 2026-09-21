@@ -1,0 +1,740 @@
+{
+  "entity_id": 0,
+  "diagnostic_only": true,
+  "known_pose_entity": [
+    {
+      "template_id": 0,
+      "level": 3,
+      "point": [
+        145.0,
+        61.0
+      ],
+      "score": 0.9999971650356597,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.944109290391274e-15,
+      "accepted": true,
+      "matched_roles": 136,
+      "evaluated_roles": 136,
+      "role_bits_hex": "0xffffffffffffffffffffffffffffffffff",
+      "evaluated_bits_hex": "0xffffffffffffffffffffffffffffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    }
+  ],
+  "known_pose_regions": [
+    {
+      "role": 0,
+      "template_id": 0,
+      "level": 2,
+      "point": [
+        145.0,
+        61.0
+      ],
+      "score": 0.9999994321023394,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.220446049250313e-15,
+      "accepted": true,
+      "matched_roles": 4,
+      "evaluated_roles": 4,
+      "role_bits_hex": "0xf",
+      "evaluated_bits_hex": "0xf",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 1,
+      "template_id": 1,
+      "level": 2,
+      "point": [
+        234.0,
+        159.0
+      ],
+      "score": 0.999988465530199,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.7578629919407715e-15,
+      "accepted": true,
+      "matched_roles": 15,
+      "evaluated_roles": 15,
+      "role_bits_hex": "0x7fff",
+      "evaluated_bits_hex": "0x7fff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 2,
+      "template_id": 2,
+      "level": 2,
+      "point": [
+        114.0,
+        142.0
+      ],
+      "score": 0.9999997700477357,
+      "evaluable_coverage": 0.9999999999999993,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.32410687763558e-15,
+      "accepted": true,
+      "matched_roles": 18,
+      "evaluated_roles": 18,
+      "role_bits_hex": "0x3ffff",
+      "evaluated_bits_hex": "0x3ffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 3,
+      "template_id": 3,
+      "level": 2,
+      "point": [
+        114.0,
+        92.0
+      ],
+      "score": 0.9999992406224779,
+      "evaluable_coverage": 0.9999999999999993,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.944109290391274e-15,
+      "accepted": true,
+      "matched_roles": 18,
+      "evaluated_roles": 18,
+      "role_bits_hex": "0x3ffff",
+      "evaluated_bits_hex": "0x3ffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 4,
+      "template_id": 4,
+      "level": 2,
+      "point": [
+        141.0,
+        184.0
+      ],
+      "score": 0.999999582908493,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.119291619286993e-15,
+      "accepted": true,
+      "matched_roles": 13,
+      "evaluated_roles": 13,
+      "role_bits_hex": "0x1fff",
+      "evaluated_bits_hex": "0x1fff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 5,
+      "template_id": 5,
+      "level": 2,
+      "point": [
+        144.0,
+        62.0
+      ],
+      "score": 0.9999961853027344,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.078796019128026e-15,
+      "accepted": true,
+      "matched_roles": 4,
+      "evaluated_roles": 4,
+      "role_bits_hex": "0xf",
+      "evaluated_bits_hex": "0xf",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 6,
+      "template_id": 6,
+      "level": 2,
+      "point": [
+        145.0,
+        61.0
+      ],
+      "score": 0.9999961853027344,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.220446049250313e-15,
+      "accepted": true,
+      "matched_roles": 4,
+      "evaluated_roles": 4,
+      "role_bits_hex": "0xf",
+      "evaluated_bits_hex": "0xf",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 7,
+      "template_id": 7,
+      "level": 2,
+      "point": [
+        145.0,
+        61.0
+      ],
+      "score": 0.9999961853027344,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.220446049250313e-15,
+      "accepted": true,
+      "matched_roles": 4,
+      "evaluated_roles": 4,
+      "role_bits_hex": "0xf",
+      "evaluated_bits_hex": "0xf",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 8,
+      "template_id": 8,
+      "level": 2,
+      "point": [
+        145.0,
+        201.0
+      ],
+      "score": 0.9999996542910145,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.9968028886505635e-15,
+      "accepted": true,
+      "matched_roles": 8,
+      "evaluated_roles": 8,
+      "role_bits_hex": "0xff",
+      "evaluated_bits_hex": "0xff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 9,
+      "template_id": 9,
+      "level": 2,
+      "point": [
+        90.0,
+        201.0
+      ],
+      "score": 0.9999968945830883,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.580361673049448e-15,
+      "accepted": true,
+      "matched_roles": 7,
+      "evaluated_roles": 7,
+      "role_bits_hex": "0x7f",
+      "evaluated_bits_hex": "0x7f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 10,
+      "template_id": 10,
+      "level": 2,
+      "point": [
+        51.0,
+        83.0
+      ],
+      "score": 0.9999998189857683,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.8435583831733384e-15,
+      "accepted": true,
+      "matched_roles": 7,
+      "evaluated_roles": 7,
+      "role_bits_hex": "0x7f",
+      "evaluated_bits_hex": "0x7f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 11,
+      "template_id": 11,
+      "level": 2,
+      "point": [
+        234.0,
+        143.0
+      ],
+      "score": 0.9999847412109375,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 4.805827935071591e-16,
+      "accepted": true,
+      "matched_roles": 5,
+      "evaluated_roles": 5,
+      "role_bits_hex": "0x1f",
+      "evaluated_bits_hex": "0x1f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 12,
+      "template_id": 12,
+      "level": 2,
+      "point": [
+        234.0,
+        151.0
+      ],
+      "score": 0.9999847412109375,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.899768658321128e-15,
+      "accepted": true,
+      "matched_roles": 7,
+      "evaluated_roles": 7,
+      "role_bits_hex": "0x7f",
+      "evaluated_bits_hex": "0x7f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 13,
+      "template_id": 13,
+      "level": 2,
+      "point": [
+        234.0,
+        159.0
+      ],
+      "score": 0.9999847412109375,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.66205343881779e-15,
+      "accepted": true,
+      "matched_roles": 8,
+      "evaluated_roles": 8,
+      "role_bits_hex": "0xff",
+      "evaluated_bits_hex": "0xff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 14,
+      "template_id": 14,
+      "level": 2,
+      "point": [
+        234.0,
+        159.0
+      ],
+      "score": 0.9999847412109375,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.7578629919407715e-15,
+      "accepted": true,
+      "matched_roles": 10,
+      "evaluated_roles": 10,
+      "role_bits_hex": "0x3ff",
+      "evaluated_bits_hex": "0x3ff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 15,
+      "template_id": 15,
+      "level": 2,
+      "point": [
+        233.0,
+        168.0
+      ],
+      "score": 0.9999847412109375,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.4492935982947064e-16,
+      "accepted": true,
+      "matched_roles": 4,
+      "evaluated_roles": 4,
+      "role_bits_hex": "0xf",
+      "evaluated_bits_hex": "0xf",
+      "version": 1,
+      "rejection_reasons": []
+    }
+  ],
+  "ordinary_target_hit": true,
+  "ordinary_entities": [
+    {
+      "template_id": 0,
+      "level": 3,
+      "point": [
+        144.42198340189498,
+        60.455238645202385
+      ],
+      "score": 0.8269819241713029,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 0.932132650880273,
+      "geometry_error": 1.414213562373097,
+      "accepted": true,
+      "matched_roles": 123,
+      "evaluated_roles": 136,
+      "role_bits_hex": "0xef7bdbf7bfffff4cefffffffffffffffff",
+      "evaluated_bits_hex": "0xffffffffffffffffffffffffffffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    }
+  ],
+  "query": {
+    "mode": "sparse_translation",
+    "search_complete": false,
+    "assignment_search_complete": false,
+    "region_pose_pruned_or_dropped": 4233,
+    "region_voted_templates": 16,
+    "entity_pose_pruned_or_dropped": 0,
+    "entity_voted_templates": 1,
+    "region_candidates": 128,
+    "weak_regions": 80,
+    "accepted_regions": 43,
+    "entity_candidates": 4,
+    "trace": [
+      {
+        "level": 2,
+        "template_id": 11,
+        "candidates": 8,
+        "accepted": 3,
+        "best": {
+          "point": [
+            64.0,
+            156.05641139648546
+          ],
+          "score": 0.9199627017137674,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 0.9999999999999996,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 7,
+        "candidates": 8,
+        "accepted": 1,
+        "best": {
+          "point": [
+            225.01143191039077,
+            135.4942840448046
+          ],
+          "score": 0.6727439908880518,
+          "evaluable": 1.0,
+          "coverage": 0.758791731137918,
+          "geometry_error": 2.23606797749979,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 0,
+        "candidates": 8,
+        "accepted": 6,
+        "best": {
+          "point": [
+            225.320157803132,
+            203.33992109843402
+          ],
+          "score": 0.9754895603702535,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 2.220446049250313e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 5,
+        "candidates": 8,
+        "accepted": 2,
+        "best": {
+          "point": [
+            72.02229840647516,
+            52.0
+          ],
+          "score": 0.8451058995467229,
+          "evaluable": 1.0,
+          "coverage": 0.879395865568959,
+          "geometry_error": 8.881784197001252e-16,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 15,
+        "candidates": 8,
+        "accepted": 6,
+        "best": {
+          "point": [
+            108.0,
+            51.007526601367
+          ],
+          "score": 0.8391334615399925,
+          "evaluable": 0.879395865568959,
+          "coverage": 1.0,
+          "geometry_error": 2.0,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 6,
+        "candidates": 8,
+        "accepted": 2,
+        "best": {
+          "point": [
+            230.0,
+            111.0
+          ],
+          "score": 0.6939165131707783,
+          "evaluable": 0.879395865568959,
+          "coverage": 1.0,
+          "geometry_error": 0.9999999999999996,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 8,
+        "candidates": 8,
+        "accepted": 5,
+        "best": {
+          "point": [
+            143.79748873364434,
+            201.01698074325526
+          ],
+          "score": 0.9711341945883311,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 0.9999999999999998,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 4,
+        "candidates": 8,
+        "accepted": 3,
+        "best": {
+          "point": [
+            141.12379665377688,
+            183.00111221853635
+          ],
+          "score": 0.9687191612661763,
+          "evaluable": 1.0000000000000002,
+          "coverage": 1.0,
+          "geometry_error": 1.0000000000000004,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 9,
+        "candidates": 8,
+        "accepted": 4,
+        "best": {
+          "point": [
+            89.34621976407131,
+            200.3462197640713
+          ],
+          "score": 0.968694484061114,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 3.580361673049448e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 14,
+        "candidates": 8,
+        "accepted": 0,
+        "best": {
+          "point": [
+            68.0,
+            207.74026490507157
+          ],
+          "score": 0.9254947615678306,
+          "evaluable": 0.27988488903198266,
+          "coverage": 1.0,
+          "geometry_error": 0.0,
+          "accepted": false,
+          "rejection_reasons": [
+            "evaluable_coverage"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 12,
+        "candidates": 8,
+        "accepted": 1,
+        "best": {
+          "point": [
+            132.0,
+            60.0
+          ],
+          "score": 0.7317868301519613,
+          "evaluable": 0.9114385108114766,
+          "coverage": 0.902833281523649,
+          "geometry_error": 2.2360679774997916,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 2,
+        "candidates": 8,
+        "accepted": 3,
+        "best": {
+          "point": [
+            111.42867226732999,
+            140.85639268334864
+          ],
+          "score": 0.8304592448713584,
+          "evaluable": 0.9999999999999993,
+          "coverage": 0.9551400320470076,
+          "geometry_error": 2.236067977499791,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 13,
+        "candidates": 8,
+        "accepted": 0,
+        "best": {
+          "point": [
+            137.99325424345304,
+            41.748663816047454
+          ],
+          "score": 0.6961992494912784,
+          "evaluable": 0.32542576627266967,
+          "coverage": 1.0,
+          "geometry_error": 0.0,
+          "accepted": false,
+          "rejection_reasons": [
+            "evaluable_coverage"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 1,
+        "candidates": 8,
+        "accepted": 1,
+        "best": {
+          "point": [
+            76.0,
+            116.7503962004297
+          ],
+          "score": 0.7684385247433072,
+          "evaluable": 1.0,
+          "coverage": 0.8963278801751273,
+          "geometry_error": 1.4142135623730945,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 10,
+        "candidates": 8,
+        "accepted": 5,
+        "best": {
+          "point": [
+            52.0,
+            83.49875756208031
+          ],
+          "score": 0.9105255141124515,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.0,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 3,
+        "candidates": 8,
+        "accepted": 1,
+        "best": {
+          "point": [
+            114.19850058289175,
+            92.79661696876289
+          ],
+          "score": 0.9468550310761134,
+          "evaluable": 0.9999999999999993,
+          "coverage": 1.0,
+          "geometry_error": 1.000000000000007,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 3,
+        "template_id": 0,
+        "candidates": 4,
+        "accepted": 1,
+        "best": {
+          "point": [
+            144.42198340189498,
+            60.455238645202385
+          ],
+          "score": 0.8269819241713029,
+          "evaluable": 1.0000000000000002,
+          "coverage": 0.932132650880273,
+          "geometry_error": 1.414213562373097,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      }
+    ],
+    "classes": 136,
+    "feature_events": 8377,
+    "event_budget_dropped": 32271,
+    "candidate_budget_dropped": 0,
+    "posting_visits": 8457,
+    "geometry_evaluations": 132,
+    "response_maps_computed": 272,
+    "static_region_bits": {
+      "0": 15,
+      "1": 524272,
+      "2": 137438429184,
+      "3": 36028659580010496,
+      "4": 295111876382333861888,
+      "5": 4427218577690292387840,
+      "6": 70835497243044678205440,
+      "7": 1133367955888714851287040,
+      "8": 308276084001730439550074880,
+      "9": 39304596247310823728047194112,
+      "10": 5030988319655785437190040846336,
+      "11": 157188674428300445785591197466624,
+      "12": 20606928157310097150730407306592256,
+      "13": 5296142795705524181101106255804497920,
+      "14": 5439200958751875751922378490667170004992,
+      "15": 81667768061025231231209905783624370749440
+    },
+    "static_entity_bits": {
+      "0": 65535
+    },
+    "query_hit_bits": 87112285931760246646623899502532662132735,
+    "sampled_evaluated_bits": 87112285931760246646623899502532662132735,
+    "invalid_regions": {},
+    "invalid_entities": {},
+    "elapsed": 0.32377745397388935,
+    "limitations": [
+      "Translation only; sparse search is approximate.",
+      "Deterministic local assignment rejects conflicts; no combinatorial backtracking."
+    ],
+    "structural_fallback": false
+  }
+}

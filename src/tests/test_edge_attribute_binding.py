@@ -8,6 +8,7 @@ class EdgeAttributeBindingTests(unittest.TestCase):
     def setUp(self):
         torch.set_num_threads(2)
         self.cfg = g.MemoryConfig(); self.cfg.device = torch.device('cpu')
+        self.cfg.once_bind_edge_attributes = True  # explicit legacy comparison, not the new default
         self.cfg.H = self.cfg.W = 24
         self.cfg.once_region_budget = 24
         strength = torch.zeros(1, 1, 24, 24)

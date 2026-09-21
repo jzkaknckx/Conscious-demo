@@ -1,0 +1,51 @@
+{
+  "torch": "2.10.0+cu128",
+  "device": "cuda",
+  "voc_root": "/home/p/code/datasets/VOC2007/VOCdevkit/VOC2007",
+  "partition": {
+    "mode": "grad_refined",
+    "grad_continuity_threshold": 0.6,
+    "version": 3
+  },
+  "supervised_config": {
+    "view_size": 256,
+    "context_fraction": 0.1,
+    "preprocessing_version": "object-view-v1",
+    "member_budget": 24,
+    "family_budget": 8,
+    "leaf_budget": 512,
+    "min_members": 2,
+    "skip_truncated_regions": true,
+    "incomplete_geometry_weight": 0.5,
+    "modality_diversity_bonus": 0.25,
+    "grid_size": 4,
+    "min_inside_fraction": 0.8,
+    "classification_threshold": 0.45,
+    "classification_margin": 0.04,
+    "nms_iou": 0.5,
+    "proposal_scales": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "proposal_aspects": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "proposal_stride_fraction": 0.5,
+    "proposal_budget": null,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "epochs": 50,
+    "patience": 5,
+    "seed": 0
+  },
+  "source_sha256": {
+    "src/nns/memorygraphs/graph_memorypool_onceoptimizer.py": "dc6fa7af0ee8e8d466d867fb068b19c5d400559b64fe751464af9eaff2e99402",
+    "src/nns/memorygraphs/supervised_graph_learning.py": "181a4adec5afb61f82836a540f7d5504fae7df38b8af3d8679c3b8baeb833eda",
+    "src/nns/memorygraphs/supervised_data.py": "03a5acfb0598e5686a15824f14885beb1d0a7740a8f08c7da88691e0627127d8",
+    "src/nns/memorygraphs/supervised_readout.py": "201baa523a078422ff4d46492fa8473023583738c7edcd5933865528630e250f"
+  }
+}

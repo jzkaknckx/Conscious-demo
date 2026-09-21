@@ -1,0 +1,419 @@
+[
+  {
+    "image_id": "003671",
+    "class": "dog",
+    "status": "ANNOTATED_SEED_CREATED",
+    "reuse_unresolved": false,
+    "decisions": {
+      "2": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "1": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "0": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "92": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "126": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "53": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "85": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "71": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "54": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "102": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "107": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "88": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "106": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "137": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "65": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "108": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "144": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "61": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "140": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "116": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "74": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "62": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "123": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "55": {
+        "state": "local_observation",
+        "candidates": []
+      }
+    },
+    "recall": true,
+    "known_pose": [
+      {
+        "template_id": 0,
+        "level": 3,
+        "point": [
+          200.0,
+          86.0
+        ],
+        "score": 0.9999992927655612,
+        "evaluable_coverage": 1.0000000000000007,
+        "matched_coverage": 1.0,
+        "geometry_error": 8.152394204457378e-15,
+        "accepted": true,
+        "matched_roles": 358,
+        "evaluated_roles": 358,
+        "role_bits_hex": "0x3fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evaluated_bits_hex": "0x3fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "version": 1,
+        "rejection_reasons": []
+      }
+    ]
+  },
+  {
+    "image_id": "007490",
+    "class": "car",
+    "status": "ANNOTATED_SEED_CREATED",
+    "reuse_unresolved": false,
+    "decisions": {
+      "0": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "4": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "16": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "6": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "52": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "117": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "62": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "84": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "104": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "156": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "111": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "109": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "208": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "160": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "134": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "54": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "108": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "112": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "171": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "53": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "124": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "68": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "88": {
+        "state": "local_observation",
+        "candidates": []
+      },
+      "162": {
+        "state": "local_observation",
+        "candidates": []
+      }
+    },
+    "recall": true,
+    "known_pose": [
+      {
+        "template_id": 1,
+        "level": 3,
+        "point": [
+          103.0,
+          86.0
+        ],
+        "score": 0.9999997770795223,
+        "evaluable_coverage": 0.999999999999999,
+        "matched_coverage": 1.0,
+        "geometry_error": 2.042810365310288e-14,
+        "accepted": true,
+        "matched_roles": 469,
+        "evaluated_roles": 469,
+        "role_bits_hex": "0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evaluated_bits_hex": "0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "version": 1,
+        "rejection_reasons": []
+      }
+    ]
+  },
+  {
+    "image_id": "007530",
+    "class": "cat",
+    "status": "ANNOTATED_SEED_CREATED",
+    "reuse_unresolved": true,
+    "decisions": {
+      "0": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "4": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "8": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "21": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "209": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "52": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "104": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "156": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "76": {
+        "state": "local_geometry_repair",
+        "candidates": [
+          {
+            "semantic_id": 14,
+            "score": 0.8773871660232544,
+            "point": [
+              153.0,
+              107.0
+            ],
+            "version": 1
+          }
+        ]
+      },
+      "86": {
+        "state": "local_geometry_repair",
+        "candidates": [
+          {
+            "semantic_id": 6,
+            "score": 0.8469192981719971,
+            "point": [
+              157.0,
+              152.0
+            ],
+            "version": 1
+          },
+          {
+            "semantic_id": 11,
+            "score": 0.8455804586410522,
+            "point": [
+              157.0,
+              152.0
+            ],
+            "version": 1
+          }
+        ]
+      },
+      "208": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "105": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "53": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "106": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "160": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "151": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "54": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "110": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "164": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "74": {
+        "state": "local_geometry_repair",
+        "candidates": [
+          {
+            "semantic_id": 17,
+            "score": 0.884457587671288,
+            "point": [
+              233.0,
+              166.0
+            ],
+            "version": 1
+          }
+        ]
+      },
+      "57": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "135": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "176": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      },
+      "153": {
+        "state": "local_geometry_repair",
+        "candidates": []
+      }
+    },
+    "recall": true,
+    "known_pose": [
+      {
+        "template_id": 2,
+        "level": 3,
+        "point": [
+          156.0,
+          131.0
+        ],
+        "score": 0.999999935091939,
+        "evaluable_coverage": 1.000000000000001,
+        "matched_coverage": 1.0,
+        "geometry_error": 2.0097183471152322e-14,
+        "accepted": true,
+        "matched_roles": 321,
+        "evaluated_roles": 321,
+        "role_bits_hex": "0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evaluated_bits_hex": "0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "version": 1,
+        "rejection_reasons": []
+      }
+    ]
+  }
+]

@@ -1,0 +1,531 @@
+{
+  "torch": "2.10.0+cu128",
+  "device": "cuda",
+  "voc_root": "/home/p/code/datasets/VOC2007/VOCdevkit/VOC2007",
+  "partition": {
+    "mode": "grad_refined",
+    "grad_continuity_threshold": 0.6,
+    "version": 4
+  },
+  "supervised_config": {
+    "learning_contract": "supervised-family-quality-v2",
+    "view_size": 256,
+    "context_fraction": 0.1,
+    "preprocessing_version": "object-view-v1",
+    "member_budget": 24,
+    "family_budget": 8,
+    "leaf_budget": 512,
+    "min_members": 2,
+    "skip_truncated_regions": true,
+    "incomplete_geometry_weight": 0.5,
+    "modality_diversity_bonus": 0.25,
+    "grid_size": 4,
+    "min_inside_fraction": 0.8,
+    "classification_threshold": 0.45,
+    "classification_margin": 0.04,
+    "nms_iou": 0.5,
+    "proposal_scales": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "proposal_aspects": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "proposal_stride_fraction": 0.5,
+    "proposal_budget": null,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "epochs": 50,
+    "patience": 5,
+    "seed": 0
+  },
+  "source_sha256": {
+    "src/nns/memorygraphs/graph_memorypool_onceoptimizer.py": "dc6fa7af0ee8e8d466d867fb068b19c5d400559b64fe751464af9eaff2e99402",
+    "src/nns/memorygraphs/supervised_graph_learning.py": "181a4adec5afb61f82836a540f7d5504fae7df38b8af3d8679c3b8baeb833eda",
+    "src/nns/memorygraphs/supervised_data.py": "03a5acfb0598e5686a15824f14885beb1d0a7740a8f08c7da88691e0627127d8",
+    "src/nns/memorygraphs/supervised_readout.py": "201baa523a078422ff4d46492fa8473023583738c7edcd5933865528630e250f"
+  },
+  "memory_config": {
+    "H": 256,
+    "T_excite_I": 0.8,
+    "T_excite_II": 2,
+    "T_excite_III": 3.0,
+    "T_inject_I": 0.5,
+    "T_inject_II": 0.5,
+    "T_inject_III": 0.5,
+    "W": 256,
+    "alpha_consume": 0.8,
+    "alpha_ior": 0.5,
+    "alpha_local": 0.5,
+    "alpha_mask": 15.0,
+    "beta_mask": 5.0,
+    "beta_periphery": 0.8,
+    "boundary_coverage_suppression": 0.35,
+    "boundary_hit_radius": 3,
+    "boundary_pending_radius": 4.0,
+    "boundary_reject_decay": 0.92,
+    "decay_rate_I": 0.6,
+    "decay_rate_II": 0.95,
+    "decay_rate_III": 0.98,
+    "default_gamma_theta": 2.0,
+    "default_lambda_rho": 1.5,
+    "device": "cuda",
+    "epsilon_breakout": 0.05,
+    "epsilon_foveal": 0.75,
+    "eta_exp": 2.0,
+    "eta_foveal": 0.25,
+    "feature_attributes": {
+      "0": {
+        "0": "STRENGTH",
+        "1": "CONTEXT",
+        "2": "CONTINUITY_TRACE",
+        "3": "CONTINUITY_TRACE"
+      },
+      "1": {
+        "0": "CONTINUITY_SURFACE",
+        "1": "CONTINUITY_SURFACE",
+        "2": "CONTINUITY_SURFACE"
+      },
+      "2": {
+        "0": "STRENGTH",
+        "1": "STRENGTH",
+        "2": "STRENGTH"
+      },
+      "3": {
+        "0": "CONTINUITY_TRACE",
+        "1": "CONTINUITY_TRACE",
+        "2": "CONTINUITY_TRACE"
+      },
+      "4": {
+        "0": "CONTINUITY_TRACE",
+        "1": "CONTINUITY_TRACE",
+        "2": "CONTINUITY_TRACE"
+      }
+    },
+    "feature_specs": {
+      "0": {
+        "name": "grad",
+        "topology": "Boundary_Edge",
+        "channels": {
+          "0": {
+            "name": "abs_strength",
+            "role": "gate_only",
+            "gate": "grad_strength"
+          },
+          "1": {
+            "name": "theta",
+            "role": "context_only",
+            "gate": "grad_coherence"
+          },
+          "2": {
+            "name": "gradx",
+            "role": "sim_only",
+            "metric_group": "grad_vec",
+            "parents": [
+              "grad_strength",
+              "grad_coherence"
+            ]
+          },
+          "3": {
+            "name": "grady",
+            "role": "sim_only",
+            "metric_group": "grad_vec",
+            "parents": [
+              "grad_strength",
+              "grad_coherence"
+            ]
+          }
+        },
+        "metric_groups": {
+          "grad_vec": {
+            "metric": "Vector_Occupancy",
+            "channels": [
+              2,
+              3
+            ],
+            "gamma": 2.0,
+            "polarity": "axis",
+            "theta_match": 0.75,
+            "min_valid_channels": 2
+          }
+        }
+      },
+      "1": {
+        "name": "RGB",
+        "topology": "Surface_2D",
+        "channels": {
+          "0": {
+            "name": "R",
+            "role": "gate_and_sim",
+            "metric_group": "rgb",
+            "parents": [
+              "rgb_surface"
+            ]
+          },
+          "1": {
+            "name": "G",
+            "role": "gate_and_sim",
+            "metric_group": "rgb",
+            "parents": [
+              "rgb_surface"
+            ]
+          },
+          "2": {
+            "name": "B",
+            "role": "gate_and_sim",
+            "metric_group": "rgb",
+            "parents": [
+              "rgb_surface"
+            ]
+          }
+        },
+        "metric_groups": {
+          "rgb": {
+            "metric": "Euclidean_Absolute",
+            "channels": [
+              0,
+              1,
+              2
+            ],
+            "sigma": [
+              0.06,
+              0.06,
+              0.06
+            ],
+            "theta_match": 0.85,
+            "min_valid_channels": 1
+          }
+        }
+      },
+      "2": {
+        "name": "Curv",
+        "encoding_version": "stable_structure_v2",
+        "topology": "Trace_1D",
+        "channels": {},
+        "metric_groups": {
+          "curv": {
+            "metric": "Euclidean_Absolute",
+            "channels": "all",
+            "sigma": 0.08,
+            "theta_match": 0.8,
+            "min_valid_channels": 1
+          }
+        }
+      },
+      "3": {
+        "name": "aps",
+        "encoding_version": "stable_structure_v2",
+        "topology": "Surface_2D",
+        "channels": {},
+        "metric_groups": {
+          "aps": {
+            "metric": "Euclidean_Absolute",
+            "channels": "all",
+            "sigma": 0.1,
+            "theta_match": 0.8,
+            "min_valid_channels": 1
+          }
+        }
+      },
+      "4": {
+        "name": "ori",
+        "encoding_version": "stable_structure_v2",
+        "topology": "Trace_1D",
+        "channels": {
+          "0": {
+            "role": "sim_only"
+          },
+          "1": {
+            "role": "sim_only"
+          },
+          "2": {
+            "role": "sim_only"
+          },
+          "3": {
+            "role": "gate_only"
+          },
+          "4": {
+            "role": "gate_only"
+          },
+          "5": {
+            "role": "gate_only"
+          }
+        },
+        "metric_groups": {
+          "ori": {
+            "metric": "Periodic_Property",
+            "channels": [
+              0,
+              1,
+              2
+            ],
+            "gamma": 2.0,
+            "k": 2.0,
+            "theta_match": 0.75,
+            "min_valid_channels": 1
+          }
+        },
+        "layout": {
+          "angle_channels": 3,
+          "confidence_channels": 3,
+          "angle_unit": "radians"
+        }
+      }
+    },
+    "feature_types": {
+      "0": {
+        "metric": "Vector_Occupancy",
+        "paradigm": "A",
+        "dominant_channel": 0
+      },
+      "1": {
+        "metric": "Euclidean_Absolute",
+        "paradigm": "A",
+        "dominant_metric": "Isurf"
+      },
+      "2": {
+        "metric": "Euclidean_Absolute",
+        "paradigm": "B"
+      },
+      "3": {
+        "metric": "Euclidean_Absolute",
+        "paradigm": "C"
+      },
+      "4": {
+        "metric": "Periodic_Property",
+        "paradigm": "C",
+        "periods": {
+          "0": 2.0,
+          "1": 2.0,
+          "2": 2.0
+        }
+      }
+    },
+    "foveal_sigma": 25,
+    "gamma_dist": 0.001,
+    "gamma_grad": 2.0,
+    "gamma_macro_dist": 0.001,
+    "gamma_ori": 2.0,
+    "gamma_remote": 0.2,
+    "grad_axis_k": 2,
+    "grad_coh_radius": 1,
+    "graph_binary_coarse": true,
+    "graph_bit_coverage_min": 0.1,
+    "graph_candidate_budget": 128,
+    "graph_candidate_expiry": 50,
+    "graph_candidate_memory_budget": 512,
+    "graph_coarse_bin_width": {
+      "0": 0.25,
+      "1": 0.125,
+      "2": 0.125,
+      "3": 0.125,
+      "4": 0.39269908169872414
+    },
+    "graph_coarse_tolerance": 1e-05,
+    "graph_coverage_min": 0.7,
+    "graph_cycle_tolerance": 1.0,
+    "graph_evaluable_min": 0.7,
+    "graph_events_per_class": 64,
+    "graph_evidence_prior": 1.0,
+    "graph_geometry_radius": 2,
+    "graph_geometry_sigma": 2.0,
+    "graph_geometry_update_limit": 4.0,
+    "graph_learn_threshold": 0.78,
+    "graph_local_response_fraction": 0.25,
+    "graph_match_margin": 0.04,
+    "graph_maturity_support": 3.0,
+    "graph_max_members": 6,
+    "graph_member_radius": 96.0,
+    "graph_member_remove_reliability": 0.25,
+    "graph_min_members": 2,
+    "graph_nms_radius": 6.0,
+    "graph_pose_bin": 3.0,
+    "graph_poses_per_node": 8,
+    "graph_progressive_matching": true,
+    "graph_proposal_budget": 64,
+    "graph_query_chunk": 2048,
+    "graph_query_stride": 4,
+    "graph_recall_threshold": 0.45,
+    "graph_response_cache": 32,
+    "graph_search_budget_seconds": null,
+    "graph_search_budget_templates": null,
+    "graph_shared_response_cache_bytes": 268435456,
+    "graph_slot_batch": 8,
+    "graph_stable_support": 3.0,
+    "graph_stable_variance": 9.0,
+    "graph_structural_recall_fallback": true,
+    "graph_structural_recall_policy": "weak_or_missing",
+    "graph_verify_threshold": 0.65,
+    "guide_kernel_size": 11,
+    "guide_padding": 5,
+    "interest_margin_radius": 24,
+    "k_depth": 2,
+    "lambda_con1": 2.0,
+    "lambda_con2": 2.0,
+    "lambda_str": 0.7,
+    "lp_base_radius": 2.0,
+    "lp_rho_bins": 64,
+    "lp_theta_bins": 64,
+    "mask_dilation_steps": 20000,
+    "mask_edge_dilation": 0,
+    "micro_min_area_for_boundary": 128.0,
+    "micro_min_interior_samples": 3,
+    "micro_repeat_to_boundary": 3,
+    "micro_w_blue": 0.6,
+    "micro_w_boundary": 1.2,
+    "micro_w_color": 1.0,
+    "micro_w_corner": 0.5,
+    "micro_w_edge": 1.0,
+    "micro_w_junction": 0.4,
+    "micro_w_residual": 0.8,
+    "micro_w_semantic_prior": 0.0,
+    "micro_w_terminator": 0.4,
+    "micro_w_unseen_boundary": 0.9,
+    "min_valid_sim_channels": 1,
+    "modality_weights": {
+      "0": 1.0,
+      "1": 1.0,
+      "2": 1.0,
+      "3": 1.0,
+      "4": 1.0
+    },
+    "once_advanced_grad_continuity": null,
+    "once_advanced_partition_mode": "grad_refined",
+    "once_affinity_min": 0.01,
+    "once_alignment_min": 0.45,
+    "once_bind_edge_attributes": false,
+    "once_boundary_spacing": 8.0,
+    "once_contact_budget": 1024,
+    "once_contact_radius": 4,
+    "once_contact_spacing": 8.0,
+    "once_contacts_per_pair": 8,
+    "once_curve_error": 1.5,
+    "once_curve_spacing": 8.0,
+    "once_direction_coherence": 0.35,
+    "once_ell_parallel": 2.0,
+    "once_ell_perp": 0.65,
+    "once_geometry_epsilon": 1e-05,
+    "once_min_support": {
+      "0": 4,
+      "1": 16,
+      "2": 3,
+      "3": 8,
+      "4": 4
+    },
+    "once_node_reuse_mode": "sample_instance",
+    "once_range_max": {
+      "1": 2.0,
+      "3": 2.0
+    },
+    "once_region_budget": 256,
+    "once_rejection_examples": 32,
+    "once_sample_budget": {
+      "0": 1024,
+      "1": 1024,
+      "2": 1024,
+      "3": 1024,
+      "4": 1024
+    },
+    "once_samples_per_region": 64,
+    "once_seed_nms_radius": 4,
+    "once_seed_threshold": {
+      "0": 0.6,
+      "1": 0.6,
+      "2": 0.6,
+      "3": 0.6,
+      "4": 0.6
+    },
+    "once_similarity_min": {
+      "0": 0.75,
+      "1": 0.85,
+      "2": 0.8,
+      "3": 0.8,
+      "4": 0.75
+    },
+    "once_support_threshold": {
+      "0": 0.05,
+      "1": 0.05,
+      "2": 0.05,
+      "3": 0.05,
+      "4": 0.05
+    },
+    "once_surface_barrier": 0.8,
+    "once_surface_cover_radius": 12.0,
+    "once_surface_sigma": 2.0,
+    "once_surface_variance": {
+      "1": 0.02,
+      "3": 0.02
+    },
+    "once_tangent_min": 0.75,
+    "once_thin_gradient_ridges": true,
+    "once_write_local_contacts": false,
+    "ori_angle_channels": 3,
+    "ori_axis_k": 2,
+    "ori_coh_radius": 1,
+    "relation_confidence_decay": 0.98,
+    "relation_merge_threshold": 0.45,
+    "rgb_gate_radius": 1,
+    "saccade_sigma": 50,
+    "seek_step": 60.0,
+    "self_edge_min_span": 1.0,
+    "sigma_boundary_reject": 10.0,
+    "sigma_boundary_suppression": 4.0,
+    "sigma_boundary_visit": 8.0,
+    "sigma_consume": 10.0,
+    "sigma_mask": 100.0,
+    "sigma_micro": 50.0,
+    "sigma_seek": 28.0,
+    "sigma_surf": 0.5,
+    "sigma_trace": 0.5,
+    "sigma_trace_angle": 0.9,
+    "sigma_trace_step": 18.0,
+    "tau_active_I": 5,
+    "tau_active_II": 15,
+    "tau_active_III": 20,
+    "tau_aps": 0.05,
+    "tau_curv": 0.05,
+    "tau_grad_coh": 0.6,
+    "tau_grad_str": 0.8,
+    "tau_ori_coh": 0.6,
+    "tau_ori_confidence": 0.05,
+    "tau_refractory_I": 10,
+    "tau_refractory_II": 30,
+    "tau_refractory_III": 50,
+    "tau_rgb_var": 0.02,
+    "tau_str_gate": 0.8,
+    "tau_surf_gate": 0.99,
+    "tau_trace_gate": 0.8,
+    "theta_bd_cover": 0.65,
+    "theta_boundary": 0.05,
+    "theta_boundary_hit_enter": 0.04,
+    "theta_boundary_hit_exit": 0.015,
+    "theta_boundary_role": 0.04,
+    "theta_color_var": 0.02,
+    "theta_res": 0.18,
+    "theta_trace_fwd_enter": 0.03,
+    "theta_trace_fwd_exit": 0.01,
+    "trace_min_age": 3,
+    "trace_step": 24.0,
+    "w_base": 1.0,
+    "w_exp": 1.0,
+    "w_guide": 2,
+    "w_sp_i": 1.2,
+    "w_sp_ii": 1.5
+  },
+  "run_id": "voc2007_20260921_231411_853393",
+  "switches": {
+    "RUN_PARTITION_COMPARISON": true,
+    "RUN_SINGLE_DEMOS": true,
+    "RUN_WRITE_RECALL_AUDIT": true,
+    "RUN_MEMORY_BUILD": true,
+    "RUN_TRAINING_RECALL": false,
+    "RUN_QUERY": false,
+    "RUN_HEAD_FIT": false,
+    "RUN_DETECTION": false
+  },
+  "notebook_source_sha256": "f7807ab924fbcd80e9dcb5310d8bb8b6beca45308817a9035a2523ae51fc5535"
+}

@@ -1,0 +1,2639 @@
+{
+  "entity_id": 1,
+  "diagnostic_only": true,
+  "known_pose_entity": [
+    {
+      "template_id": 1,
+      "level": 3,
+      "point": [
+        153.0,
+        75.0
+      ],
+      "score": 0.9999985300551918,
+      "evaluable_coverage": 0.9999999999999993,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.5888218580782548e-14,
+      "accepted": true,
+      "matched_roles": 429,
+      "evaluated_roles": 429,
+      "role_bits_hex": "0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evaluated_bits_hex": "0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    }
+  ],
+  "known_pose_regions": [
+    {
+      "role": 0,
+      "template_id": 24,
+      "level": 2,
+      "point": [
+        153.0,
+        75.0
+      ],
+      "score": 0.9999995962860624,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.4238583238573986e-14,
+      "accepted": true,
+      "matched_roles": 33,
+      "evaluated_roles": 33,
+      "role_bits_hex": "0x1ffffffff",
+      "evaluated_bits_hex": "0x1ffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 1,
+      "template_id": 25,
+      "level": 2,
+      "point": [
+        31.0,
+        85.0
+      ],
+      "score": 0.9999995137422975,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.432144669219779e-14,
+      "accepted": true,
+      "matched_roles": 40,
+      "evaluated_roles": 40,
+      "role_bits_hex": "0xffffffffff",
+      "evaluated_bits_hex": "0xffffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 2,
+      "template_id": 26,
+      "level": 2,
+      "point": [
+        228.0,
+        68.0
+      ],
+      "score": 0.9999989865121595,
+      "evaluable_coverage": 0.9999999999999996,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.5887111468902202e-14,
+      "accepted": true,
+      "matched_roles": 32,
+      "evaluated_roles": 32,
+      "role_bits_hex": "0xffffffff",
+      "evaluated_bits_hex": "0xffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 3,
+      "template_id": 27,
+      "level": 2,
+      "point": [
+        123.0,
+        180.0
+      ],
+      "score": 0.9999984259228203,
+      "evaluable_coverage": 0.9999999999999999,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.108895957933346e-15,
+      "accepted": true,
+      "matched_roles": 31,
+      "evaluated_roles": 31,
+      "role_bits_hex": "0x7fffffff",
+      "evaluated_bits_hex": "0x7fffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 4,
+      "template_id": 28,
+      "level": 2,
+      "point": [
+        153.0,
+        75.0
+      ],
+      "score": 0.999998753298201,
+      "evaluable_coverage": 0.9999999999999999,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.4238583238573986e-14,
+      "accepted": true,
+      "matched_roles": 21,
+      "evaluated_roles": 21,
+      "role_bits_hex": "0x1fffff",
+      "evaluated_bits_hex": "0x1fffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 5,
+      "template_id": 29,
+      "level": 2,
+      "point": [
+        157.0,
+        75.0
+      ],
+      "score": 1.0,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.0286177268740498e-15,
+      "accepted": true,
+      "matched_roles": 8,
+      "evaluated_roles": 8,
+      "role_bits_hex": "0xff",
+      "evaluated_bits_hex": "0xff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 6,
+      "template_id": 30,
+      "level": 2,
+      "point": [
+        167.0,
+        74.0
+      ],
+      "score": 1.0,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 4.076197102228689e-15,
+      "accepted": true,
+      "matched_roles": 11,
+      "evaluated_roles": 11,
+      "role_bits_hex": "0x7ff",
+      "evaluated_bits_hex": "0x7ff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 7,
+      "template_id": 31,
+      "level": 2,
+      "point": [
+        168.0,
+        69.0
+      ],
+      "score": 1.0,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.580361673049448e-15,
+      "accepted": true,
+      "matched_roles": 18,
+      "evaluated_roles": 18,
+      "role_bits_hex": "0x3ffff",
+      "evaluated_bits_hex": "0x3ffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 8,
+      "template_id": 32,
+      "level": 2,
+      "point": [
+        168.0,
+        69.0
+      ],
+      "score": 0.9999997761636327,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.160723346098895e-15,
+      "accepted": true,
+      "matched_roles": 25,
+      "evaluated_roles": 25,
+      "role_bits_hex": "0x1ffffff",
+      "evaluated_bits_hex": "0x1ffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 9,
+      "template_id": 33,
+      "level": 2,
+      "point": [
+        181.0,
+        72.0
+      ],
+      "score": 1.0,
+      "evaluable_coverage": 1.0000000000000004,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.7763568394002505e-15,
+      "accepted": true,
+      "matched_roles": 6,
+      "evaluated_roles": 6,
+      "role_bits_hex": "0x3f",
+      "evaluated_bits_hex": "0x3f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 10,
+      "template_id": 34,
+      "level": 2,
+      "point": [
+        207.0,
+        153.0
+      ],
+      "score": 0.999999177801943,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.1374233532693354e-14,
+      "accepted": true,
+      "matched_roles": 37,
+      "evaluated_roles": 37,
+      "role_bits_hex": "0x1fffffffff",
+      "evaluated_bits_hex": "0x1fffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 11,
+      "template_id": 35,
+      "level": 2,
+      "point": [
+        205.0,
+        70.0
+      ],
+      "score": 0.9999990210630544,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.552713678800501e-15,
+      "accepted": true,
+      "matched_roles": 8,
+      "evaluated_roles": 8,
+      "role_bits_hex": "0xff",
+      "evaluated_bits_hex": "0xff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 12,
+      "template_id": 36,
+      "level": 2,
+      "point": [
+        205.0,
+        70.0
+      ],
+      "score": 0.9999976310581089,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.580361673049448e-15,
+      "accepted": true,
+      "matched_roles": 11,
+      "evaluated_roles": 11,
+      "role_bits_hex": "0x7ff",
+      "evaluated_bits_hex": "0x7ff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 13,
+      "template_id": 37,
+      "level": 2,
+      "point": [
+        206.0,
+        66.0
+      ],
+      "score": 0.9999921999549742,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 3.944781826356614e-15,
+      "accepted": true,
+      "matched_roles": 7,
+      "evaluated_roles": 7,
+      "role_bits_hex": "0x7f",
+      "evaluated_bits_hex": "0x7f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 14,
+      "template_id": 38,
+      "level": 2,
+      "point": [
+        31.0,
+        85.0
+      ],
+      "score": 0.9999979559628391,
+      "evaluable_coverage": 1.0000000000000002,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.432144669219779e-14,
+      "accepted": true,
+      "matched_roles": 21,
+      "evaluated_roles": 21,
+      "role_bits_hex": "0x1fffff",
+      "evaluated_bits_hex": "0x1fffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 15,
+      "template_id": 39,
+      "level": 2,
+      "point": [
+        31.0,
+        85.0
+      ],
+      "score": 0.9999974648366724,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.220446049250313e-15,
+      "accepted": true,
+      "matched_roles": 9,
+      "evaluated_roles": 9,
+      "role_bits_hex": "0x1ff",
+      "evaluated_bits_hex": "0x1ff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 16,
+      "template_id": 40,
+      "level": 2,
+      "point": [
+        31.0,
+        85.0
+      ],
+      "score": 0.9999973038198697,
+      "evaluable_coverage": 0.9999999999999998,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.432144669219779e-14,
+      "accepted": true,
+      "matched_roles": 35,
+      "evaluated_roles": 35,
+      "role_bits_hex": "0x7ffffffff",
+      "evaluated_bits_hex": "0x7ffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 17,
+      "template_id": 41,
+      "level": 2,
+      "point": [
+        32.0,
+        79.0
+      ],
+      "score": 0.9999975489473149,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.831026719408895e-15,
+      "accepted": true,
+      "matched_roles": 7,
+      "evaluated_roles": 7,
+      "role_bits_hex": "0x7f",
+      "evaluated_bits_hex": "0x7f",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 18,
+      "template_id": 42,
+      "level": 2,
+      "point": [
+        21.0,
+        166.0
+      ],
+      "score": 0.9999980463063125,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 7.160723346098895e-15,
+      "accepted": true,
+      "matched_roles": 15,
+      "evaluated_roles": 15,
+      "role_bits_hex": "0x7fff",
+      "evaluated_bits_hex": "0x7fff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 19,
+      "template_id": 43,
+      "level": 2,
+      "point": [
+        226.0,
+        68.0
+      ],
+      "score": 0.9999996998806507,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 8.881784197001252e-16,
+      "accepted": true,
+      "matched_roles": 4,
+      "evaluated_roles": 4,
+      "role_bits_hex": "0xf",
+      "evaluated_bits_hex": "0xf",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 20,
+      "template_id": 44,
+      "level": 2,
+      "point": [
+        228.0,
+        68.0
+      ],
+      "score": 0.9999984822883861,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 5.763623918550032e-16,
+      "accepted": true,
+      "matched_roles": 3,
+      "evaluated_roles": 3,
+      "role_bits_hex": "0x7",
+      "evaluated_bits_hex": "0x7",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 21,
+      "template_id": 45,
+      "level": 2,
+      "point": [
+        228.0,
+        68.0
+      ],
+      "score": 0.9999994253306212,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.5887111468902202e-14,
+      "accepted": true,
+      "matched_roles": 28,
+      "evaluated_roles": 28,
+      "role_bits_hex": "0xfffffff",
+      "evaluated_bits_hex": "0xfffffff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 22,
+      "template_id": 46,
+      "level": 2,
+      "point": [
+        37.0,
+        54.0
+      ],
+      "score": 0.9999954092273834,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 1.831026719408895e-15,
+      "accepted": true,
+      "matched_roles": 8,
+      "evaluated_roles": 8,
+      "role_bits_hex": "0xff",
+      "evaluated_bits_hex": "0xff",
+      "version": 1,
+      "rejection_reasons": []
+    },
+    {
+      "role": 23,
+      "template_id": 47,
+      "level": 2,
+      "point": [
+        37.0,
+        54.0
+      ],
+      "score": 0.9999959046555803,
+      "evaluable_coverage": 1.0,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.7465400791133423e-15,
+      "accepted": true,
+      "matched_roles": 11,
+      "evaluated_roles": 11,
+      "role_bits_hex": "0x7ff",
+      "evaluated_bits_hex": "0x7ff",
+      "version": 1,
+      "rejection_reasons": []
+    }
+  ],
+  "ordinary_target_hit": true,
+  "ordinary_entities": [
+    {
+      "template_id": 1,
+      "level": 3,
+      "point": [
+        152.99999999999997,
+        74.99999999999999
+      ],
+      "score": 0.9999985300551918,
+      "evaluable_coverage": 0.9999999999999993,
+      "matched_coverage": 1.0,
+      "geometry_error": 2.161031364628563e-14,
+      "accepted": true,
+      "matched_roles": 429,
+      "evaluated_roles": 429,
+      "role_bits_hex": "0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evaluated_bits_hex": "0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "version": 1,
+      "rejection_reasons": []
+    }
+  ],
+  "query": {
+    "mode": "sparse_translation",
+    "search_complete": false,
+    "assignment_search_complete": false,
+    "region_pose_pruned_or_dropped": 8345,
+    "region_voted_templates": 48,
+    "entity_pose_pruned_or_dropped": 0,
+    "entity_voted_templates": 2,
+    "region_candidates": 2608,
+    "weak_regions": 285,
+    "accepted_regions": 77,
+    "entity_candidates": 3,
+    "trace": [
+      {
+        "level": 2,
+        "template_id": 43,
+        "candidates": 55,
+        "accepted": 23,
+        "best": {
+          "point": [
+            226.0,
+            68.0
+          ],
+          "score": 0.9999996998806507,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 8.881784197001252e-16,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 12,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            159.6692313106078,
+            160.0
+          ],
+          "score": 0.585176710371764,
+          "evaluable": 1.0,
+          "coverage": 0.8923757902318692,
+          "geometry_error": 1.4142135623730934,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 19,
+        "candidates": 55,
+        "accepted": 8,
+        "best": {
+          "point": [
+            96.0,
+            116.70670926659447
+          ],
+          "score": 0.813371787490678,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.0,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 9,
+        "candidates": 55,
+        "accepted": 2,
+        "best": {
+          "point": [
+            215.0,
+            138.0
+          ],
+          "score": 0.7288585590601439,
+          "evaluable": 1.0,
+          "coverage": 0.8628556954233444,
+          "geometry_error": 1.4142135623730951,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 8,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            225.0,
+            130.0
+          ],
+          "score": 0.8057499963194691,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.414213562373095,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 44,
+        "candidates": 55,
+        "accepted": 7,
+        "best": {
+          "point": [
+            228.0,
+            68.0
+          ],
+          "score": 0.9999984822883861,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 5.763623918550032e-16,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 15,
+        "candidates": 55,
+        "accepted": 6,
+        "best": {
+          "point": [
+            219.0,
+            131.0
+          ],
+          "score": 0.9067743126507315,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.0000000000000004,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 21,
+        "candidates": 55,
+        "accepted": 4,
+        "best": {
+          "point": [
+            58.0,
+            197.0
+          ],
+          "score": 0.8147796778773986,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 2.0000000000000013,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 39,
+        "candidates": 55,
+        "accepted": 3,
+        "best": {
+          "point": [
+            31.0,
+            85.0
+          ],
+          "score": 0.9999974648366724,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 2.220446049250313e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 36,
+        "candidates": 55,
+        "accepted": 3,
+        "best": {
+          "point": [
+            205.0,
+            70.0
+          ],
+          "score": 0.9999976310581089,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 3.580361673049448e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 5,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            64.0,
+            104.0
+          ],
+          "score": 0.5710928223323429,
+          "evaluable": 1.0000000000000002,
+          "coverage": 0.9028332815236491,
+          "geometry_error": 2.23606797749979,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 23,
+        "candidates": 55,
+        "accepted": 4,
+        "best": {
+          "point": [
+            186.0,
+            146.0
+          ],
+          "score": 0.853778411060225,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.4142135623730945,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 47,
+        "candidates": 55,
+        "accepted": 2,
+        "best": {
+          "point": [
+            37.0,
+            54.0
+          ],
+          "score": 0.9999959046555803,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 2.7465400791133423e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 30,
+        "candidates": 54,
+        "accepted": 2,
+        "best": {
+          "point": [
+            167.0,
+            74.0
+          ],
+          "score": 1.0,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 4.076197102228689e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 31,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            168.0,
+            69.0
+          ],
+          "score": 1.0,
+          "evaluable": 1.0000000000000002,
+          "coverage": 1.0,
+          "geometry_error": 3.580361673049448e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 2,
+        "candidates": 55,
+        "accepted": 4,
+        "best": {
+          "point": [
+            24.0,
+            140.59971395521868
+          ],
+          "score": 0.9427517688799164,
+          "evaluable": 0.9999999999999994,
+          "coverage": 1.0,
+          "geometry_error": 0.999999999999999,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 41,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            32.0,
+            79.0
+          ],
+          "score": 0.9999975489473149,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.831026719408895e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 37,
+        "candidates": 55,
+        "accepted": 5,
+        "best": {
+          "point": [
+            206.0,
+            66.0
+          ],
+          "score": 0.9999921999549742,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 3.944781826356614e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 16,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            158.0,
+            94.0
+          ],
+          "score": 0.5940215292104679,
+          "evaluable": 1.0,
+          "coverage": 0.9114385108114766,
+          "geometry_error": 1.9999999999999996,
+          "accepted": false,
+          "rejection_reasons": [
+            "score"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 3,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            51.0,
+            149.0
+          ],
+          "score": 0.7962130564609832,
+          "evaluable": 0.9999999999999998,
+          "coverage": 0.9530330983438617,
+          "geometry_error": 2.236067977499789,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 25,
+        "candidates": 55,
+        "accepted": 4,
+        "best": {
+          "point": [
+            31.0,
+            85.0
+          ],
+          "score": 0.9999995137422975,
+          "evaluable": 1.0000000000000002,
+          "coverage": 1.0,
+          "geometry_error": 1.432144669219779e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 11,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            226.0,
+            68.0
+          ],
+          "score": 0.8652938593039391,
+          "evaluable": 0.688983640525382,
+          "coverage": 1.0,
+          "geometry_error": 1.0000000000000018,
+          "accepted": false,
+          "rejection_reasons": [
+            "evaluable_coverage",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 13,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            37.0,
+            54.0
+          ],
+          "score": 0.5126717526489581,
+          "evaluable": 0.6371475806129456,
+          "coverage": 0.7559306752954978,
+          "geometry_error": 2.2360679774997885,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "evaluable_coverage",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 14,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            122.0,
+            157.0
+          ],
+          "score": 0.4373248526702184,
+          "evaluable": 1.0,
+          "coverage": 0.6371475806129456,
+          "geometry_error": 2.236067977499792,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "matched_coverage",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 22,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            51.0,
+            149.0
+          ],
+          "score": 0.6453622860023528,
+          "evaluable": 1.0,
+          "coverage": 0.7926557603502546,
+          "geometry_error": 2.236067977499788,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 6,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            56.61879558834396,
+            105.18215241716459
+          ],
+          "score": 0.41604377103855067,
+          "evaluable": 1.0,
+          "coverage": 0.4816394008756366,
+          "geometry_error": 1.0000000000000004,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "matched_coverage"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 20,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            34.0,
+            158.0
+          ],
+          "score": 0.6695652378470142,
+          "evaluable": 0.9999999999999998,
+          "coverage": 0.8843368346362083,
+          "geometry_error": 2.000000000000001,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 46,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            37.0,
+            54.0
+          ],
+          "score": 0.9999954092273834,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.831026719408895e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 29,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            157.0,
+            75.0
+          ],
+          "score": 1.0,
+          "evaluable": 1.0000000000000002,
+          "coverage": 1.0,
+          "geometry_error": 2.0286177268740498e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 35,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            205.0,
+            70.0
+          ],
+          "score": 0.9999990210630544,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 3.552713678800501e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 18,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            55.0,
+            103.0
+          ],
+          "score": 0.7470949040555165,
+          "evaluable": 1.0,
+          "coverage": 0.9346045755227574,
+          "geometry_error": 1.9999999999999996,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 32,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            168.0,
+            69.0
+          ],
+          "score": 0.9999997761636327,
+          "evaluable": 1.0000000000000002,
+          "coverage": 1.0,
+          "geometry_error": 7.160723346098895e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 34,
+        "candidates": 50,
+        "accepted": 2,
+        "best": {
+          "point": [
+            207.0,
+            153.0
+          ],
+          "score": 0.999999177801943,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.1374233532693354e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 42,
+        "candidates": 55,
+        "accepted": 1,
+        "best": {
+          "point": [
+            21.0,
+            166.0
+          ],
+          "score": 0.9999980463063125,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 7.160723346098895e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 17,
+        "candidates": 55,
+        "accepted": 0,
+        "best": {
+          "point": [
+            21.0,
+            166.0
+          ],
+          "score": 0.6230859648945548,
+          "evaluable": 0.5485867280717234,
+          "coverage": 1.0,
+          "geometry_error": 2.23606797749979,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "evaluable_coverage"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 33,
+        "candidates": 55,
+        "accepted": 4,
+        "best": {
+          "point": [
+            181.0,
+            72.0
+          ],
+          "score": 1.0,
+          "evaluable": 1.0000000000000004,
+          "coverage": 1.0,
+          "geometry_error": 1.7763568394002505e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 40,
+        "candidates": 54,
+        "accepted": 2,
+        "best": {
+          "point": [
+            31.0,
+            85.0
+          ],
+          "score": 0.9999973038198697,
+          "evaluable": 0.9999999999999998,
+          "coverage": 1.0,
+          "geometry_error": 1.432144669219779e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 1,
+        "candidates": 54,
+        "accepted": 0,
+        "best": {
+          "point": [
+            137.0,
+            49.0
+          ],
+          "score": 0.951677501608649,
+          "evaluable": 0.3413358207022802,
+          "coverage": 1.0,
+          "geometry_error": 9.930136612989092e-16,
+          "accepted": false,
+          "rejection_reasons": [
+            "evaluable_coverage"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 45,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            228.0,
+            68.0
+          ],
+          "score": 0.9999994253306212,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.5887111468902202e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 24,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            153.0,
+            75.0
+          ],
+          "score": 0.9999995962860624,
+          "evaluable": 1.0,
+          "coverage": 1.0,
+          "geometry_error": 1.4238583238573986e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 28,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            153.0,
+            75.0
+          ],
+          "score": 0.999998753298201,
+          "evaluable": 0.9999999999999999,
+          "coverage": 1.0,
+          "geometry_error": 1.4238583238573986e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 4,
+        "candidates": 50,
+        "accepted": 2,
+        "best": {
+          "point": [
+            138.0,
+            201.0
+          ],
+          "score": 0.8970443685518196,
+          "evaluable": 0.8205601281880297,
+          "coverage": 1.0,
+          "geometry_error": 1.0000000000000036,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 10,
+        "candidates": 50,
+        "accepted": 1,
+        "best": {
+          "point": [
+            23.0,
+            198.0
+          ],
+          "score": 0.835679863959104,
+          "evaluable": 0.551400320470075,
+          "coverage": 1.0,
+          "geometry_error": 1.4142135623730976,
+          "accepted": false,
+          "rejection_reasons": [
+            "evaluable_coverage"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 27,
+        "candidates": 50,
+        "accepted": 4,
+        "best": {
+          "point": [
+            123.0,
+            180.0
+          ],
+          "score": 0.9999984259228203,
+          "evaluable": 0.9999999999999999,
+          "coverage": 1.0,
+          "geometry_error": 7.108895957933346e-15,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 38,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            31.0,
+            85.0
+          ],
+          "score": 0.9999979559628391,
+          "evaluable": 1.0000000000000002,
+          "coverage": 1.0,
+          "geometry_error": 1.432144669219779e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 26,
+        "candidates": 54,
+        "accepted": 1,
+        "best": {
+          "point": [
+            228.0,
+            68.0
+          ],
+          "score": 0.9999989865121595,
+          "evaluable": 0.9999999999999996,
+          "coverage": 1.0,
+          "geometry_error": 1.5887111468902202e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 0,
+        "candidates": 54,
+        "accepted": 0,
+        "best": {
+          "point": [
+            99.14356100288079,
+            128.42892022348684
+          ],
+          "score": 0.6826339434508688,
+          "evaluable": 1.0,
+          "coverage": 0.8985628171165996,
+          "geometry_error": 3.1622776601683915,
+          "accepted": false,
+          "rejection_reasons": [
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 2,
+        "template_id": 7,
+        "candidates": 54,
+        "accepted": 0,
+        "best": {
+          "point": [
+            138.0,
+            62.0
+          ],
+          "score": 0.49412675356827807,
+          "evaluable": 0.9236477825875121,
+          "coverage": 0.5866810982937998,
+          "geometry_error": 2.000000000000007,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "matched_coverage",
+            "evidence_conflict"
+          ]
+        }
+      },
+      {
+        "level": 3,
+        "template_id": 1,
+        "candidates": 2,
+        "accepted": 1,
+        "best": {
+          "point": [
+            152.99999999999997,
+            74.99999999999999
+          ],
+          "score": 0.9999985300551918,
+          "evaluable": 0.9999999999999993,
+          "coverage": 1.0,
+          "geometry_error": 2.161031364628563e-14,
+          "accepted": true,
+          "rejection_reasons": []
+        }
+      },
+      {
+        "level": 3,
+        "template_id": 0,
+        "candidates": 1,
+        "accepted": 0,
+        "best": {
+          "point": [
+            -17.0,
+            75.99999999999999
+          ],
+          "score": 0.01301216886506836,
+          "evaluable": 0.34206761874644925,
+          "coverage": 0.5367904143904706,
+          "geometry_error": 3.1622776601683658,
+          "accepted": false,
+          "rejection_reasons": [
+            "score",
+            "evaluable_coverage",
+            "matched_coverage",
+            "evidence_conflict"
+          ]
+        }
+      }
+    ],
+    "classes": 750,
+    "feature_events": 44120,
+    "event_budget_dropped": 111164,
+    "candidate_budget_dropped": 256,
+    "posting_visits": 44405,
+    "geometry_evaluations": 2611,
+    "response_maps_computed": 1500,
+    "static_region_bits": {
+      "0": 35184372088831,
+      "1": 36893452963047014400,
+      "2": 2417814745741110930309120,
+      "3": 316910232205418121115826388992,
+      "4": 83076432823907184999137567091720192,
+      "5": 5233835233403106249558740299853856768,
+      "6": 174219254951537353629756183776824202887168,
+      "7": 5986310706333153781098772581512647449505634371764224,
+      "8": 41904174945551648470736051523641266739574897872207872,
+      "9": 335233399564413187765888412189130133916599182977662976,
+      "10": 100433244642301675749158041184565875080341782426644006305792,
+      "11": 3290908681014645897417716992483929687302814093580048302145011712,
+      "12": 102021282553914774613608089318555731308929623669281951527613759488,
+      "13": 3450767861103613336530680013110829055793235590989792728470007800922112,
+      "14": 113074761272643201811437322669615646500232743845553528126505215620615766016,
+      "15": 3505424576520314509893262241473950335401728051401228012913266703364557635584,
+      "16": 459549854160598650587297346753230134292665251641760988531597286531405233258496,
+      "17": 236679030401074303445779093357758083652083848656569312896651301712174436984029184,
+      "18": 485430080857674244161638003328581933825318212834439648437800293302677865211799535616,
+      "19": 7285008345846484015947982150588195899909025646445523204694296536520891069519531868160,
+      "20": 63649603584883787279605249915165773457231817674704299274294381792685460000463451234238464,
+      "21": 8084486531077491654877893825874719576673015187361684494712182408375200783435742552665358336,
+      "22": 266990231346208422355032639488440376812693859421006932498377656415980048197381015406045527277568,
+      "23": 4004975692351706404490665699067910214880070979418723943650703014666661985838701031293053913006080,
+      "24": 36695977851569170113931314160043347640405935597487088935088115890296682801771317477559015749716086811000832,
+      "25": 40347654345071250735517895918361287402076819621903872348152359947967817672582952900070792888073033319336225051089305600,
+      "26": 173291855842203274378542939795568994402230256674586882935198356400434779291903982345985256715420514986084797068901736177236705280,
+      "27": 372141426666058872078702860915007435080121645207129529653134446032332341725645905005158216525448545185601687431321332416881992794539819008,
+      "28": 780436765437571218494671346194501937778827946601866115807942375783360954217625890970339782756055027343011165669940593315578891950106037475868672,
+      "29": 199011470082644504750576823399314351991473131594891910867271256176117448349760058282669514070297613161438966858989672209584808449554628188275998720,
+      "30": 408974034079797510248840289880743131383512345474252540531756434966600700759299854360721061950141956157706606592353238852286848397792199681406463377408,
+      "31": 107262054265714789778858448336934665569940899484483391638689806138353100223863825230095633976573686683500611004656372461821154910338504323897337525982724096,
+      "32": 3599130928372093666707654009556585501448988674806606741741457436300978514763078055666856734468118300384709306986561850606678206014364377255634252573222939035435008,
+      "33": 226745255244977097693651140787373485687032734762416598308278080859636614065842988664079650579636099200356013895929453114209696609196912704326029165115604258298789888,
+      "34": 31658291388327035973463711035714940752903290413780987016543013048276086128318352913670119156878774875539982730643989884812538454560955891653804599708965089516065370445650591744,
+      "35": 8072864304082131991734802286081284282746687234663554454795018150872165427477200144439127330638972988460467995345166788036428554719772359493340706502525793000798045042933539799040,
+      "36": 16589957752928501144677536908155872804926713744922399090412325300540559189379341749375391267958440365054572409947915459875708738772202937607899282784045475912918435842896269521453056,
+      "37": 2107953908991544422924303194755109864714322685979157945197793923482851628197757338371051180865128727498404526398540800904656736746309181856406532415729893553027080356127966838032171008,
+      "38": 4455506291094703751135874387838864537091534145737450899078549895484458103862984566850709523152111446679187704885645343403340376818150850559339656931961309726865430773854862898742430701453312,
+      "39": 2276764800395450934302381533703953971699648210160170043482390016256376572698861469242696725178883579381724824406354240366955007922483250797956162045291065869332782498630952528801121789294936064,
+      "40": 78382132968236258682354508813105647869505562859503241126110368844571529602115166346226250247689158949281355735712661583484847988404288840999995823053558108313136911038448033392823936106484882843837136896,
+      "41": 9954530887255719831878032015648131676389174982287631633226300398852362984355230099088484795499648650077385262321451807760498939391573415556806809840690923749570748302836901902710516709853842632374975725568,
+      "42": 328748460933753117965250998482385971038986176145757556637153950406748097419457335087201140201964837610921003228207381553273215745051904108396738255672359809514012935699206817911045544346991734460503513297321984,
+      "43": 4931377407701600163038428015200120623953443565146725493279638346626936394653513270731562377760239173025296533302667079105955717734547316121682326347486138296833022191682916810804684773016552547441837423502295040,
+      "44": 36820951310838614550686929180160900658852378619762217016487966321481125080079565754795665753943119158588880781993247523991136025751286627041894703394563165949686565697899112187341646305190259020899052762150469632,
+      "45": 11296055792751782775409447310890592390364386323003591676148216847464528096894936765246849107071587697662883852177272235463067445759358105789035781448925266260508137566289075113262971504437504047820447699744992107576688640,
+      "46": 2880494237882381846888091019048720420618380990088609075177069969479947706968422469903991399415134596910315822808249676509685762803195958766579084150256685028559412013312370442984084713942557598278232506668411220973049610240,
+      "47": 5919494731239138525444941619192702193950946772541623493659569922535356693247358289210699690267889463090614201011187037179308430012879939860266551472263965368180571749647482776383670120849985660160544066409650466466467189620736
+    },
+    "static_entity_bits": {
+      "0": 16777215,
+      "1": 281474959933440
+    },
+    "query_hit_bits": 5922386521532855740161817506647119732883018558947359509044845726112560091729648156474603305162988578607512400425457279991804428268870599332596921062626576000993556884845161077691136496092218188572933193945756793025561702170623,
+    "sampled_evaluated_bits": 5922386521532855740161817506647119732883018558947359509044845726112560091729648156474603305162988578607512400425457279991804428268870599332596921062626576000993556884845161077691136496092218188572933193945756793025561702170623,
+    "invalid_regions": {},
+    "invalid_entities": {},
+    "elapsed": 4.420608357992023,
+    "limitations": [
+      "Translation only; sparse search is approximate.",
+      "Deterministic local assignment rejects conflicts; no combinatorial backtracking."
+    ],
+    "structural_fallback": true,
+    "fallback_policy": "weak_or_missing",
+    "initial_sparse": {
+      "mode": "sparse_translation",
+      "search_complete": false,
+      "assignment_search_complete": false,
+      "region_pose_pruned_or_dropped": 8345,
+      "region_voted_templates": 48,
+      "entity_pose_pruned_or_dropped": 1,
+      "entity_voted_templates": 1,
+      "region_candidates": 128,
+      "weak_regions": 60,
+      "accepted_regions": 17,
+      "entity_candidates": 1,
+      "trace": [
+        {
+          "level": 2,
+          "template_id": 43,
+          "candidates": 3,
+          "accepted": 2,
+          "best": {
+            "point": [
+              92.71245305777954,
+              80.0
+            ],
+            "score": 0.8233666840085652,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.0000000000000009,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 12,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              159.6692313106078,
+              160.0
+            ],
+            "score": 0.585176710371764,
+            "evaluable": 1.0,
+            "coverage": 0.8923757902318692,
+            "geometry_error": 1.4142135623730934,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 19,
+          "candidates": 3,
+          "accepted": 2,
+          "best": {
+            "point": [
+              96.0,
+              116.70670926659447
+            ],
+            "score": 0.813371787490678,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.0,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 9,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              80.42920414539071,
+              80.85840829078141
+            ],
+            "score": 0.6216224506285639,
+            "evaluable": 1.0,
+            "coverage": 0.8628556954233444,
+            "geometry_error": 2.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 8,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              228.0,
+              159.03315123040085
+            ],
+            "score": 0.59727529445891,
+            "evaluable": 1.0,
+            "coverage": 0.8628556954233444,
+            "geometry_error": 2.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 44,
+          "candidates": 3,
+          "accepted": 1,
+          "best": {
+            "point": [
+              159.23428451286648,
+              160.0
+            ],
+            "score": 0.6745084704492907,
+            "evaluable": 1.0,
+            "coverage": 0.8628556954233444,
+            "geometry_error": 1.0000000000000004,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 15,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              64.0,
+              104.4241548340587
+            ],
+            "score": 0.6753791247931854,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.4142135623730956,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 21,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              231.01200455049613,
+              100.0
+            ],
+            "score": 0.8111432572949493,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.4142135623730954,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 39,
+          "candidates": 3,
+          "accepted": 1,
+          "best": {
+            "point": [
+              22.0,
+              150.3763378886249
+            ],
+            "score": 0.8304368272115128,
+            "evaluable": 0.8495289093572412,
+            "coverage": 1.0,
+            "geometry_error": 1.414213562373093,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 36,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              89.97574255784941,
+              80.35643194466553
+            ],
+            "score": 0.5076652683396548,
+            "evaluable": 1.0,
+            "coverage": 0.7384183020910298,
+            "geometry_error": 1.4142135623730976,
+            "accepted": false,
+            "rejection_reasons": [
+              "score"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 5,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              64.0,
+              102.52790013127934
+            ],
+            "score": 0.3770792435309712,
+            "evaluable": 1.0000000000000002,
+            "coverage": 0.2915001554290533,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 23,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              215.4608481108256,
+              176.5391518891744
+            ],
+            "score": 0.3933177470265187,
+            "evaluable": 1.0,
+            "coverage": 0.758791731137918,
+            "geometry_error": 1.0000000000000002,
+            "accepted": false,
+            "rejection_reasons": [
+              "score"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 47,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              35.485116160173746,
+              59.99062088148304
+            ],
+            "score": 0.6825951441974395,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 2.2360679774997902,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 30,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              207.19733458312936,
+              75.38814275606421
+            ],
+            "score": 0.30997147808423464,
+            "evaluable": 1.0,
+            "coverage": 0.5422320286593021,
+            "geometry_error": 2.2360679774997907,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 31,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              80.73496717240921,
+              110.525774555258
+            ],
+            "score": 0.43714708445316947,
+            "evaluable": 1.0000000000000002,
+            "coverage": 0.730840192282045,
+            "geometry_error": 2.9999999999999964,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 2,
+          "candidates": 3,
+          "accepted": 2,
+          "best": {
+            "point": [
+              24.0,
+              140.59971395521868
+            ],
+            "score": 0.9427517688799164,
+            "evaluable": 0.9999999999999994,
+            "coverage": 1.0,
+            "geometry_error": 0.999999999999999,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 41,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              32.26479337297759,
+              78.12908591975136
+            ],
+            "score": 0.689304186258229,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.0000000000000004,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 37,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              122.62848208343772,
+              92.0
+            ],
+            "score": 0.642474022064263,
+            "evaluable": 1.0,
+            "coverage": 0.9114385108114766,
+            "geometry_error": 2.2360679774997907,
+            "accepted": false,
+            "rejection_reasons": [
+              "score"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 16,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              232.0,
+              183.73087476323582
+            ],
+            "score": 0.4906856560951501,
+            "evaluable": 1.0,
+            "coverage": 0.6457540432459064,
+            "geometry_error": 1.0000000000000018,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 3,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              221.77883224668065,
+              72.34293654145974
+            ],
+            "score": 0.5697466910387319,
+            "evaluable": 0.9999999999999998,
+            "coverage": 0.7181985900631709,
+            "geometry_error": 2.2360679774997902,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 25,
+          "candidates": 3,
+          "accepted": 3,
+          "best": {
+            "point": [
+              30.187289496002922,
+              86.81157827956685
+            ],
+            "score": 0.9924328269517704,
+            "evaluable": 0.9322670507051011,
+            "coverage": 1.0,
+            "geometry_error": 1.432144669219779e-14,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 11,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              165.20965417038053,
+              66.20877496401906
+            ],
+            "score": 0.435555526027527,
+            "evaluable": 1.0,
+            "coverage": 0.46652453921192716,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 13,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              62.956542246128464,
+              95.7438811312605
+            ],
+            "score": 0.31767658980115276,
+            "evaluable": 1.0,
+            "coverage": 0.7408197004378184,
+            "geometry_error": 2.236067977499792,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 14,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              188.3928991311698,
+              143.7877402866646
+            ],
+            "score": 0.20848391865608215,
+            "evaluable": 1.0,
+            "coverage": 0.2591802995621818,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 22,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              156.2830237097822,
+              56.620680328043676
+            ],
+            "score": 0.23439312230851583,
+            "evaluable": 0.9481639400875637,
+            "coverage": 0.39863072731479143,
+            "geometry_error": 1.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 6,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              56.61879558834396,
+              105.18215241716459
+            ],
+            "score": 0.41604377103855067,
+            "evaluable": 1.0,
+            "coverage": 0.4816394008756366,
+            "geometry_error": 1.0000000000000004,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 20,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              140.81129779710938,
+              81.24337463308707
+            ],
+            "score": 0.4942554586853495,
+            "evaluable": 0.9999999999999998,
+            "coverage": 0.8265052519543123,
+            "geometry_error": 2.2360679774997907,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 46,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              98.68082470192627,
+              116.63092450861726
+            ],
+            "score": 0.44227354424148024,
+            "evaluable": 1.0,
+            "coverage": 0.6745742337273302,
+            "geometry_error": 2.2360679774997894,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 29,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              240.30705756131871,
+              100.0
+            ],
+            "score": 0.8235472300925292,
+            "evaluable": 0.2440693247045023,
+            "coverage": 1.0,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "evaluable_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 35,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              83.9889336096692,
+              100.0
+            ],
+            "score": 0.7406940873310845,
+            "evaluable": 1.0,
+            "coverage": 0.9186435584318327,
+            "geometry_error": 1.4142135623730963,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 18,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              24.213030142354917,
+              155.51970742173066
+            ],
+            "score": 0.49956414040529845,
+            "evaluable": 1.0,
+            "coverage": 0.8038137265682723,
+            "geometry_error": 1.4142135623730978,
+            "accepted": false,
+            "rejection_reasons": [
+              "score"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 32,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              192.0208907417824,
+              78.21257793263194
+            ],
+            "score": 0.6143976548612204,
+            "evaluable": 0.8634420309843919,
+            "coverage": 0.881383494100998,
+            "geometry_error": 1.414213562373097,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 34,
+          "candidates": 2,
+          "accepted": 1,
+          "best": {
+            "point": [
+              206.69401826001229,
+              153.00062768037563
+            ],
+            "score": 0.9779868919504782,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.1374233532693354e-14,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 42,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              26.938155533889663,
+              116.63175755176681
+            ],
+            "score": 0.5662720167204838,
+            "evaluable": 1.0,
+            "coverage": 0.6738687788616725,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 17,
+          "candidates": 3,
+          "accepted": 0,
+          "best": {
+            "point": [
+              27.254754930300624,
+              119.74524506969938
+            ],
+            "score": 0.34218394019377774,
+            "evaluable": 1.0,
+            "coverage": 0.6238222733931028,
+            "geometry_error": 1.4142135623730958,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 33,
+          "candidates": 3,
+          "accepted": 1,
+          "best": {
+            "point": [
+              179.51097467782506,
+              72.0
+            ],
+            "score": 0.8986487923475022,
+            "evaluable": 1.0000000000000004,
+            "coverage": 1.0,
+            "geometry_error": 1.0000000000000009,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 40,
+          "candidates": 2,
+          "accepted": 1,
+          "best": {
+            "point": [
+              32.85582558795568,
+              72.00417609639115
+            ],
+            "score": 0.8123445744285093,
+            "evaluable": 0.8218448260375288,
+            "coverage": 1.0,
+            "geometry_error": 1.4142135623730931,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 1,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              59.331742112836125,
+              122.49781518881497
+            ],
+            "score": 0.608655153381665,
+            "evaluable": 1.0,
+            "coverage": 0.6586641792977199,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 45,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              132.24976643126942,
+              81.12346125735647
+            ],
+            "score": 0.5656663629634237,
+            "evaluable": 1.0,
+            "coverage": 0.7122597619610427,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 24,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              152.75010102599364,
+              75.25006476216323
+            ],
+            "score": 0.9668280228336588,
+            "evaluable": 1.0,
+            "coverage": 1.0,
+            "geometry_error": 1.0000000000000018,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 28,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              141.01687671733688,
+              75.58614902466319
+            ],
+            "score": 0.4855667968485342,
+            "evaluable": 0.9999999999999999,
+            "coverage": 0.5930825294950096,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 4,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              156.00244176011338,
+              195.24608156652673
+            ],
+            "score": 0.361441868487242,
+            "evaluable": 0.9999999999999993,
+            "coverage": 0.8654200961410224,
+            "geometry_error": 2.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 10,
+          "candidates": 2,
+          "accepted": 1,
+          "best": {
+            "point": [
+              96.22562894082647,
+              192.74070045740856
+            ],
+            "score": 0.7838531403395491,
+            "evaluable": 0.8205601281880297,
+            "coverage": 0.9453300661195263,
+            "geometry_error": 1.4142135623730945,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 27,
+          "candidates": 2,
+          "accepted": 2,
+          "best": {
+            "point": [
+              123.59965338260974,
+              180.39952523372978
+            ],
+            "score": 0.8932157851072775,
+            "evaluable": 0.9999999999999999,
+            "coverage": 1.0,
+            "geometry_error": 1.4142135623730963,
+            "accepted": true,
+            "rejection_reasons": []
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 38,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              30.771336565800908,
+              86.22866343419909
+            ],
+            "score": 0.6876545192687702,
+            "evaluable": 1.0000000000000002,
+            "coverage": 1.0,
+            "geometry_error": 1.4142135623730894,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 26,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              240.00196055922575,
+              48.831749900905926
+            ],
+            "score": 0.7904833511882513,
+            "evaluable": 0.7990832099653203,
+            "coverage": 0.9655172413793104,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 0,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              99.14356100288079,
+              128.42892022348684
+            ],
+            "score": 0.6826339434508688,
+            "evaluable": 1.0,
+            "coverage": 0.8985628171165996,
+            "geometry_error": 3.1622776601683915,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 2,
+          "template_id": 7,
+          "candidates": 2,
+          "accepted": 0,
+          "best": {
+            "point": [
+              162.14994550523133,
+              155.80391742835278
+            ],
+            "score": 0.3634218028245479,
+            "evaluable": 0.9999999999999997,
+            "coverage": 0.5090147827499175,
+            "geometry_error": 0.0,
+            "accepted": false,
+            "rejection_reasons": [
+              "score",
+              "matched_coverage",
+              "evidence_conflict"
+            ]
+          }
+        },
+        {
+          "level": 3,
+          "template_id": 1,
+          "candidates": 1,
+          "accepted": 0,
+          "best": {
+            "point": [
+              152.74224522445763,
+              75.16501303714598
+            ],
+            "score": 0.8678135737036065,
+            "evaluable": 0.9999999999999993,
+            "coverage": 1.0,
+            "geometry_error": 1.4142135623731047,
+            "accepted": false,
+            "rejection_reasons": [
+              "evidence_conflict"
+            ]
+          }
+        }
+      ],
+      "classes": 750,
+      "feature_events": 44120,
+      "event_budget_dropped": 111164,
+      "candidate_budget_dropped": 256,
+      "posting_visits": 44180,
+      "geometry_evaluations": 129,
+      "response_maps_computed": 1179,
+      "static_region_bits": {
+        "0": 35184372088831,
+        "1": 36893452963047014400,
+        "2": 2417814745741110930309120,
+        "3": 316910232205418121115826388992,
+        "4": 83076432823907184999137567091720192,
+        "5": 5233835233403106249558740299853856768,
+        "6": 174219254951537353629756183776824202887168,
+        "7": 5986310706333153781098772581512647449505634371764224,
+        "8": 41904174945551648470736051523641266739574897872207872,
+        "9": 335233399564413187765888412189130133916599182977662976,
+        "10": 100433244642301675749158041184565875080341782426644006305792,
+        "11": 3290908681014645897417716992483929687302814093580048302145011712,
+        "12": 102021282553914774613608089318555731308929623669281951527613759488,
+        "13": 3450767861103613336530680013110829055793235590989792728470007800922112,
+        "14": 113074761272643201811437322669615646500232743845553528126505215620615766016,
+        "15": 3505424576520314509893262241473950335401728051401228012913266703364557635584,
+        "16": 459549854160598650587297346753230134292665251641760988531597286531405233258496,
+        "17": 236679030401074303445779093357758083652083848656569312896651301712174436984029184,
+        "18": 485430080857674244161638003328581933825318212834439648437800293302677865211799535616,
+        "19": 7285008345846484015947982150588195899909025646445523204694296536520891069519531868160,
+        "20": 63649603584883787279605249915165773457231817674704299274294381792685460000463451234238464,
+        "21": 8084486531077491654877893825874719576673015187361684494712182408375200783435742552665358336,
+        "22": 266990231346208422355032639488440376812693859421006932498377656415980048197381015406045527277568,
+        "23": 4004975692351706404490665699067910214880070979418723943650703014666661985838701031293053913006080,
+        "24": 36695977851569170113931314160043347640405935597487088935088115890296682801771317477559015749716086811000832,
+        "25": 40347654345071250735517895918361287402076819621903872348152359947967817672582952900070792888073033319336225051089305600,
+        "26": 173291855842203274378542939795568994402230256674586882935198356400434779291903982345985256715420514986084797068901736177236705280,
+        "27": 372141426666058872078702860915007435080121645207129529653134446032332341725645905005158216525448545185601687431321332416881992794539819008,
+        "28": 780436765437571218494671346194501937778827946601866115807942375783360954217625890970339782756055027343011165669940593315578891950106037475868672,
+        "29": 199011470082644504750576823399314351991473131594891910867271256176117448349760058282669514070297613161438966858989672209584808449554628188275998720,
+        "30": 408974034079797510248840289880743131383512345474252540531756434966600700759299854360721061950141956157706606592353238852286848397792199681406463377408,
+        "31": 107262054265714789778858448336934665569940899484483391638689806138353100223863825230095633976573686683500611004656372461821154910338504323897337525982724096,
+        "32": 3599130928372093666707654009556585501448988674806606741741457436300978514763078055666856734468118300384709306986561850606678206014364377255634252573222939035435008,
+        "33": 226745255244977097693651140787373485687032734762416598308278080859636614065842988664079650579636099200356013895929453114209696609196912704326029165115604258298789888,
+        "34": 31658291388327035973463711035714940752903290413780987016543013048276086128318352913670119156878774875539982730643989884812538454560955891653804599708965089516065370445650591744,
+        "35": 8072864304082131991734802286081284282746687234663554454795018150872165427477200144439127330638972988460467995345166788036428554719772359493340706502525793000798045042933539799040,
+        "36": 16589957752928501144677536908155872804926713744922399090412325300540559189379341749375391267958440365054572409947915459875708738772202937607899282784045475912918435842896269521453056,
+        "37": 2107953908991544422924303194755109864714322685979157945197793923482851628197757338371051180865128727498404526398540800904656736746309181856406532415729893553027080356127966838032171008,
+        "38": 4455506291094703751135874387838864537091534145737450899078549895484458103862984566850709523152111446679187704885645343403340376818150850559339656931961309726865430773854862898742430701453312,
+        "39": 2276764800395450934302381533703953971699648210160170043482390016256376572698861469242696725178883579381724824406354240366955007922483250797956162045291065869332782498630952528801121789294936064,
+        "40": 78382132968236258682354508813105647869505562859503241126110368844571529602115166346226250247689158949281355735712661583484847988404288840999995823053558108313136911038448033392823936106484882843837136896,
+        "41": 9954530887255719831878032015648131676389174982287631633226300398852362984355230099088484795499648650077385262321451807760498939391573415556806809840690923749570748302836901902710516709853842632374975725568,
+        "42": 328748460933753117965250998482385971038986176145757556637153950406748097419457335087201140201964837610921003228207381553273215745051904108396738255672359809514012935699206817911045544346991734460503513297321984,
+        "43": 4931377407701600163038428015200120623953443565146725493279638346626936394653513270731562377760239173025296533302667079105955717734547316121682326347486138296833022191682916810804684773016552547441837423502295040,
+        "44": 36820951310838614550686929180160900658852378619762217016487966321481125080079565754795665753943119158588880781993247523991136025751286627041894703394563165949686565697899112187341646305190259020899052762150469632,
+        "45": 11296055792751782775409447310890592390364386323003591676148216847464528096894936765246849107071587697662883852177272235463067445759358105789035781448925266260508137566289075113262971504437504047820447699744992107576688640,
+        "46": 2880494237882381846888091019048720420618380990088609075177069969479947706968422469903991399415134596910315822808249676509685762803195958766579084150256685028559412013312370442984084713942557598278232506668411220973049610240,
+        "47": 5919494731239138525444941619192702193950946772541623493659569922535356693247358289210699690267889463090614201011187037179308430012879939860266551472263965368180571749647482776383670120849985660160544066409650466466467189620736
+      },
+      "static_entity_bits": {
+        "0": 16777215,
+        "1": 281474959933440
+      },
+      "query_hit_bits": 5922386521532855740161817506647119732883018558947359509044845726112560091729648156474603305162988578607512400425457279991804428268870599332596921062626576000993556884845161077691136496092218188572933193945756793025561702170623,
+      "sampled_evaluated_bits": 5922386521532855740161817506647119732883018558947359509044845726112560091729648156474603305162988578607512400425457279991804428268870599332596921062626576000993556884845161077691136496092218188572933193945756793025561702170623,
+      "invalid_regions": {},
+      "invalid_entities": {},
+      "elapsed": 1.3905936680384912,
+      "limitations": [
+        "Translation only; sparse search is approximate.",
+        "Deterministic local assignment rejects conflicts; no combinatorial backtracking."
+      ]
+    }
+  }
+}

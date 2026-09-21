@@ -12,6 +12,7 @@ import torch.nn.functional as F
 
 @dataclass
 class SupervisedConfig:
+    learning_contract: str = 'supervised-family-quality-v2'
     view_size: int = 256
     context_fraction: float = .1
     preprocessing_version: str = 'object-view-v1'
@@ -19,6 +20,9 @@ class SupervisedConfig:
     family_budget: int = 8
     leaf_budget: int = 512
     min_members: int = 2
+    skip_truncated_regions: bool = True  # choose alternative complete samples; never silently accept truncation
+    incomplete_geometry_weight: float = .5  # soft penalty, not blanket rejection
+    modality_diversity_bonus: float = .25  # reward reliable unused modalities
     grid_size: int = 4
     min_inside_fraction: float = .8
     classification_threshold: float = .45
@@ -42,7 +46,8 @@ class SupervisedConfig:
                 raise ValueError(f'{name} must be positive')
         if self.member_budget < self.min_members or not np.isfinite(self.context_fraction) or self.context_fraction < 0:
             raise ValueError('Invalid member budget/context')
-        for name in ('min_inside_fraction', 'classification_threshold', 'classification_margin', 'nms_iou'):
+        for name in ('min_inside_fraction', 'classification_threshold', 'classification_margin', 'nms_iou',
+                     'incomplete_geometry_weight', 'modality_diversity_bonus'):
             if not 0 <= getattr(self, name) <= 1:
                 raise ValueError(f'{name} must be in [0,1]')
         if not 0 < self.proposal_stride_fraction <= 1:

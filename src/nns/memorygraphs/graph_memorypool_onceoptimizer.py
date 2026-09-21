@@ -276,7 +276,9 @@ class MemoryConfig:
     boundary_coverage_suppression = 0.35
 
     # OnceGraphBuilder: distances are measured in feature-map pixels.
-    once_bind_edge_attributes = True  # aps/ori inherit grad partitions, never split independently
+    once_bind_edge_attributes = False  # explicit legacy comparison only: copy grad partitions
+    once_advanced_partition_mode = 'grad_refined'  # grad_refined / grad_gated / independent
+    once_advanced_grad_continuity = None  # None follows tau_grad_coh; strict > threshold
     once_support_threshold = {0: 0.05, 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.05}
     once_seed_threshold = {0: .6, 1: .6, 2: .6, 3: .6, 4: .6}
     once_surface_variance = {1: .02, 3: .02}
@@ -321,6 +323,8 @@ class MemoryConfig:
     graph_geometry_sigma = 2.0
     graph_cycle_tolerance = 1.0
     graph_nms_radius = 6.0
+    graph_structural_recall_policy = 'weak_or_missing'  # missing / weak_or_missing / always
+    graph_structural_recall_fallback = True  # input-derived anchors on sparse entity miss
     graph_query_stride = 4
     graph_events_per_class = 64
     graph_candidate_budget = 128
@@ -1214,7 +1218,8 @@ class Region:
     closed: bool = False
     completed: bool = False
     reasons: List[str] = field(default_factory=list)
-    parent_region_id: Optional[int] = None  # observation-local grad region, not a Gmem ID
+    parent_region_id: Optional[int] = None  # legacy copied grad partition
+    support_parent_region_id: Optional[int] = None  # independently refined within this grad region
 
 
 @dataclass
@@ -1362,6 +1367,36 @@ def prepare_feature_subspaces(features, cfg):
     return dict(sorted(result.items()))
 
 
+def advanced_partition_contract(cfg):
+    mode = 'legacy_grad_partition' if cfg.once_bind_edge_attributes else cfg.once_advanced_partition_mode
+    threshold = cfg.tau_grad_coh if cfg.once_advanced_grad_continuity is None else cfg.once_advanced_grad_continuity
+    return {'mode': mode, 'grad_continuity_threshold': float(threshold) if mode in ('grad_gated', 'grad_refined') else None,
+            'version': 4}
+
+
+def advanced_grad_gate(inputs, cfg):
+    """Pointwise prerequisite, NOT grad labels, ridge thinning or a region-ID mapping."""
+    shape = next(iter(inputs.values())).shape
+    reference = next(iter(inputs.values()))
+    empty = torch.zeros((1, 1, *shape[-2:]), dtype=torch.bool, device=reference.device)
+    raw = inputs.get(0)
+    if raw is None or raw.shape[1] < 2:
+        return empty, empty.to(reference.dtype)
+    finite = torch.isfinite(raw).all(1, keepdim=True)
+    grad = torch.nan_to_num(raw, nan=0., posinf=0., neginf=0.)
+    if grad.shape[1] >= 4:
+        strength, angle = grad[:, :1].abs(), grad[:, 1:2]
+    else:
+        strength = torch.linalg.vector_norm(grad[:, :2], dim=1, keepdim=True)
+        angle = torch.atan2(grad[:, 1:2], grad[:, :1])
+    coherence = SimilarityEngine._circular_coherence_map(
+        angle, strength * finite, cfg.grad_coh_radius, cfg.grad_axis_k)
+    threshold = advanced_partition_contract(cfg)['grad_continuity_threshold']
+    if threshold is None:
+        threshold = cfg.tau_grad_coh
+    return finite & (strength > 1e-8) & (coherence > threshold), coherence
+
+
 class FeatureSupportBuilder:
     """Cache existing gates once, then describe samples without state-machine calls."""
     def __init__(self, cfg):
@@ -1391,6 +1426,8 @@ class FeatureSupportBuilder:
 
     def build(self, inputs, valid, report):
         result = {}
+        gated = advanced_partition_contract(self.cfg)['mode'] in ('grad_gated', 'grad_refined')
+        grad_mask, grad_response = advanced_grad_gate(inputs, self.cfg) if gated and inputs else (None, None)
         for mid, original in inputs.items():
             finite = torch.isfinite(original).all(dim=1, keepdim=True)
             value = torch.nan_to_num(original, nan=0.0, posinf=0.0, neginf=0.0)
@@ -1401,8 +1438,16 @@ class FeatureSupportBuilder:
                 continue
             writable = gate.cpu().numpy() & finite[0, 0].cpu().numpy() & valid
             context = {}
+            if gated and mid in (2, 3, 4):
+                before = writable.copy()
+                allowed = grad_mask[0, 0].cpu().numpy() & valid
+                writable &= allowed
+                context.update(grad_continuity=grad_response[0, 0].cpu().numpy(),
+                               grad_eligible=allowed.astype(np.float32),
+                               own_gate_before_grad=before.astype(np.float32))
+                report.reject('advanced_grad_gate_' + str(mid), int((before & ~allowed).sum()))
             spec = self.cfg.feature_specs[mid]
-            dim = 1 if spec.get('topology') in {'Boundary_Edge', 'Trace_1D'} else 2
+            dim = 1 if spec.get('topology') in {'Boundary_Edge', 'Trace_1D'} or (gated and mid in (2, 3, 4)) else 2
             if mid == 0 and value.shape[1] >= 4:
                 strength = value[0, 0].abs()
                 theta = value[:, 1:2]
@@ -1495,10 +1540,22 @@ class FeatureSupportBuilder:
         return FeatureDescriptor(
             support.modality_id, values, sim, gate, context,
             {'gate': 1.0, **{key: float(v[y, x]) for key, v in support.gate_context.items()}},
-            {'topology': ('Trace_1D' if self.cfg.once_bind_edge_attributes and support.modality_id in (3, 4)
+            {'topology': ('Trace_1D' if support.support_dim == 1
                           else self.cfg.feature_specs[support.modality_id].get('topology', 'Surface_2D'))},
             threshold,
         )
+
+
+def advanced_query_gate(inputs, cfg, valid=None):
+    eligibility, _ = advanced_grad_gate(inputs, cfg)
+    if advanced_partition_contract(cfg)['mode'] == 'grad_refined' and 0 in inputs:
+        shape = inputs[0].shape[-2:]
+        mask = np.ones(shape, bool) if valid is None else torch.as_tensor(valid).detach().cpu().numpy().reshape(shape).astype(bool)
+        report = BuildReport(0, shape, mask)
+        support = FeatureSupportBuilder(cfg).build({0: inputs[0]}, mask, report).get(0)
+        if support is not None:
+            eligibility &= torch.as_tensor(support.support, device=eligibility.device)[None, None]
+    return eligibility
 
 
 class LocalAffinityBuilder:
@@ -1739,6 +1796,80 @@ class RegionContactBuilder:
         return contacts
 
 
+class GradRefinedRegionAssembler:
+    """Refine retained grad components using attribute similarity, never copy their labels."""
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    def bind_support(self, support, edge):
+        support.support_dim = 1
+        if edge is None:
+            support.writable[:] = False
+            support.support[:] = False
+            support.seeds = []
+            return
+        # Reuse established contour geometry, not a noisy second PCA of scalar responses.
+        support.writable &= edge.support
+        support.support = support.writable.copy()
+        support.quality = np.where(support.support, edge.quality, 0.)
+        support.tangent = edge.tangent.copy()
+        support.directional = edge.directional & support.support
+        support.events = edge.events & support.support
+        support.seeds = [p for p in edge.seeds if support.support.flat[p]]
+
+    def assemble(self, support, parents, report, budget):
+        parent_labels = np.full(report.shape, -1, np.int32)
+        pairs = []
+        for parent in parents:
+            parent_labels.flat[parent.pixels] = parent.region_id
+            pairs.extend((p, q) for p, neighbors in parent.adjacency.items()
+                         for q, _ in neighbors if p < q and support.support.flat[p] and support.support.flat[q])
+        support.writable &= parent_labels >= 0
+        support.support &= parent_labels >= 0
+        support.directional &= support.support
+        support.events &= support.support
+        support.seeds = [p for p in support.seeds if support.support.flat[p]]
+        support.edges = np.empty((0, 2), dtype=np.int64)
+        support.edge_scores = np.empty(0)
+        if pairs:
+            pairs = np.unique(np.asarray(pairs, dtype=np.int64), axis=0)
+            values = support.values[0].reshape(support.values.shape[1], -1).T
+            a, b = [torch.as_tensor(pairs[:, k], device=values.device) for k in (0, 1)]
+            score = SimilarityEngine.calculate_similarity(values[a], values[b], self.cfg,
+                support.modality_id, support.sim_mask, support.sim_mask).flatten().cpu().numpy()
+            keep = score >= _setting(self.cfg.once_similarity_min, support.modality_id, .8)
+            report.reject('refinement_attribute_discontinuity_' + str(support.modality_id), int((~keep).sum()))
+            support.edges, support.edge_scores = pairs[keep], score[keep]
+        support.gate_context['grad_partition_eligible'] = (parent_labels >= 0).astype(np.float32)
+        regions, labels = ContinuousRegionAssembler(self.cfg).assemble(
+            support, report.valid_mask, len(report.regions), report, budget)
+        for region in regions:
+            region.support_parent_region_id = int(parent_labels.flat[region.pixels[0]])
+        return regions, labels
+
+
+def region_shape_descriptors(report, modality_id=1):
+    """Geometry diagnostics on actual region support; not a replacement for legacy CNN aps."""
+    result = []
+    width = report.shape[1]
+    for r in report.regions:
+        if r.modality_id != modality_id or len(r.pixels) < 3:
+            continue
+        xy = np.column_stack((r.pixels % width, r.pixels // width)).astype(float)
+        centered = xy - xy.mean(0)
+        covariance = centered.T @ centered / len(xy)
+        values, vectors = np.linalg.eigh(covariance)
+        projected = centered @ vectors
+        lengths = np.ptp(projected, axis=0) + np.abs(vectors).sum(axis=0)  # unit pixel footprints
+        result.append({'region_id': r.region_id, 'modality_id': r.modality_id, 'pixels': len(xy),
+            'axis_aligned_ratio': float((np.ptp(xy[:, 0])+1)/(np.ptp(xy[:, 1])+1)),
+            'pca_box_ratio': float(max(lengths)/min(lengths)),
+            'moment_elongation': float(np.sqrt((values[1]+1/12)/(values[0]+1/12))),
+            'axis_confidence': float((values[1]-values[0])/max(values.sum(), 1e-8)),
+            'truncated': r.view_truncated, 'sampling_complete': r.completed})
+    return result
+
+
 class EdgeAttributeRegionAssembler:
     """Project each grad partition into an attribute's valid pixels, without re-segmentation."""
     def bind_support(self, support, edge):
@@ -1837,6 +1968,45 @@ class RegionSampler:
             p = remaining[0]
         return (path, closed) if len(path) == len(pixels) else ([], False)
 
+    @staticmethod
+    def _curve_segments(region):
+        """Edge-disjoint maximal non-branching paths; junction pixels may be shared."""
+        pixels = set(map(int, region.pixels))
+        adjacent = {p: set() for p in pixels}
+        for p in pixels:
+            for q, _ in region.adjacency.get(p, []):
+                if q in pixels and q != p:
+                    adjacent[p].add(q)
+                    adjacent[q].add(p)
+        used, segments = set(), []
+        def walk(start, neighbor):
+            path = [start, neighbor]
+            used.add(tuple(sorted((start, neighbor))))
+            previous, current = start, neighbor
+            while len(adjacent[current]) == 2:
+                next_point = next(q for q in sorted(adjacent[current]) if q != previous)
+                edge = tuple(sorted((current, next_point)))
+                if edge in used:
+                    break
+                used.add(edge)
+                if next_point == start:
+                    return path, True
+                path.append(next_point)
+                previous, current = current, next_point
+            return path, False
+        for p in sorted(pixels):
+            if not adjacent[p]:
+                segments.append(([p], False))
+            elif len(adjacent[p]) != 2:
+                for q in sorted(adjacent[p]):
+                    if tuple(sorted((p, q))) not in used:
+                        segments.append(walk(p, q))
+        for p in sorted(pixels):
+            for q in sorted(adjacent[p]):
+                if tuple(sorted((p, q))) not in used:
+                    segments.append(walk(p, q))
+        return segments
+
     def _curve_keypoints(self, path, closed, width):
         if len(path) < 2:
             return list(path)
@@ -1889,13 +2059,19 @@ class RegionSampler:
             support = supports[r.modality_id]
             if r.support_dim == 1:
                 path, closed = self._ordered_curve(r)
-                paths[r.region_id] = path
+                segments = [(path, closed)] if path else self._curve_segments(r)
+                paths[r.region_id] = segments
+                r.topology_segments = len(segments)
+                r.topology_junctions = sum(len(set(q for q, _ in r.adjacency.get(int(p), []))) > 2 for p in r.pixels)
                 r.closed = closed and not r.view_truncated
                 if path:
                     r.anchor = path[len(path) // 2] if not closed else min(path, key=lambda p: (-support.quality.flat[p], p))
                 else:
                     r.anchor = min(map(int, r.pixels), key=lambda p: (-support.quality.flat[p], p))
-                    r.reasons.append('curve_order_unresolved')
+                    if segments:
+                        r.reasons.append('branched_curve_paths')
+                    else:
+                        r.reasons.append('curve_order_unresolved')
             elif r.support_dim == 2:
                 mask = report.labels[r.modality_id] == r.region_id
                 depth = _distance_to_boundary(mask)
@@ -1933,9 +2109,9 @@ class RegionSampler:
         for r in regions:
             if not r.samples:
                 continue
-            path = paths.get(r.region_id, [])
-            if path:
-                for p in self._curve_keypoints(path, r.closed, w):
+            segments = paths.get(r.region_id, [])
+            for path, closed in segments:
+                for p in self._curve_keypoints(path, closed, w):
                     if not add(r, p):
                         report.reject('curve_keypoint_budget', example={'region': r.region_id})
                         r.curve_error = float('inf')
@@ -1959,7 +2135,8 @@ class RegionSampler:
                 distance = {q: min(d, fresh[q]) for q, d in distance.items()}
             r.coverage_error = max(distance.values(), default=0.)
             if r.support_dim == 1:
-                r.curve_error = self._polyline_error(path, r.samples, r.closed, w) if path else float('inf')
+                r.curve_error = max((self._polyline_error(path, r.samples, closed, w)
+                                     for path, closed in segments), default=float('inf'))
             boundary_ok = (r.support_dim != 2 or
                            max((distance[int(p)] for p in r.boundary), default=0.) <= self.cfg.once_boundary_spacing)
             r.completed = (r.coverage_error <= radius and boundary_ok and not r.budget_truncated
@@ -1967,17 +2144,18 @@ class RegionSampler:
                            and r.curve_error <= self.cfg.once_curve_error)
             if not r.completed:
                 r.reasons.append('sampling_target_unmet')
-            if self.cfg.once_write_local_contacts and path:
-                ordered = [p for p in path if p in r.samples]
-                links = list(zip(ordered, ordered[1:]))
-                if r.closed and len(ordered) > 2:
-                    links.append((ordered[-1], ordered[0]))
-                for p, q in links:
-                    if len(contacts) >= self.cfg.once_contact_budget:
-                        report.reject('local_contact_budget')
-                        continue
-                    contacts.append(RegionContact(r.region_id, r.region_id, p, q,
-                                    math.hypot(p % w - q % w, p // w - q // w), kind='local_curve'))
+            if self.cfg.once_write_local_contacts:
+                for path, closed in segments:
+                    ordered = [p for p in path if p in r.samples]
+                    links = list(zip(ordered, ordered[1:]))
+                    if closed and len(ordered) > 2:
+                        links.append((ordered[-1], ordered[0]))
+                    for p, q in links:
+                        if len(contacts) >= self.cfg.once_contact_budget:
+                            report.reject('local_contact_budget')
+                            continue
+                        contacts.append(RegionContact(r.region_id, r.region_id, p, q,
+                                        math.hypot(p % w - q % w, p // w - q // w), kind='local_curve'))
 
 
 class GraphWriteAdapter:
@@ -2110,6 +2288,11 @@ class OnceGraphBuilder:
                 raise ValueError(name + ' must be a nonnegative integer.')
         if self.cfg.once_samples_per_region < 1:
             raise ValueError('At least one sample slot per region is required.')
+        if self.cfg.once_advanced_partition_mode not in {'grad_gated', 'grad_refined', 'independent'}:
+            raise ValueError('Unknown advanced partition mode')
+        threshold = self.cfg.once_advanced_grad_continuity
+        if threshold is not None and (not math.isfinite(float(threshold)) or not 0 <= threshold <= 1):
+            raise ValueError('Advanced grad continuity threshold must be in [0,1] or None')
         if self.cfg.once_node_reuse_mode not in {'sample_instance', 'prototype'}:
             raise ValueError('Unknown once_node_reuse_mode.')
         for name in ('once_seed_threshold', 'once_support_threshold', 'once_similarity_min', 'tau_ori_confidence'):
@@ -2170,11 +2353,13 @@ class OnceGraphBuilder:
             edge = report.supports[0]
             barrier = np.where(valid, edge.values[0, 0].abs().cpu().numpy(), 0)
         t = time.perf_counter()
-        bound = [m for m in (3, 4) if m in report.supports] if self.cfg.once_bind_edge_attributes else []
+        refined = advanced_partition_contract(self.cfg)['mode'] == 'grad_refined'
+        bound = ([m for m in (2, 3, 4) if m in report.supports] if refined else
+                 [m for m in (3, 4) if m in report.supports] if self.cfg.once_bind_edge_attributes else [])
         roots = [(m, support) for m, support in report.supports.items() if m not in bound]
-        attributes = EdgeAttributeRegionAssembler()
+        attributes = GradRefinedRegionAssembler(self.cfg) if refined else EdgeAttributeRegionAssembler()
         if bound and 0 not in report.supports:
-            report.warnings.append('aps/ori binding requires grad; no independent attribute partitions were created.')
+            report.warnings.append('Advanced partition support requires grad; no attribute partitions were created.')
             for mid in bound:
                 attributes.bind_support(report.supports[mid], None)
                 report.labels[mid] = np.full(report.shape, -1, dtype=np.int32)
@@ -2193,8 +2378,9 @@ class OnceGraphBuilder:
                 for child in bound:
                     child_support = report.supports[child]
                     attributes.bind_support(child_support, support)
-                    children, child_labels = attributes.assemble(child_support, regions, report,
-                        max(0, self.cfg.once_region_budget - len(report.regions)))
+                    available = max(0, self.cfg.once_region_budget - len(report.regions))
+                    child_quota = min(quota, available) if refined else available
+                    children, child_labels = attributes.assemble(child_support, regions, report, child_quota)
                     report.regions.extend(children)
                     report.labels[child] = child_labels
         report.timings['regions'] = time.perf_counter() - t
@@ -2296,16 +2482,16 @@ class MultilevelCoordinator:
         return entity
 
     @torch.no_grad()
-    def query_hierarchy(self, features, valid_mask=None, exact=False):
+    def query_hierarchy(self, features, valid_mask=None, exact=False, trace=False):
         return HierarchyRetriever(self.cfg).query(features, self.gmem_i, self.gmem_ii,
-                                                  self.gmem_iii, valid_mask, exact)
+                                                  self.gmem_iii, valid_mask, exact, trace=trace)
 
     def state_dict(self):
         """Versioned pools include incidence, role geometry and evidence provenance."""
         return copy.deepcopy({'schema_version': 1, 'gmem_i': self.gmem_i,
                               'gmem_ii': self.gmem_ii, 'gmem_iii': self.gmem_iii,
                               'feature_contract': self.cfg.feature_specs,
-                              'segmentation_contract': {'edge_attributes': 'grad' if self.cfg.once_bind_edge_attributes else 'independent'},
+                              'segmentation_contract': advanced_partition_contract(self.cfg),
                               'geometry_mode': 'translation'})
 
     def load_state_dict(self, state):
@@ -2313,9 +2499,9 @@ class MultilevelCoordinator:
             raise ValueError('Unsupported memory schema; old raw pools need explicit migration.')
         if state.get('feature_contract') != self.cfg.feature_specs:
             raise ValueError('Stored feature contract differs from the current configuration.')
-        expected = {'edge_attributes': 'grad' if self.cfg.once_bind_edge_attributes else 'independent'}
+        expected = advanced_partition_contract(self.cfg)
         if state.get('segmentation_contract', {'edge_attributes': 'independent'}) != expected:
-            raise ValueError('Stored segmentation contract differs; rebuild or explicitly select independent attributes.')
+            raise ValueError('Stored segmentation contract differs; rebuild with the current partition protocol.')
         staged = copy.deepcopy(state)
         self.gmem_i, self.gmem_ii, self.gmem_iii = staged['gmem_i'], staged['gmem_ii'], staged['gmem_iii']
         self.last_report = None
@@ -2338,6 +2524,11 @@ class MultilevelCoordinator:
                     raise ValueError('Query mask shape does not match the feature maps.')
                 mask = torch.isfinite(mask) & (mask > 0)
                 maps[nid] = value * mask.reshape(1, 1, h, w)
+        if inputs and advanced_partition_contract(self.cfg)['mode'] in ('grad_gated', 'grad_refined'):
+            eligibility = advanced_query_gate(prepare_feature_subspaces(features, self.cfg), self.cfg, valid_mask)
+            for nid in maps:
+                if self.gmem_i.nodes[nid].modality_id in (2, 3, 4):
+                    maps[nid] = maps[nid] * eligibility
         return maps
 
 
@@ -2522,6 +2713,7 @@ class StructureMatch:
     accepted: bool
     role_bits: int = 0
     evaluated_bits: int = 0
+    rejection_reasons: List[str] = field(default_factory=list)
 
     def summary(self):
         return {'template_id': self.template_id, 'level': self.level,
@@ -2532,7 +2724,7 @@ class StructureMatch:
                 'matched_roles': self.role_bits.bit_count(),
                 'evaluated_roles': self.evaluated_bits.bit_count(),
                 'role_bits_hex': hex(self.role_bits), 'evaluated_bits_hex': hex(self.evaluated_bits),
-                'version': self.version}
+                'version': self.version, 'rejection_reasons': self.rejection_reasons}
 
 
 @dataclass
@@ -2608,7 +2800,17 @@ def region_view(sem, cfg):
 def entity_view(entity, gmem_ii, cfg):
     """Query-only flattening: roles remain unique, component weights normalised."""
     slots, constraints = [], []
-    family_sizes = Counter(m.get('family_id', role) for role, m in entity.component_edges.items())
+    family_quality, family_evidence = defaultdict(float), defaultdict(float)
+    for role, member in entity.component_edges.items():
+        family = member.get('family_id', role)
+        q = float(member.get('reliability', 1.))
+        if not math.isfinite(q) or not 0 < q <= 1:
+            raise ValueError('Entity member reliability must be finite in (0, 1].')
+        family_quality[family] += q
+        family_evidence[family] = max(family_evidence[family], member['evidence'].weight(cfg))
+    for role, member in entity.component_edges.items():
+        if member.get('is_family_root', False):
+            family_evidence[member.get('family_id', role)] = member['evidence'].weight(cfg) * member.get('reliability', 1.)
     for sid, member in sorted(entity.component_edges.items()):
         if member.get('scale', 1.) != 1. or member.get('angle', 0.) != 0.:
             raise ValueError('This implementation supports translation only, including appearance.')
@@ -2619,8 +2821,8 @@ def entity_view(entity, gmem_ii, cfg):
             slots.append({**item, 'key': (sid, item['key']), 'group': sid,
                           'xy': tuple(offset + item['xy']),
                           'member_xy': tuple(offset),
-                          'group_weight': member['evidence'].weight(cfg) /
-                              family_sizes[member.get('family_id', sid)]})
+                          'group_weight': family_evidence[member.get('family_id', sid)] * member.get('reliability', 1.) /
+                              family_quality[member.get('family_id', sid)]})
         for e in sub.constraints:
             constraints.append({**e, 'source': (sid, e['source']), 'target': (sid, e['target'])})
     for (a, b), relation in entity.relation_edges.items():
@@ -2650,6 +2852,12 @@ class FeatureResponseCache:
                        for m, x in self.inputs.items()}
         self.inputs = {m: torch.nan_to_num(x, nan=0., posinf=0., neginf=0.) for m, x in self.inputs.items()}
         self.gates = {m: SimilarityEngine.compute_gate_map(x, cfg, m) for m, x in self.inputs.items()}
+        if self.inputs and advanced_partition_contract(cfg)['mode'] in ('grad_gated', 'grad_refined'):
+            # Use unsanitized maps so nonfinite grad cannot become valid zero-angle evidence.
+            eligibility = advanced_query_gate(prepare_feature_subspaces(inputs, cfg), cfg, self.valid)
+            for mid in (2, 3, 4):
+                if mid in self.gates:
+                    self.gates[mid] = self.gates[mid] * eligibility
         self.cache = OrderedDict()
         self.map_computations = 0
         self.signatures = {}
@@ -3164,6 +3372,12 @@ class SpatialStructureMatcher:
                 all_results.append(StructureMatch(view.template_id, view.level, tuple(center), score,
                     evaluable, coverage, error, assignments, member_positions, missing, view.version,
                     accepted, bits, evaluated_bits))
+                all_results[-1].rejection_reasons = [name for name, failed in (
+                    ('score', score < self.cfg.graph_verify_threshold),
+                    ('evaluable_coverage', evaluable < self.cfg.graph_evaluable_min),
+                    ('matched_coverage', coverage < self.cfg.graph_coverage_min),
+                    ('evidence_conflict', conflict),
+                    ('geometry_error', error > 2 * radius + self.cfg.graph_cycle_tolerance)) if failed]
         return all_results
 
     def nms(self, matches, accepted_only=True, limit=None):
@@ -3186,6 +3400,7 @@ class HypergraphIndex:
         self.region_bits, self.entity_bits = {}, {}
         self.entity_parents = defaultdict(list)
         self.views, self.invalid = {}, {}
+        self.audit = {}
         signature_ids = {}
         for nid in sorted(gi.nodes):
             signature = provider.signature(nid)
@@ -3240,7 +3455,19 @@ class HypergraphIndex:
                                 key=lambda t: (-t[0], t[2], t[1]))
             if cfg.graph_events_per_class and len(candidates) > cfg.graph_events_per_class:
                 truncated += len(candidates) - cfg.graph_events_per_class
-                candidates = candidates[:cfg.graph_events_per_class]
+                # Equal-score surfaces need spatial coverage, not a top-left raster prefix.
+                side = max(1, int(math.sqrt(cfg.graph_events_per_class)))
+                height, width = provider.shape
+                representatives, rest = {}, []
+                for item in candidates:
+                    _, px, py = item
+                    cell = (min(side-1, px*side//width), min(side-1, py*side//height))
+                    if cell not in representatives:
+                        representatives[cell] = item
+                    else:
+                        rest.append(item)
+                candidates = list(representatives.values())
+                candidates += rest[:max(0, cfg.graph_events_per_class-len(candidates))]
             events.extend((cls, (x, y), score) for score, x, y in candidates)
         # 'evaluated' means modality/descriptor evaluated at sampled sites, not proven absent globally.
         return events, evaluated, truncated
@@ -3253,8 +3480,10 @@ class HypergraphIndex:
                 visits += 1
                 center = np.asarray(point) - offset
                 bucket = (parent, round(center[0] / cfg.graph_pose_bin), round(center[1] / cfg.graph_pose_bin))
-                entry = buckets.setdefault(bucket, {'roles': {}, 'center': tuple(center), 'hits': 0})
-                entry['roles'][role] = max(score, entry['roles'].get(role, 0.))
+                entry = buckets.setdefault(bucket, {'roles': {}, 'centers': {}, 'hits': 0})
+                if score > entry['roles'].get(role, -1.):
+                    entry['roles'][role] = score
+                    entry['centers'][role] = tuple(center)
                 entry['hits'] |= 1 << key
         by_parent = defaultdict(list)
         for (parent, _, _), entry in buckets.items():
@@ -3263,20 +3492,33 @@ class HypergraphIndex:
             if coverage < cfg.graph_bit_coverage_min:
                 continue
             rank = (coverage, len(entry['roles']), sum(entry['roles'].values()))
-            by_parent[parent].append((rank, entry['center']))
+            center = tuple(np.average(list(entry['centers'].values()), axis=0,
+                                      weights=list(entry['roles'].values())))
+            by_parent[parent].append((rank, center))
         return by_parent, visits
 
     def region_candidates(self, events, cfg):
         ranked, visits = self._votes(events, self.parents, cfg, self.region_bits)
-        return self._limit(ranked, cfg), visits
+        limited, dropped = self._limit(ranked, cfg)
+        self.audit['region_pose_pruned_or_dropped'] = sum(map(len, ranked.values())) - sum(map(len, limited.values())) - dropped
+        self.audit['region_voted_templates'] = len(ranked)
+        return (limited, dropped), visits
 
     @staticmethod
     def _limit(ranked, cfg):
-        rows = []
+        # Preserve spatially distinct poses and give each template a first hypothesis
+        # before a heavily sampled template consumes all global capacity.
+        layers = defaultdict(list)
         for parent, values in ranked.items():
-            for rank, center in sorted(values, reverse=True)[:cfg.graph_poses_per_node]:
-                rows.append((rank, parent, center))
-        rows.sort(reverse=True)
+            selected = []
+            for rank, center in sorted(values, reverse=True):
+                if any(math.dist(center, old) < cfg.graph_nms_radius for old in selected):
+                    continue
+                selected.append(center)
+                layers[len(selected)-1].append((rank, parent, center))
+                if len(selected) >= cfg.graph_poses_per_node:
+                    break
+        rows = [row for depth in sorted(layers) for row in sorted(layers[depth], reverse=True)]
         truncated = max(0, len(rows) - cfg.graph_candidate_budget) if cfg.graph_candidate_budget else 0
         if cfg.graph_candidate_budget:
             rows = rows[:cfg.graph_candidate_budget]
@@ -3327,7 +3569,7 @@ class HierarchyRetriever:
             raise ValueError('Minimum members must not exceed maximum members.')
 
     @torch.no_grad()
-    def query(self, features, gi, gii, giii, valid_mask=None, exact=False):
+    def query(self, features, gi, gii, giii, valid_mask=None, exact=False, trace=False, _structural_centers=None):
         start = time.perf_counter()
         provider = FeatureResponseCache(features, gi, self.cfg, valid_mask)
         result = HierarchyQuery()
@@ -3341,10 +3583,26 @@ class HierarchyRetriever:
         dense = [(x, y) for y in range(h) for x in range(w)] if exact else None
         if exact:
             candidates = {sid: dense for sid in index.views}
+        elif _structural_centers is not None:
+            for sid in index.views:
+                mid = gi.nodes[gii.semantic_nodes[sid].anchor_id].modality_id
+                candidates[sid] = list(dict.fromkeys(list(candidates.get(sid, [])) +
+                                                    _structural_centers.get(mid, [])))
         weak_regions, refinements = [], 0
+        trace_rows = []
+        def record(level, tid, matches):
+            if trace:
+                best = max(matches, key=lambda m: m.score, default=None)
+                trace_rows.append({'level': level, 'template_id': tid, 'candidates': len(matches),
+                    'accepted': sum(m.accepted for m in matches),
+                    'best': None if best is None else {'point': best.point, 'score': best.score,
+                        'evaluable': best.evaluable_coverage, 'coverage': best.matched_coverage,
+                        'geometry_error': best.geometry_error, 'accepted': best.accepted,
+                        'rejection_reasons': getattr(best, 'rejection_reasons', [])}})
         for sid, centers in candidates.items():
             matches = self.matcher.evaluate(index.views[sid], provider, centers)
             refinements += len(matches)
+            record(2, sid, matches)
             weak = self.matcher.nms([m for m in matches if m.score >= self.cfg.graph_recall_threshold],
                                     accepted_only=False, limit=None if exact else self.cfg.graph_poses_per_node)
             weak_regions.extend(weak)
@@ -3352,6 +3610,8 @@ class HierarchyRetriever:
         parent_events = [(m.template_id, m.point, m.score) for m in weak_regions]
         entity_ranked, entity_visits = index._votes(parent_events, index.entity_parents, self.cfg, index.entity_bits)
         entity_candidates, entity_drop = index._limit(entity_ranked, self.cfg)
+        index.audit['entity_pose_pruned_or_dropped'] = sum(len(v) for v in entity_ranked.values()) - sum(map(len, entity_candidates.values())) - entity_drop
+        index.audit['entity_voted_templates'] = len(entity_ranked)
         if exact:
             entity_candidates = {eid: dense for eid in giii.entity_nodes}
         invalid_entities = {}
@@ -3369,6 +3629,7 @@ class HierarchyRetriever:
                 positions = list(match.member_positions.values())
                 if len(positions) < min(self.cfg.graph_min_members, len(entity.component_edges)):
                     match.accepted = False
+                    match.rejection_reasons.append('insufficient_distinct_members')
                 if len(set(positions)) != len(positions):
                     # Co-located DIFFERENT modalities are valid; repeated semantic roles are not.
                     seen = set()
@@ -3376,7 +3637,9 @@ class HierarchyRetriever:
                         key = (entity.component_edges[role]['sem_id'], point)
                         if key in seen:
                             match.accepted = False
+                            match.rejection_reasons.append('duplicate_semantic_role_position')
                         seen.add(key)
+            record(3, eid, matches)
             result.entities.extend(self.matcher.nms(matches, limit=None if exact else self.cfg.graph_poses_per_node))
         hit_bits = 0
         for cls, _, _ in events:
@@ -3386,7 +3649,10 @@ class HierarchyRetriever:
         result.diagnostics = {'mode': 'dense_translation' if exact else 'sparse_translation',
             'search_complete': bool(exact and not index.invalid and not invalid_entities),
             'assignment_search_complete': False,
-            'classes': len(index.classes), 'feature_events': len(events),
+            **index.audit, 'region_candidates': sum(map(len, candidates.values())),
+            'weak_regions': len(weak_regions), 'accepted_regions': len(result.regions),
+            'entity_candidates': sum(map(len, entity_candidates.values())),
+            'trace': trace_rows, 'classes': len(index.classes), 'feature_events': len(events),
             'event_budget_dropped': event_drop, 'candidate_budget_dropped': dropped + entity_drop,
             'posting_visits': visits + entity_visits, 'geometry_evaluations': refinements,
             'response_maps_computed': provider.map_computations,
@@ -3396,6 +3662,37 @@ class HierarchyRetriever:
             'elapsed': time.perf_counter() - start,
             'limitations': ['Translation only; sparse search is approximate.',
                            'Deterministic local assignment rejects conflicts; no combinatorial backtracking.']}
+        policy = self.cfg.graph_structural_recall_policy
+        if policy not in {'missing', 'weak_or_missing', 'always'}:
+            raise ValueError('Invalid structural recall policy')
+        ranked_scores = sorted(result.activation.values(), reverse=True)
+        uncertain = (not ranked_scores or ranked_scores[0] < self.cfg.graph_learn_threshold or
+                     (len(ranked_scores) > 1 and ranked_scores[0]-ranked_scores[1] < self.cfg.graph_match_margin))
+        need_fallback = policy == 'always' or not result.entities or (policy == 'weak_or_missing' and uncertain)
+        if (not exact and _structural_centers is None and self.cfg.graph_structural_recall_fallback
+                and giii.entity_nodes and need_fallback):
+            # Derive geometry without labels, write witnesses, or persistent mutation.
+            report = OnceGraphBuilder(self.cfg).build_once(features, GmemoryI(), GmemoryII(self.cfg),
+                                                          valid_mask=valid_mask)
+            centers = defaultdict(list)
+            for region in report.regions:
+                if region.anchor is not None:
+                    centers[region.modality_id].append((region.anchor % w, region.anchor // w))
+            fallback = self.query(features, gi, gii, giii, valid_mask, exact=False,
+                                  trace=trace, _structural_centers=centers)
+            # Supplementary candidates must not erase previously accepted hypotheses.
+            combined = result.entities + fallback.entities
+            fallback.entities = [match for eid in sorted({m.template_id for m in combined})
+                for match in self.matcher.nms([m for m in combined if m.template_id == eid],
+                                             limit=self.cfg.graph_poses_per_node)]
+            fallback.activation = {eid: max(m.score for m in fallback.entities if m.template_id == eid)
+                                   for eid in {m.template_id for m in fallback.entities}}
+            fallback.diagnostics['structural_fallback'] = True
+            fallback.diagnostics['fallback_policy'] = policy
+            fallback.diagnostics['initial_sparse'] = result.diagnostics
+            fallback.diagnostics['elapsed'] = time.perf_counter()-start
+            return fallback
+        result.diagnostics['structural_fallback'] = _structural_centers is not None
         return result
 
 
@@ -3447,7 +3744,7 @@ class GraphConsolidationOptimizer:
             digest.update(tensor.numpy().tobytes())
         return digest.hexdigest()
 
-    def _region_match(self, region, report, gi, gii, provider, prior, budget=None, coarse=None):
+    def _region_match(self, region, report, gi, gii, provider, prior, budget=None, coarse=None, candidate_sink=None):
         if not gi.nodes:
             return None, False
         # Exhaustive local translation fallback: a sparse global miss is not novelty.
@@ -3505,6 +3802,8 @@ class GraphConsolidationOptimizer:
                     choices.append(best)
         self.work_counts['local_response_maps_computed'] += local.map_computations
         choices.sort(key=lambda m: (-m.score, m.template_id))
+        if candidate_sink is not None and not unresolved:
+            candidate_sink.extend(choices)
         if len(choices) > 1 and choices[0].score - choices[1].score < self.cfg.graph_match_margin:
             return None, True
         return (choices[0], False) if choices else (None, unresolved)

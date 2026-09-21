@@ -40,23 +40,33 @@ class SupervisedExperiment:
         self.transform = ObjectViewTransform(learner.config)
         self.readout = ClassEvidenceReadout(learner.classes, learner.config)
 
-    def _objects(self, split):
-        for image_id in self.splits['splits'][split]:
+    def _objects(self, split, image_ids=None):
+        for image_id in (self.splits['splits'][split] if image_ids is None else image_ids):
             image, objects = self.dataset.load_image_objects(image_id)
             for annotation in objects:
                 if annotation.class_id in self.learner.classes:
                     others = [a.bbox for a in objects if a.object_id != annotation.object_id]
                     yield annotation, self.transform.make_view(image, annotation, other_boxes=others)
 
-    def build_memory(self, search_budget=None, on_result=None):
+    def image_window(self, split, max_images=None, start_image=0):
+        if not isinstance(start_image, int) or start_image < 0:
+            raise ValueError('start_image must be a nonnegative integer')
+        if max_images is not None and (not isinstance(max_images, int) or max_images < 1):
+            raise ValueError('max_images must be positive or None')
+        ids = self.splits['splits'][split]
+        return ids[start_image:None if max_images is None else start_image + max_images]
+
+    def build_memory(self, search_budget=None, on_result=None, max_images=None,
+                     start_image=0, profile_stages=False):
         results = []
-        for annotation, observation in self._objects('memory_build'):
+        ids = self.image_window('memory_build', max_images, start_image)
+        for annotation, observation in self._objects('memory_build', ids):
             start = time.perf_counter()
             features = self.encoder(observation)
             if torch.device(self.learner.cfg.device).type == 'cuda':
                 torch.cuda.synchronize(self.learner.cfg.device)
             encoded_at = time.perf_counter()
-            result = self.learner.learn_object(observation, features, search_budget)
+            result = self.learner.learn_object(observation, features, search_budget, profile_stages=profile_stages)
             if torch.device(self.learner.cfg.device).type == 'cuda':
                 torch.cuda.synchronize(self.learner.cfg.device)
             result.update(image_id=annotation.image_id, object_id=annotation.object_id,
@@ -65,15 +75,47 @@ class SupervisedExperiment:
             results.append(result)
             if on_result is not None:
                 on_result(result)
-        return {'objects': results, 'status_counts': dict(Counter(r['status'] for r in results))}
+        return {'objects': results, 'status_counts': dict(Counter(r['status'] for r in results)),
+                'image_ids': ids, 'start_image': start_image, 'max_images': max_images}
 
     @torch.no_grad()
-    def query_split(self, split, exact=False):
+    def audit_memory_recall(self, max_images=None, start_image=0, on_result=None):
+        """Frozen training recall, distinct from ledger replay and held-out evaluation."""
+        version = self.learner.graph_version
+        rows = []
+        for annotation, observation in self._objects('memory_build', self.image_window('memory_build', max_images, start_image)):
+            entry = self.learner.ledger.get(observation.ledger_key)
+            if entry is None:
+                row = {'image_id': annotation.image_id, 'object_id': annotation.object_id,
+                       'status': 'NOT_COMMITTED', 'class_id': annotation.class_id}
+            else:
+                features = self.encoder(observation)
+                query = self.learner.model.query_hierarchy(features, valid_mask=observation.valid_mask)
+                target = entry['entity_id']
+                hits = [m.template_id for m in query.entities]
+                labels = [self.learner.model.gmem_iii.entity_nodes[eid].supervision['label_id'] for eid in hits]
+                row = {'image_id': annotation.image_id, 'object_id': annotation.object_id,
+                       'class_id': annotation.class_id, 'target_entity_id': target, 'hits': hits,
+                       'status': 'TARGET_HIT' if target in hits else 'SAME_CLASS_ONLY' if annotation.class_id in labels
+                                 else 'WRONG_CLASS_ONLY' if hits else 'NO_HIT',
+                       'structural_fallback': query.diagnostics.get('structural_fallback', False),
+                       'graph_version': version}
+            rows.append(row)
+            if on_result is not None:
+                on_result(row)
+            if self.learner.graph_version != version:
+                raise RuntimeError('Graph changed during frozen recall audit')
+        return {'graph_version': version, 'rows': rows,
+                'status_counts': dict(Counter(row['status'] for row in rows)),
+                'evaluation_kind': 'training_recall_not_generalization'}
+
+    @torch.no_grad()
+    def query_split(self, split, exact=False, max_images=None, start_image=0):
         if split not in ('readout_fit', 'validation', 'test'):
             raise ValueError('Classification caches must be independent of memory_build')
         rows, targets, source_ids, predictions, timings = [], [], [], [], []
         version = self.learner.graph_version
-        for annotation, observation in self._objects(split):
+        for annotation, observation in self._objects(split, self.image_window(split, max_images, start_image)):
             # The annotation supplies a box for task A only; its label is never passed to retrieval/readout.
             start = time.perf_counter()
             features = self.encoder(observation)
