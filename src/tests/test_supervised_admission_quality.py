@@ -49,6 +49,7 @@ class AdmissionQualityTests(unittest.TestCase):
                  query_hierarchy=lambda *args,**kwargs:NS(entities=[NS(template_id=3)],diagnostics={}))
         exp.learner=NS(graph_version=2,ledger={'committed':{'entity_id':3}},model=model)
         exp.encoder=lambda observation:{}
+        exp.readout=NS(encode=lambda *args:{},predict=lambda *args:{"class_id":"cat"})
         result=exp.audit_memory_recall()
         self.assertEqual(result['status_counts'],{'TARGET_HIT':1,'NOT_COMMITTED':1})
         self.assertEqual(exp.learner.graph_version,2)

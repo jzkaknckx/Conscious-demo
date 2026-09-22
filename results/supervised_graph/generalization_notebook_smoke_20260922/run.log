@@ -1,0 +1,49 @@
+CELL 1
+{'device': 'cpu', 'torch': '2.10.0+cu128', 'voc_root': '/home/p/code/datasets/VOC2007/VOCdevkit/VOC2007', 'output': '/home/p/code/Conscious-linux/Conscious-demo/results/supervised_graph/voc2007_20260922_221701_080104'}
+CELL 3
+CELL 5
+notebook_cell_5:40: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+{'image_id': '007530', 'bbox': (182.0, 60.0, 326.0, 167.0), 'round_trip': (182.0, 60.0, 326.0, 167.0)}
+{'image_id': '000209', 'bbox': (13.0, 75.0, 400.0, 375.0), 'round_trip': (13.0, 75.00000000000001, 400.0, 375.0)}
+CELL 7
+segmentation contract: {'mode': 'grad_refined', 'grad_continuity_threshold': 0.6, 'version': 4}
+CELL 9
+分区对照未运行；设置 RUN_PARTITION_COMPARISON=True 后执行此格。
+CELL 11
+两张单图演示已关闭。
+CELL 13
+第二张单图演示已关闭。
+CELL 15
+segmentation contract: {'mode': 'grad_refined', 'grad_continuity_threshold': 0.6, 'version': 4}
+pending maintenance: {'changed': True, 'graph_version': 35, 'region_states': {'pending': 279, 'resolved_local': 328}, 'unresolved_entities': 31}
+完整建图集: 549 本次原图数: 1 起点: 0 日志: results/supervised_graph/generalization_notebook_smoke_20260922
+{'image_id': '003671', 'object_id': '0', 'class_id': 'dog', 'status': 'ALREADY_OBSERVED', 'reason': None, 'entity_id': 0, 'independent_support': None, 'encoder_seconds': 0.009032458998262882, 'total_seconds': 0.009154307015705854, 'reuse_unresolved': False, 'geometry_repaired': False, 'initial_write_rejection': [], 'geometry_retry_prior_stage_seconds': {}, 'reuse_decisions': {}, 'stage_seconds': {'validation': 0.00010270398342981935}, 'work_counts': {}, 'modality_counts': {}, 'GmemI': 12467, 'GmemII': 758, 'GmemIII': 34, 'peak_rss_bytes': 1005666304, 'rss_bytes': 1005666304}
+{'ALREADY_OBSERVED': 1}
+memory invariants: {'broken_roles': 0, 'nonfinite_prototypes': 0, 'bad_ledger': 0, 'modality_patterns': {(0, 2, 3, 4): 2, (0, 1, 2, 3, 4): 32}, 'visually_confirmed': 0}
+CELL 17
+notebook_cell_17:22: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+review run: generalization_notebook_smoke_20260922 log: results/supervised_graph/generalization_notebook_smoke_20260922/learning.jsonl
+CELL 19
+query 002215 0 no_accepted_entity
+query 002215 1 no_accepted_entity
+query 002215 2 no_accepted_entity
+query 002215 3 no_accepted_entity
+query 002215 4 no_accepted_entity
+readout_fit accepted unique rows: 1 weak unique rows: 5
+query 000007 0 no_accepted_entity
+validation {'accuracy': 0.0, 'macro_f1': 0.0, 'recall': {'cat': 0.0, 'dog': 0.0, 'car': 0.0}, 'confusion': [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 1]], 'prediction_columns': ['cat', 'dog', 'car', 'REJECTED_OR_UNRESOLVED'], 'coverage': 0.0, 'accepted_accuracy': None, 'unresolved_rate': 1.0, 'samples': 1}
+validation accepted unique rows: 1 weak unique rows: 1
+query 000001 0 no_accepted_entity
+test {'accuracy': 0.0, 'macro_f1': 0.0, 'recall': {'cat': 0.0, 'dog': 0.0, 'car': 0.0}, 'confusion': [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 0, 0]], 'prediction_columns': ['cat', 'dog', 'car', 'REJECTED_OR_UNRESOLVED'], 'coverage': 0.0, 'accepted_accuracy': None, 'unresolved_rate': 1.0, 'samples': 1}
+test accepted unique rows: 1 weak unique rows: 1
+CELL 21
+CELL 23
+训练集回查未启动；它与留出集 RUN_QUERY 分开执行。
+CELL 25
+CELL 27
+{'graph_version_equal': True, 'ledger_equal': True, 'counts_equal': True, 'replay_idempotent': True, 'query_equivalent': True}
+全部结果目录: results/supervised_graph/generalization_notebook_smoke_20260922
+readout: {'validation': {'accuracy': 0.0, 'macro_f1': 0.0, 'recall': {'cat': 0.0, 'dog': 0.0, 'car': 0.0}, 'confusion': [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 1]], 'prediction_columns': ['cat', 'dog', 'car', 'REJECTED_OR_UNRESOLVED'], 'coverage': 0.0, 'accepted_accuracy': None, 'unresolved_rate': 1.0, 'samples': 1}, 'test': {'accuracy': 0.0, 'macro_f1': 0.0, 'recall': {'cat': 0.0, 'dog': 0.0, 'car': 0.0}, 'confusion': [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 0, 0]], 'prediction_columns': ['cat', 'dog', 'car', 'REJECTED_OR_UNRESOLVED'], 'coverage': 0.0, 'accepted_accuracy': None, 'unresolved_rate': 1.0, 'samples': 1}}
+recall: None
+new algorithm: None
+NOTEBOOK_SMOKE_PASSED

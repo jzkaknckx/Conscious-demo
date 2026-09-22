@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from .supervised_data import SupervisedConfig
+from .pending_associations import normalize_pending, review_regions, review_entities, pending_summary
 from .graph_memorypool_onceoptimizer import (
     GmemoryI, GmemoryII, GraphConsolidationOptimizer, FeatureResponseCache,
     BinaryCoarseIndex, HierarchyQuery, SearchBudget, SearchBudgetExceeded,
@@ -329,6 +330,7 @@ class SupervisedGraphOptimizer:
                 if alignment:
                     choices.append((alignment[0], eid, alignment))
             choices.sort(key=lambda item: (-item[0], item[1]))
+            verified_alignments = list(choices)
             if len(choices) > 1 and choices[0][0]-choices[1][0] < self.cfg.graph_match_margin:
                 unresolved_entities.extend(item[1] for item in choices)
                 choices = []  # preserve a protected observation, never merge competing entities
@@ -466,10 +468,15 @@ class SupervisedGraphOptimizer:
             member['last_quality'] = dict(q)
             member['is_family_root'] = families[rid] == rid
         entity.supervision.setdefault('pending_reuse', {})[episode] = {
-            'regions': {rid: value for rid, value in reuse_decisions.items() if value['state'] in ('ambiguous_reuse', 'local_geometry_repair')},
+            'regions': {rid: {**value, 'local_semantic_id': mapped[rid]} for rid, value in reuse_decisions.items() if value['state'] in ('ambiguous_reuse', 'local_geometry_repair')},
             'entity_candidates': sorted(set(unresolved_entities))}
         entity.supervision['reuse_unresolved'] = any(
             item['regions'] or item['entity_candidates'] for item in entity.supervision['pending_reuse'].values())
+        normalize_pending(entity)
+        if choices:
+            review_regions(entity, wii, FeatureResponseCache(inputs, wi, self.cfg, observation.valid_mask),
+                           alignment[1], episode, self.cfg)
+            review_entities(entity, wiii.entity_nodes, verified_alignments, episode, self.cfg)
         entity.status = 'stable'
         metadata = entity.supervision
         metadata['annotation_ids'].add(a.annotation_id)
@@ -487,11 +494,16 @@ class SupervisedGraphOptimizer:
                                                                     write_provider, [write_center])
         if not verified_write or not verified_write[0].accepted:
             if not _local_geometry_retry:
+                stage('retry')  # Close the first attempt before timing its replacement.
                 repaired = self.learn_object(observation, features, search_budget=budget,
                     capture_debug=capture_debug, profile_stages=profile_stages, _local_geometry_retry=True)
                 repaired['geometry_repaired'] = repaired['status'] in ('ANNOTATED_SEED_CREATED', 'MATCHED_UPDATED')
                 repaired['initial_write_rejection'] = [m.summary() for m in verified_write]
                 repaired['geometry_retry_prior_stage_seconds'] = dict(stage_seconds)
+                combined_stages = dict(repaired['stage_seconds'])
+                for name, seconds in stage_seconds.items():
+                    combined_stages[name] = combined_stages.get(name, 0.)+seconds
+                repaired['stage_seconds'] = combined_stages
                 repaired['seconds'] = time.perf_counter()-started
                 return repaired
             return result('UNRESOLVED', reason='local observation fails write geometry validation',
@@ -536,6 +548,24 @@ class SupervisedGraphOptimizer:
                 'known_pose_entity': [m.summary() for m in entity_matches], 'known_pose_regions': regions,
                 'ordinary_target_hit': any(m.template_id == eid for m in query.entities),
                 'ordinary_entities': [m.summary() for m in query.entities], 'query': query.diagnostics}
+
+    def maintain_pending(self):
+        """Explicit metadata migration before evaluation; invalidates existing readout caches."""
+        entities = copy.deepcopy(self.model.gmem_iii.entity_nodes)
+        changed = False
+        for entity in entities.values():
+            if not getattr(entity, 'supervision', None): continue
+            updated = normalize_pending(entity)
+            if updated:
+                entity.version += 1
+                entity.supervision['visually_confirmed'] = (not entity.supervision['reuse_unresolved'] and
+                    entity.evidence.support >= self.cfg.graph_stable_support and
+                    max((max(m['evidence'].variance()) for m in entity.component_edges.values()), default=0.) <= self.cfg.graph_stable_variance)
+            changed |= updated
+        if changed:
+            self.model.gmem_iii.entity_nodes = entities
+            self.graph_version += 1
+        return {'changed': changed, 'graph_version': self.graph_version, **pending_summary(entities)}
 
     def withdraw_entity(self, entity_id):
         """Explicitly withdraw the whole template; partial evidence subtraction needs rebuilding."""

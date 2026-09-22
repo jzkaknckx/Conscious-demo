@@ -1,4 +1,5 @@
 """Fixed-vocabulary graph classification, frozen-graph head fitting and ROI detection."""
+from collections import Counter
 import copy
 import math
 from dataclasses import asdict
@@ -76,7 +77,10 @@ class ClassEvidenceReadout:
             metadata = coordinator.gmem_iii.entity_nodes[match.template_id].supervision
             relative = metadata['canonical_box_relative_to_root']
             box = observation.box_to_original(tuple(v+match.point[i % 2] for i, v in enumerate(relative)))
-        return {'status': status, 'class_id': self.classes[top] if accepted else None,
+        rejection = None if accepted else ('no_accepted_entity' if not found else
+                    'class_score_below_threshold' if scores[top] < self.config.classification_threshold
+                    else 'class_margin_below_threshold')
+        return {'rejection_reason': rejection, 'status': status, 'class_id': self.classes[top] if accepted else None,
                 'scores': {c: float(v) for c, v in zip(self.classes, scores)},
                 'top_k': [(self.classes[int(i)], float(scores[i])) for i in ranking[:5]],
                 'entity_id': match.template_id if match else None, 'point': match.point if match else None,
@@ -98,6 +102,7 @@ class ClassifierTrainer:
         self.optimizer = torch.optim.Adam(self.head.parameters(), lr=self.config.learning_rate, weight_decay=self.config.weight_decay)
         self.history = []
         self.mode = 'single_label'
+        self.feature_source = 'accepted'
 
     def _validate_batch(self, batch, split):
         if batch['split'] != split or batch['graph_version'] != self.graph_version or tuple(batch['classes']) != self.classes:
@@ -110,6 +115,9 @@ class ClassifierTrainer:
         return x.to(self.device), y.to(self.device)
 
     def fit(self, training, validation, memory_source_ids, multilabel=False):
+        self.feature_source = training.get('feature_source', 'accepted')
+        if validation.get('feature_source', 'accepted') != self.feature_source:
+            raise ValueError('Training and validation evidence sources differ')
         x, y = self._validate_batch(training, 'readout_fit')
         vx, vy = self._validate_batch(validation, 'validation')
         train_sources, val_sources, memory_sources = set(training['source_ids']), set(validation['source_ids']), set(memory_source_ids)
@@ -180,7 +188,7 @@ class ClassifierTrainer:
     def state_dict(self):
         return {'classes': self.classes, 'graph_version': self.graph_version, 'config': asdict(self.config),
                 'head': copy.deepcopy(self.head.state_dict()), 'optimizer': copy.deepcopy(self.optimizer.state_dict()),
-                'mode': self.mode, 'history': copy.deepcopy(self.history)}
+                'mode': self.mode, 'history': copy.deepcopy(self.history), 'feature_source': self.feature_source}
 
     def load_state_dict(self, state):
         if tuple(state['classes']) != self.classes or state['graph_version'] != self.graph_version or state['config'] != asdict(self.config):
@@ -188,6 +196,7 @@ class ClassifierTrainer:
         self.head.load_state_dict(state['head'])
         self.optimizer.load_state_dict(state['optimizer'])
         self.mode, self.history = state['mode'], copy.deepcopy(state['history'])
+        self.feature_source = state.get('feature_source', 'accepted')
 
 
 def classification_metrics(targets, predictions, classes):
@@ -259,12 +268,19 @@ class ProposalDetector:
         # No ground-truth annotations or labels are accepted by this inference API.
         proposals, complete = self.proposals(*image.shape[-2:])
         detections, unresolved = [], 0
+        proposal_audits = []
+        rejected = Counter()
         for i, box in enumerate(proposals):
             annotation = ObjectAnnotation(image_id, str(i), None, box, f'proposal:{i}')
             observation = self.transform.make_view(image, annotation)
             query = self.learner.model.query_hierarchy(self.encoder(observation), valid_mask=observation.valid_mask, exact=exact)
             evidence = self.readout.encode(query, self.learner.model, self.learner.graph_version)
             unresolved += not evidence['search_complete']
+            prediction = self.readout.predict(evidence, self.learner.model, observation)
+            rejected[prediction['rejection_reason'] or 'accepted_readout'] += 1
+            proposal_audits.append({'proposal_id': i, 'box': box, 'prediction': prediction,
+                                   'accepted_entities': len(query.entities),
+                                   'structural_fallback': query.diagnostics.get('structural_fallback', False)})
             # Retain every accepted instance, not just one maximum per class.
             for match in query.entities:
                 entity = self.learner.model.gmem_iii.entity_nodes[match.template_id]
@@ -281,11 +297,14 @@ class ProposalDetector:
                         'bbox': recovered, 'entity_id': match.template_id, 'proposal_id': i})
         return {'detections': classwise_nms(detections, self.config.nms_iou), 'proposals': proposals,
                 'proposal_search_complete': complete, 'unresolved_proposals': unresolved,
+                'incomplete_search_proposals': unresolved, 'proposal_count': len(proposals),
+                'readout_rejections': dict(rejected), 'proposal_audits': proposal_audits,
                 'search_complete': complete and unresolved == 0, 'graph_version': self.learner.graph_version}
 
 
 def detection_metrics(predictions, annotations, classes, iou_threshold=.5, proposals=None):
     """All-point interpolated AP at one explicit IoU; no COCO multi-threshold claim."""
+    counts = {}
     ap, recall, errors = {}, {}, {'unmatched_or_localization': 0, 'duplicate': 0}
     for label in classes:
         truth = {}
@@ -308,6 +327,8 @@ def detection_metrics(predictions, annotations, classes, iou_threshold=.5, propo
                 errors['duplicate'] += 1
             else:
                 errors['unmatched_or_localization'] += 1
+        counts[label] = {'truth': total, 'tp': int(sum(tp)), 'fp': int(sum(fp)),
+                         'fn': total-int(sum(tp)), 'recall': sum(tp)/total if total else None}
         if not total:
             ap[label] = None
             continue
@@ -323,7 +344,7 @@ def detection_metrics(predictions, annotations, classes, iou_threshold=.5, propo
                 for image_id, boxes in truth.items() for box in boxes)/total
     valid = [v for v in ap.values() if v is not None]
     return {'iou_threshold': iou_threshold, 'ap': ap, 'map': float(np.mean(valid)) if valid else None,
-            'proposal_recall': recall, 'errors': errors}
+            'proposal_recall': recall, 'errors': errors, 'counts': counts}
 
 
 def multilabel_metrics(targets, scores, classes, threshold=.5):

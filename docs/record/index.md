@@ -2,6 +2,9 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-22_generalization_diagnostics_familiarity_pilot.md | 完善留出拒绝诊断、弱证据分类对照、pending 生命周期与恢复检查；默认开启 Notebook 全流程，六条件先导发现缩放/遮挡对应仍失败 | chatgpt | 2026-09-22 |
+| 2026-09-22_recall_generalization_experiments.md | 审查 34/34 训练回查、57 个留出对象全未决及单图空检测；澄清候选统计，提出失败漏斗、扰动阶梯和分类证据改进 | chatgpt | 2026-09-22 |
+| 2026-09-22_phd_research_proposal.md | 综合全部算法文档形成申博研究计划；纳入最新 34/34 完整训练回查，区分记忆保持与泛化，提出跨观察巩固及实验路线 | chatgpt | 2026-09-22 |
 | 2026-09-21_large_training_readiness_review.md | 最新 34/34 写入、25 次修复、31 个未决实体；冻结三点回查通过，审查待决退出、复用巩固、全体回查与扩容门槛 | chatgpt | 2026-09-21 |
 | 2026-09-21_admission_quality_implementation.md | 分离标注准入与区域复用，持续质量计权/family 覆盖、分支路径采样、提交前几何修复和冻结回查；22 项回归及三图顺序验证 | chatgpt | 2026-09-21 |
 | 2026-09-21_postcorrection_learning_review.md | 审查最新 CUDA 两图及 20 图批量：自检成功、五模态入图，但 19/34 因局部歧义弃写；提出新类准入、质量计权与 family 对应方案 | chatgpt | 2026-09-21 |

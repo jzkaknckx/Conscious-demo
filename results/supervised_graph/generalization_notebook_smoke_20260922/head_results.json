@@ -1,0 +1,10 @@
+{
+  "accepted": {
+    "status": "SKIPPED",
+    "reason": "fit window lacks a class; expand the window"
+  },
+  "weak": {
+    "status": "SKIPPED",
+    "reason": "fit window lacks a class; expand the window"
+  }
+}

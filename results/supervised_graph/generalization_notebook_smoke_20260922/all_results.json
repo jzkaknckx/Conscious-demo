@@ -1,0 +1,115 @@
+{
+  "run_id": "generalization_notebook_smoke_20260922",
+  "graph_version": 35,
+  "memory": {
+    "GmemI": 12467,
+    "GmemII": 758,
+    "GmemIII": 34
+  },
+  "readout_metrics": {
+    "validation": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 0.0,
+      "accepted_accuracy": null,
+      "unresolved_rate": 1.0,
+      "samples": 1
+    },
+    "test": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 0.0,
+      "accepted_accuracy": null,
+      "unresolved_rate": 1.0,
+      "samples": 1
+    }
+  },
+  "head_results": {
+    "accepted": {
+      "status": "SKIPPED",
+      "reason": "fit window lacks a class; expand the window"
+    },
+    "weak": {
+      "status": "SKIPPED",
+      "reason": "fit window lacks a class; expand the window"
+    }
+  },
+  "resume_check": {
+    "graph_version_equal": true,
+    "ledger_equal": true,
+    "counts_equal": true,
+    "replay_idempotent": true,
+    "query_equivalent": true
+  },
+  "pending_maintenance": {
+    "changed": true,
+    "graph_version": 35,
+    "region_states": {
+      "pending": 279,
+      "resolved_local": 328
+    },
+    "unresolved_entities": 31
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "image_id": "007530",
+    "class": "cat",
+    "status": "ANNOTATED_SEED_CREATED",
+    "encoder_seconds": 0.010215804970357567,
+    "learn_seconds": 1.3044603129965253,
+    "GmemI": 321,
+    "GmemII": 24,
+    "GmemIII": 1,
+    "peak_rss_bytes": 1059098624,
+    "rss_bytes": 1059098624
+  },
+  {
+    "image_id": "000209",
+    "class": "cat",
+    "status": "ANNOTATED_SEED_CREATED",
+    "encoder_seconds": 0.008971542003564537,
+    "learn_seconds": 3.8161864280118607,
+    "GmemI": 750,
+    "GmemII": 48,
+    "GmemIII": 2,
+    "peak_rss_bytes": 1215340544,
+    "rss_bytes": 1197711360
+  }
+]

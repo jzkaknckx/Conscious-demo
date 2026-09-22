@@ -3652,7 +3652,12 @@ class HierarchyRetriever:
             **index.audit, 'region_candidates': sum(map(len, candidates.values())),
             'weak_regions': len(weak_regions), 'accepted_regions': len(result.regions),
             'entity_candidates': sum(map(len, entity_candidates.values())),
-            'trace': trace_rows, 'classes': len(index.classes), 'feature_events': len(events),
+            'trace': trace_rows,
+            'local_hypotheses': [m.summary() for m in weak_regions] if trace else [],
+            'gate_counts': {mid: {'finite_pixels': int(torch.isfinite(x).all(1).sum().item()),
+                                  'gate_pixels': int((provider.gates[mid] > 0).sum().item())}
+                            for mid, x in provider.inputs.items()} if trace else {},
+            'classes': len(index.classes), 'feature_events': len(events),
             'event_budget_dropped': event_drop, 'candidate_budget_dropped': dropped + entity_drop,
             'posting_visits': visits + entity_visits, 'geometry_evaluations': refinements,
             'response_maps_computed': provider.map_computations,

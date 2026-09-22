@@ -1,0 +1,417 @@
+{
+  "graph_version": 34,
+  "rows": [
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 0,
+      "hits": [
+        0
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 1,
+      "hits": [
+        1
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "007490",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 2,
+      "hits": [
+        2
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "class_id": "cat",
+      "target_entity_id": 3,
+      "hits": [
+        3
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "007900",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 4,
+      "hits": [
+        4
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005156",
+      "object_id": "2",
+      "class_id": "car",
+      "target_entity_id": 5,
+      "hits": [
+        5
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "001239",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 6,
+      "hits": [
+        6
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "001239",
+      "object_id": "1",
+      "class_id": "dog",
+      "target_entity_id": 7,
+      "hits": [
+        7
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "001239",
+      "object_id": "2",
+      "class_id": "dog",
+      "target_entity_id": 8,
+      "hits": [
+        8
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008558",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 9,
+      "hits": [
+        9
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008558",
+      "object_id": "1",
+      "class_id": "dog",
+      "target_entity_id": 10,
+      "hits": [
+        10
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008558",
+      "object_id": "2",
+      "class_id": "dog",
+      "target_entity_id": 11,
+      "hits": [
+        11
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "004228",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 12,
+      "hits": [
+        12
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "004228",
+      "object_id": "2",
+      "class_id": "car",
+      "target_entity_id": 13,
+      "hits": [
+        13
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 14,
+      "hits": [
+        14
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "7",
+      "class_id": "car",
+      "target_entity_id": 15,
+      "hits": [
+        15
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "8",
+      "class_id": "car",
+      "target_entity_id": 16,
+      "hits": [
+        16
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "9",
+      "class_id": "car",
+      "target_entity_id": 17,
+      "hits": [
+        17
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "11",
+      "class_id": "car",
+      "target_entity_id": 18,
+      "hits": [
+        18
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "12",
+      "class_id": "car",
+      "target_entity_id": 19,
+      "hits": [
+        19
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005071",
+      "object_id": "14",
+      "class_id": "car",
+      "target_entity_id": 20,
+      "hits": [
+        20
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "002056",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 21,
+      "hits": [
+        21
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "000036",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 22,
+      "hits": [
+        22
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008980",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 23,
+      "hits": [
+        23
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008968",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 24,
+      "hits": [
+        24
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "000209",
+      "object_id": "0",
+      "class_id": "cat",
+      "target_entity_id": 25,
+      "hits": [
+        25
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "001404",
+      "object_id": "0",
+      "class_id": "cat",
+      "target_entity_id": 26,
+      "hits": [
+        26
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "006459",
+      "object_id": "6",
+      "class_id": "car",
+      "target_entity_id": 27,
+      "hits": [
+        27
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "007905",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 28,
+      "hits": [
+        28
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005273",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 29,
+      "hits": [
+        29
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "005273",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 30,
+      "hits": [
+        30
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "003261",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 31,
+      "hits": [
+        31
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008169",
+      "object_id": "0",
+      "class_id": "cat",
+      "target_entity_id": 32,
+      "hits": [
+        32
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    },
+    {
+      "image_id": "008169",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 33,
+      "hits": [
+        33
+      ],
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 34
+    }
+  ],
+  "status_counts": {
+    "TARGET_HIT": 34
+  },
+  "evaluation_kind": "training_recall_not_generalization"
+}

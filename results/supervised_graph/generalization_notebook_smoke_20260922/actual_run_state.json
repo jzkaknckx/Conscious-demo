@@ -1,0 +1,7 @@
+{
+  "run_id": "generalization_notebook_smoke_20260922",
+  "graph_version": 35,
+  "ledger_size": 34,
+  "resume_from": "/home/p/code/Conscious-linux/Conscious-demo/results/supervised_graph/voc2007_20260921_231411_853393/memory.pt",
+  "device": "cpu"
+}

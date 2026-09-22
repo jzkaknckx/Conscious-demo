@@ -1,0 +1,116 @@
+{
+  "accepted": {
+    "status": "SKIPPED",
+    "reason": "constant evidence vectors; head cannot recover missing information"
+  },
+  "weak": {
+    "status": "FIT",
+    "feature_source": "weak",
+    "history": [
+      {
+        "epoch": 0,
+        "validation_loss": 0.8847208023071289
+      },
+      {
+        "epoch": 1,
+        "validation_loss": 0.8877469301223755
+      },
+      {
+        "epoch": 2,
+        "validation_loss": 0.8909618854522705
+      },
+      {
+        "epoch": 3,
+        "validation_loss": 0.8943642377853394
+      },
+      {
+        "epoch": 4,
+        "validation_loss": 0.8979438543319702
+      },
+      {
+        "epoch": 5,
+        "validation_loss": 0.9016867876052856
+      }
+    ],
+    "metrics": {
+      "validation": {
+        "accuracy": 0.5384615384615384,
+        "macro_f1": 0.2333333333333333,
+        "recall": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 1.0
+        },
+        "confusion": [
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            14,
+            0
+          ]
+        ],
+        "prediction_columns": [
+          "cat",
+          "dog",
+          "car",
+          "REJECTED_OR_UNRESOLVED"
+        ],
+        "coverage": 1.0,
+        "accepted_accuracy": 0.5384615384615384,
+        "unresolved_rate": 0.0,
+        "samples": 26
+      },
+      "test": {
+        "accuracy": 0.5161290322580645,
+        "macro_f1": 0.22695035460992907,
+        "recall": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 1.0
+        },
+        "confusion": [
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            9,
+            0
+          ],
+          [
+            0,
+            0,
+            16,
+            0
+          ]
+        ],
+        "prediction_columns": [
+          "cat",
+          "dog",
+          "car",
+          "REJECTED_OR_UNRESOLVED"
+        ],
+        "coverage": 1.0,
+        "accepted_accuracy": 0.5161290322580645,
+        "unresolved_rate": 0.0,
+        "samples": 31
+      }
+    }
+  }
+}
