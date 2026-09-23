@@ -1,0 +1,2183 @@
+{
+  "graph_version": 35,
+  "cohort_objects": 3,
+  "rows": [
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "identity",
+      "target_entity_id": 0,
+      "target_hit": true,
+      "class_id": "dog",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999951124191284,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999951124191284
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 0,
+        "point": [
+          200.0,
+          86.0
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 0,
+      "candidate_pose": [
+        200.0,
+        86.0
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 3,
+      "anchor_span": 0.2658873334197344,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "2",
+          "familiar": 0.9999945976279225,
+          "difference": 5.402372077356609e-06,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9999945976279226,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            193.84057971014494,
+            83.73913043478261
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.9999963937708143,
+          "difference": 3.60622918560427e-06,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9999963937708144,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            98.29007633587786,
+            72.06106870229007
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.9999984768315445,
+          "difference": 1.5231684556971108e-06,
+          "unknown": -2.220446049250313e-16,
+          "similarity": 0.9999984768315443,
+          "evaluable": 1.0000000000000002,
+          "center": [
+            180.46835443037975,
+            39.39873417721519
+          ]
+        }
+      ],
+      "map_coverage": 0.01629638671875,
+      "familiar": 0.9999964894100938,
+      "difference": 3.5105899062193298e-06,
+      "unknown": 0.0,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 3.427516958254273e-06,
+      "unknown_unchanged": -4.677906128105303e-18
+    },
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "translation",
+      "target_entity_id": 0,
+      "target_hit": true,
+      "class_id": "dog",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9997578859329224,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9997578859329224
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 0,
+        "point": [
+          203.99999999999997,
+          85.99999999999999
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 0,
+      "candidate_pose": [
+        203.99999999999997,
+        85.99999999999999
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 3,
+      "anchor_span": 0.2658873334197344,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "2",
+          "familiar": 0.9998441307321655,
+          "difference": 0.00015586926783439645,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9998441307321656,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            197.8405797101449,
+            83.7391304347826
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.999889663830335,
+          "difference": 0.00011033616966493741,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9998896638303351,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            102.29007633587784,
+            72.06106870229006
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.9999198446251073,
+          "difference": 8.01553748929207e-05,
+          "unknown": -2.220446049250313e-16,
+          "similarity": 0.9999198446251071,
+          "evaluable": 1.0000000000000002,
+          "center": [
+            184.46835443037972,
+            39.39873417721518
+          ]
+        }
+      ],
+      "map_coverage": 0.01629638671875,
+      "familiar": 0.9998845463958692,
+      "difference": 0.00011545360413075151,
+      "unknown": 0.0,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.0001136654318543151,
+      "unknown_unchanged": -4.677906128105303e-18
+    },
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "scale",
+      "target_entity_id": 0,
+      "target_hit": false,
+      "class_id": "dog",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 16,
+      "candidate_pose": [
+        -63.000000000000014,
+        62.00000000000001
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "1",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -65.92523364485982,
+            61.046728971962615
+          ]
+        },
+        {
+          "family": "2",
+          "familiar": 0.24174773856209608,
+          "difference": 0.06381577912099919,
+          "unknown": 0.6944364823169047,
+          "similarity": 0.7911538013278682,
+          "evaluable": 0.30556351768309525,
+          "center": [
+            47.233644859813076,
+            63.81308411214953
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -78.3700787401575,
+            42.496062992125985
+          ]
+        },
+        {
+          "family": "198",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -61.348837209302324,
+            98.51162790697674
+          ]
+        }
+      ],
+      "map_coverage": 0.0052032470703125,
+      "familiar": 0.06043693464052402,
+      "difference": 0.015953944780249796,
+      "unknown": 0.9236091205792262,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.06381577998399734,
+      "unknown_unchanged": 0.6944364905357361
+    },
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "brightness",
+      "target_entity_id": 0,
+      "target_hit": true,
+      "class_id": "dog",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999834895133972,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999834895133972
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 0,
+        "point": [
+          199.99999999999997,
+          86.00000000000003
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 0,
+      "candidate_pose": [
+        199.99999999999997,
+        86.00000000000003
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 3,
+      "anchor_span": 0.2658873334197344,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "2",
+          "familiar": 0.999981109024322,
+          "difference": 1.889097567786546e-05,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9999811090243221,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            193.8405797101449,
+            83.73913043478262
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.9999880487249748,
+          "difference": 1.1951275025068318e-05,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9999880487249749,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            98.29007633587784,
+            72.06106870229009
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.9999889952143772,
+          "difference": 1.1004785622992232e-05,
+          "unknown": -2.220446049250313e-16,
+          "similarity": 0.999988995214377,
+          "evaluable": 1.0000000000000002,
+          "center": [
+            180.46835443037972,
+            39.398734177215196
+          ]
+        }
+      ],
+      "map_coverage": 0.01629638671875,
+      "familiar": 0.9999860509878914,
+      "difference": 1.3949012108642002e-05,
+      "unknown": 0.0,
+      "difference_changed": 1.3727788427786436e-05,
+      "unknown_changed": -4.677906128105303e-18,
+      "difference_unchanged": null,
+      "unknown_unchanged": null
+    },
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "occlusion",
+      "target_entity_id": 0,
+      "target_hit": false,
+      "class_id": "dog",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 9,
+      "candidate_pose": [
+        308.0,
+        138.99999999999997
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "16",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            301.57142857142856,
+            146.56349206349202
+          ]
+        },
+        {
+          "family": "2",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            344.5,
+            90.2179487179487
+          ]
+        },
+        {
+          "family": "5",
+          "familiar": 0.1533566845426479,
+          "difference": 0.03481715527456449,
+          "unknown": 0.8118261601827876,
+          "similarity": 0.8149734558832139,
+          "evaluable": 0.1881738398172124,
+          "center": [
+            219.08609271523179,
+            72.55629139072846
+          ]
+        },
+        {
+          "family": "7",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            345.0,
+            22.24050632911392
+          ]
+        },
+        {
+          "family": "208",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            283.125,
+            53.70833333333332
+          ]
+        }
+      ],
+      "map_coverage": 0.0075531005859375,
+      "familiar": 0.03067133690852958,
+      "difference": 0.006963431054912898,
+      "unknown": 0.9623652320365575,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.034817155450582504,
+      "unknown_unchanged": 0.8118260502815247
+    },
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "layout_negative",
+      "target_entity_id": 0,
+      "target_hit": false,
+      "class_id": "dog",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 9,
+      "candidate_pose": [
+        308.0,
+        138.99999999999997
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "16",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            301.57142857142856,
+            146.56349206349202
+          ]
+        },
+        {
+          "family": "2",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            344.5,
+            90.2179487179487
+          ]
+        },
+        {
+          "family": "5",
+          "familiar": 0.1533566845426479,
+          "difference": 0.03481715527456449,
+          "unknown": 0.8118261601827876,
+          "similarity": 0.8149734558832139,
+          "evaluable": 0.1881738398172124,
+          "center": [
+            219.08609271523179,
+            72.55629139072846
+          ]
+        },
+        {
+          "family": "7",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            345.0,
+            22.24050632911392
+          ]
+        },
+        {
+          "family": "208",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            283.125,
+            53.70833333333332
+          ]
+        }
+      ],
+      "map_coverage": 0.0075531005859375,
+      "familiar": 0.03067133690852958,
+      "difference": 0.006963431054912898,
+      "unknown": 0.9623652320365575,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.034817155450582504,
+      "unknown_unchanged": 0.8118260502815247
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "identity",
+      "target_entity_id": 1,
+      "target_hit": true,
+      "class_id": "car",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999287128448486
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999287128448486
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 1,
+        "point": [
+          103.0,
+          86.0
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 1,
+      "candidate_pose": [
+        103.0,
+        86.0
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 6,
+      "anchor_span": 0.39167374390573595,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.9997904765281731,
+          "difference": 0.00020952347182667802,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.9997904765281733,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            93.57692307692308,
+            93.0
+          ]
+        },
+        {
+          "family": "3",
+          "familiar": 0.9999990934308617,
+          "difference": 9.065691383147723e-07,
+          "unknown": 0.0,
+          "similarity": 0.9999990934308617,
+          "evaluable": 1.0,
+          "center": [
+            177.96153846153845,
+            88.65384615384616
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.9999992973754781,
+          "difference": 7.026245217867099e-07,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9999992973754782,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            72.725,
+            168.15
+          ]
+        },
+        {
+          "family": "19",
+          "familiar": 0.9999923682982873,
+          "difference": 7.631701712695893e-06,
+          "unknown": 0.0,
+          "similarity": 0.9999923682982873,
+          "evaluable": 1.0,
+          "center": [
+            187.9512195121951,
+            116.26829268292683
+          ]
+        },
+        {
+          "family": "16",
+          "familiar": 0.9999974996654651,
+          "difference": 2.5003345346386037e-06,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.9999974996654654,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            213.0222222222222,
+            169.42222222222222
+          ]
+        },
+        {
+          "family": "210",
+          "familiar": 0.9999998035192367,
+          "difference": 1.9648076354794602e-07,
+          "unknown": -2.220446049250313e-16,
+          "similarity": 0.9999998035192365,
+          "evaluable": 1.0000000000000002,
+          "center": [
+            179.0,
+            134.6153846153846
+          ]
+        }
+      ],
+      "map_coverage": 0.032928466796875,
+      "familiar": 0.9999630898029171,
+      "difference": 3.691019708294366e-05,
+      "unknown": 5.551115123125783e-17,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 5.666106517310254e-05,
+      "unknown_unchanged": 7.588410679262647e-17
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "translation",
+      "target_entity_id": 1,
+      "target_hit": false,
+      "class_id": "car",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 1,
+      "candidate_pose": [
+        107.0,
+        86.00000000000001
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 6,
+      "anchor_span": 0.39167374390573595,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.8871245100255862,
+          "difference": 0.11287548997441352,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.8871245100255865,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            97.57692307692308,
+            93.00000000000001
+          ]
+        },
+        {
+          "family": "3",
+          "familiar": 0.9076367138655225,
+          "difference": 0.09236328613447753,
+          "unknown": 0.0,
+          "similarity": 0.9076367138655225,
+          "evaluable": 1.0,
+          "center": [
+            181.96153846153845,
+            88.65384615384617
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.9996890690432768,
+          "difference": 0.00031093095672307664,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9996890690432769,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            76.725,
+            168.15
+          ]
+        },
+        {
+          "family": "19",
+          "familiar": 0.9625074447110796,
+          "difference": 0.03749255528892037,
+          "unknown": 0.0,
+          "similarity": 0.9625074447110796,
+          "evaluable": 1.0,
+          "center": [
+            191.9512195121951,
+            116.26829268292686
+          ]
+        },
+        {
+          "family": "16",
+          "familiar": 0.8832755467937324,
+          "difference": 0.11672445320626731,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.8832755467937327,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            217.0222222222222,
+            169.42222222222222
+          ]
+        },
+        {
+          "family": "210",
+          "familiar": 0.9999997897311129,
+          "difference": 2.102688873018011e-07,
+          "unknown": -2.220446049250313e-16,
+          "similarity": 0.9999997897311127,
+          "evaluable": 1.0000000000000002,
+          "center": [
+            183.0,
+            134.6153846153846
+          ]
+        }
+      ],
+      "map_coverage": 0.032928466796875,
+      "familiar": 0.9400388456950518,
+      "difference": 0.05996115430494819,
+      "unknown": 5.551115123125783e-17,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.061852335929870605,
+      "unknown_unchanged": 7.588410679262647e-17
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "scale",
+      "target_entity_id": 1,
+      "target_hit": false,
+      "class_id": "car",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 5,
+      "candidate_pose": [
+        59.00000000000001,
+        84.0
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 1,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "28",
+          "familiar": 0.8533235865568566,
+          "difference": 0.14667641344314317,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.8533235865568568,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            64.45454545454545,
+            83.78787878787878
+          ]
+        },
+        {
+          "family": "43",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -2.7142857142857073,
+            116.0
+          ]
+        },
+        {
+          "family": "35",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -21.576923076923073,
+            180.92307692307693
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -8.073170731707313,
+            76.1829268292683
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -28.050420168067223,
+            106.99159663865547
+          ]
+        },
+        {
+          "family": "216",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            3.3333333333333406,
+            174.41666666666666
+          ]
+        },
+        {
+          "family": "212",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -19.999999999999996,
+            216.0
+          ]
+        }
+      ],
+      "map_coverage": 0.0091400146484375,
+      "familiar": 0.12190336950812238,
+      "difference": 0.020953773349020453,
+      "unknown": 0.8571428571428571,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.14667640626430511,
+      "unknown_unchanged": 2.220446049250313e-16
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "brightness",
+      "target_entity_id": 1,
+      "target_hit": false,
+      "class_id": "car",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 1,
+      "candidate_pose": [
+        102.8734235194606,
+        86.00000000000001
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 6,
+      "anchor_span": 0.3916737439057359,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.9776399934080716,
+          "difference": 0.022360006591928158,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.9776399934080718,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            93.4503465963837,
+            93.00000000000001
+          ]
+        },
+        {
+          "family": "3",
+          "familiar": 0.9841479770693556,
+          "difference": 0.01585202293064436,
+          "unknown": 0.0,
+          "similarity": 0.9841479770693556,
+          "evaluable": 1.0,
+          "center": [
+            177.83496198099905,
+            88.65384615384617
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.9749926262411714,
+          "difference": 0.02500737375882844,
+          "unknown": 1.1102230246251565e-16,
+          "similarity": 0.9749926262411716,
+          "evaluable": 0.9999999999999999,
+          "center": [
+            72.59842351946062,
+            168.15
+          ]
+        },
+        {
+          "family": "19",
+          "familiar": 0.9679313060544744,
+          "difference": 0.032068693945525584,
+          "unknown": 0.0,
+          "similarity": 0.9679313060544744,
+          "evaluable": 1.0,
+          "center": [
+            187.82464303165574,
+            116.26829268292686
+          ]
+        },
+        {
+          "family": "16",
+          "familiar": 0.9704760582897479,
+          "difference": 0.02952394171025185,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.9704760582897481,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            212.8956457416828,
+            169.42222222222222
+          ]
+        },
+        {
+          "family": "210",
+          "familiar": 0.9171300503439374,
+          "difference": 0.08286994965606288,
+          "unknown": -2.220446049250313e-16,
+          "similarity": 0.9171300503439371,
+          "evaluable": 1.0000000000000002,
+          "center": [
+            178.8734235194606,
+            134.6153846153846
+          ]
+        }
+      ],
+      "map_coverage": 0.032928466796875,
+      "familiar": 0.9653863352344597,
+      "difference": 0.03461366476554021,
+      "unknown": 5.551115123125783e-17,
+      "difference_changed": 0.03282979875802994,
+      "unknown_changed": 7.588410679262647e-17,
+      "difference_unchanged": null,
+      "unknown_unchanged": null
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "occlusion",
+      "target_entity_id": 1,
+      "target_hit": false,
+      "class_id": "car",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 16,
+      "candidate_pose": [
+        -98.99999999999999,
+        86.99999999999999
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "1",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -101.9252336448598,
+            86.0467289719626
+          ]
+        },
+        {
+          "family": "2",
+          "familiar": 0.26024992202897457,
+          "difference": 0.0453135956541207,
+          "unknown": 0.6944364823169047,
+          "similarity": 0.8517048239341316,
+          "evaluable": 0.30556351768309525,
+          "center": [
+            11.233644859813088,
+            88.81308411214951
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -114.37007874015748,
+            67.49606299212597
+          ]
+        },
+        {
+          "family": "198",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -97.34883720930233,
+            123.51162790697674
+          ]
+        }
+      ],
+      "map_coverage": 0.0034942626953125,
+      "familiar": 0.06506248050724364,
+      "difference": 0.011328398913530175,
+      "unknown": 0.9236091205792262,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.045313600450754166,
+      "unknown_unchanged": 0.6944364309310913
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "layout_negative",
+      "target_entity_id": 1,
+      "target_hit": false,
+      "class_id": "car",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 5,
+      "candidate_pose": [
+        34.0,
+        163.00000000000003
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "28",
+          "familiar": 0.7491183373614645,
+          "difference": 0.25088166263853534,
+          "unknown": 2.220446049250313e-16,
+          "similarity": 0.7491183373614646,
+          "evaluable": 0.9999999999999998,
+          "center": [
+            39.45454545454545,
+            162.7878787878788
+          ]
+        },
+        {
+          "family": "43",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -27.714285714285715,
+            195.00000000000003
+          ]
+        },
+        {
+          "family": "35",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -46.57692307692308,
+            259.9230769230769
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -33.073170731707314,
+            155.18292682926833
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -53.05042016806723,
+            185.9915966386555
+          ]
+        },
+        {
+          "family": "216",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -21.666666666666668,
+            253.41666666666666
+          ]
+        },
+        {
+          "family": "212",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -45.0,
+            295.0
+          ]
+        }
+      ],
+      "map_coverage": 0.0034332275390625,
+      "familiar": 0.10701690533735207,
+      "difference": 0.03584023751979076,
+      "unknown": 0.8571428571428571,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.2508816719055176,
+      "unknown_unchanged": 2.220446049250313e-16
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "identity",
+      "target_entity_id": 3,
+      "target_hit": true,
+      "class_id": "cat",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.9999942183494568,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.9999942183494568
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 3,
+        "point": [
+          156.00000000000003,
+          131.00000000000006
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 3,
+      "candidate_pose": [
+        156.00000000000003,
+        131.00000000000006
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 6,
+      "anchor_span": 0.46613200668341076,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.9999993539027302,
+          "difference": 6.460972697963641e-07,
+          "unknown": 0.0,
+          "similarity": 0.9999993539027302,
+          "evaluable": 1.0,
+          "center": [
+            165.76229508196724,
+            146.03278688524594
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.9999961812593089,
+          "difference": 3.818740691552415e-06,
+          "unknown": -4.440892098500626e-16,
+          "similarity": 0.9999961812593084,
+          "evaluable": 1.0000000000000004,
+          "center": [
+            66.70909090909092,
+            187.09090909090912
+          ]
+        },
+        {
+          "family": "8",
+          "familiar": 0.9999859934271128,
+          "difference": 1.400657288719298e-05,
+          "unknown": 0.0,
+          "similarity": 0.9999859934271128,
+          "evaluable": 1.0,
+          "center": [
+            233.25000000000003,
+            159.82692307692312
+          ]
+        },
+        {
+          "family": "21",
+          "familiar": 0.9999862673440572,
+          "difference": 1.3732655942844119e-05,
+          "unknown": 0.0,
+          "similarity": 0.9999862673440572,
+          "evaluable": 1.0,
+          "center": [
+            225.83928571428575,
+            200.08928571428575
+          ]
+        },
+        {
+          "family": "209",
+          "familiar": 0.9999997700478291,
+          "difference": 2.2995217086041464e-07,
+          "unknown": 0.0,
+          "similarity": 0.9999997700478291,
+          "evaluable": 1.0,
+          "center": [
+            122.66666666666669,
+            142.3888888888889
+          ]
+        },
+        {
+          "family": "208",
+          "familiar": 0.9999992406230629,
+          "difference": 7.593769371094794e-07,
+          "unknown": 0.0,
+          "similarity": 0.9999992406230629,
+          "evaluable": 1.0,
+          "center": [
+            115.72222222222224,
+            95.94444444444447
+          ]
+        }
+      ],
+      "map_coverage": 0.0317230224609375,
+      "familiar": 0.9999944677673501,
+      "difference": 5.532232649892628e-06,
+      "unknown": -7.401486830834377e-17,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 3.7651939237548504e-06,
+      "unknown_unchanged": -5.0624889473788686e-17
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "translation",
+      "target_entity_id": 3,
+      "target_hit": true,
+      "class_id": "cat",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.9995381236076355,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.9995381236076355
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 3,
+        "point": [
+          160.0,
+          131.00000000000003
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 3,
+      "candidate_pose": [
+        160.0,
+        131.00000000000003
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 6,
+      "anchor_span": 0.46613200668341076,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.9993475185090183,
+          "difference": 0.0006524814909817378,
+          "unknown": 0.0,
+          "similarity": 0.9993475185090183,
+          "evaluable": 1.0,
+          "center": [
+            169.7622950819672,
+            146.03278688524594
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.9996123191603761,
+          "difference": 0.00038768083962437155,
+          "unknown": -4.440892098500626e-16,
+          "similarity": 0.9996123191603756,
+          "evaluable": 1.0000000000000004,
+          "center": [
+            70.7090909090909,
+            187.09090909090912
+          ]
+        },
+        {
+          "family": "8",
+          "familiar": 0.9998097675649272,
+          "difference": 0.000190232435072768,
+          "unknown": 0.0,
+          "similarity": 0.9998097675649272,
+          "evaluable": 1.0,
+          "center": [
+            237.25,
+            159.82692307692312
+          ]
+        },
+        {
+          "family": "21",
+          "familiar": 0.9998037672668016,
+          "difference": 0.00019623273319835377,
+          "unknown": 0.0,
+          "similarity": 0.9998037672668016,
+          "evaluable": 1.0,
+          "center": [
+            229.83928571428572,
+            200.08928571428575
+          ]
+        },
+        {
+          "family": "209",
+          "familiar": 0.9999997860910039,
+          "difference": 2.139089960717655e-07,
+          "unknown": 0.0,
+          "similarity": 0.9999997860910039,
+          "evaluable": 1.0,
+          "center": [
+            126.66666666666667,
+            142.3888888888889
+          ]
+        },
+        {
+          "family": "208",
+          "familiar": 0.9999993903593604,
+          "difference": 6.096406396371989e-07,
+          "unknown": 0.0,
+          "similarity": 0.9999993903593604,
+          "evaluable": 1.0,
+          "center": [
+            119.72222222222223,
+            95.94444444444446
+          ]
+        }
+      ],
+      "map_coverage": 0.0317230224609375,
+      "familiar": 0.9997620914919146,
+      "difference": 0.00023790850808549002,
+      "unknown": -7.401486830834377e-17,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.00025480336626060307,
+      "unknown_unchanged": -5.0624889473788686e-17
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "scale",
+      "target_entity_id": 3,
+      "target_hit": false,
+      "class_id": "cat",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 0,
+      "candidate_pose": [
+        266.0,
+        239.0
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "2",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            259.84057971014494,
+            236.7391304347826
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.10686997014843751,
+          "difference": 0.010299375656404885,
+          "unknown": 0.8828306541951576,
+          "similarity": 0.9120983770485537,
+          "evaluable": 0.1171693458048424,
+          "center": [
+            164.29007633587787,
+            225.06106870229007
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            246.46835443037975,
+            192.3987341772152
+          ]
+        }
+      ],
+      "map_coverage": 0.0106964111328125,
+      "familiar": 0.0356233233828125,
+      "difference": 0.0034331252188016283,
+      "unknown": 0.9609435513983859,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.010299376212060452,
+      "unknown_unchanged": 0.8828306794166565
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "brightness",
+      "target_entity_id": 3,
+      "target_hit": true,
+      "class_id": "cat",
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.9956732392311096,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.9956732392311096
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 3,
+        "point": [
+          155.99999999999997,
+          130.99999999999997
+        ],
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 3,
+      "candidate_pose": [
+        155.99999999999997,
+        130.99999999999997
+      ],
+      "action": "reinforce_known",
+      "diagnostic_only": true,
+      "anchor_families": 6,
+      "anchor_span": 0.46613200668341065,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.9999952562444191,
+          "difference": 4.743755580904896e-06,
+          "unknown": 0.0,
+          "similarity": 0.9999952562444191,
+          "evaluable": 1.0,
+          "center": [
+            165.7622950819672,
+            146.03278688524588
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.9999883604908725,
+          "difference": 1.1639509127969743e-05,
+          "unknown": -4.440892098500626e-16,
+          "similarity": 0.999988360490872,
+          "evaluable": 1.0000000000000004,
+          "center": [
+            66.7090909090909,
+            187.09090909090907
+          ]
+        },
+        {
+          "family": "8",
+          "familiar": 0.9999643016115053,
+          "difference": 3.56983884947093e-05,
+          "unknown": 0.0,
+          "similarity": 0.9999643016115053,
+          "evaluable": 1.0,
+          "center": [
+            233.24999999999997,
+            159.82692307692304
+          ]
+        },
+        {
+          "family": "21",
+          "familiar": 0.9999818680115402,
+          "difference": 1.8131988459790804e-05,
+          "unknown": 0.0,
+          "similarity": 0.9999818680115402,
+          "evaluable": 1.0,
+          "center": [
+            225.8392857142857,
+            200.0892857142857
+          ]
+        },
+        {
+          "family": "209",
+          "familiar": 0.9896430890122903,
+          "difference": 0.010356910987709744,
+          "unknown": 0.0,
+          "similarity": 0.9896430890122903,
+          "evaluable": 1.0,
+          "center": [
+            122.66666666666664,
+            142.38888888888886
+          ]
+        },
+        {
+          "family": "208",
+          "familiar": 0.9847541100817332,
+          "difference": 0.015245889918266808,
+          "unknown": 0.0,
+          "similarity": 0.9847541100817332,
+          "evaluable": 1.0,
+          "center": [
+            115.7222222222222,
+            95.94444444444443
+          ]
+        }
+      ],
+      "map_coverage": 0.0317230224609375,
+      "familiar": 0.9957211642420601,
+      "difference": 0.004278835757939988,
+      "unknown": -7.401486830834377e-17,
+      "difference_changed": 0.005333463195711374,
+      "unknown_changed": -5.0624889473788686e-17,
+      "difference_unchanged": null,
+      "unknown_unchanged": null
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "occlusion",
+      "target_entity_id": 3,
+      "target_hit": false,
+      "class_id": "cat",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 0,
+      "candidate_pose": [
+        267.99999999999994,
+        243.0
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 0,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "2",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            261.8405797101449,
+            240.7391304347826
+          ]
+        },
+        {
+          "family": "1",
+          "familiar": 0.10372199775894121,
+          "difference": 0.013447348045901182,
+          "unknown": 0.8828306541951576,
+          "similarity": 0.8852315172238042,
+          "evaluable": 0.1171693458048424,
+          "center": [
+            166.29007633587784,
+            229.06106870229007
+          ]
+        },
+        {
+          "family": "0",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            248.4683544303797,
+            196.3987341772152
+          ]
+        }
+      ],
+      "map_coverage": 0.00994873046875,
+      "familiar": 0.0345739992529804,
+      "difference": 0.004482449348633727,
+      "unknown": 0.9609435513983859,
+      "difference_changed": null,
+      "unknown_changed": null,
+      "difference_unchanged": 0.013447347097098827,
+      "unknown_unchanged": 0.8828306794166565
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "layout_negative",
+      "target_entity_id": 3,
+      "target_hit": false,
+      "class_id": "cat",
+      "prediction": {
+        "rejection_reason": "no_accepted_entity",
+        "status": "UNRESOLVED",
+        "class_id": null,
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": null,
+        "point": null,
+        "bbox": null,
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "graph_version": 35,
+      "candidate_id": 3,
+      "candidate_pose": [
+        28.000000000000004,
+        3.0000000000000004
+      ],
+      "action": "insufficient_correspondence",
+      "diagnostic_only": true,
+      "anchor_families": 1,
+      "anchor_span": 0.0,
+      "candidate_ambiguous": false,
+      "families": [
+        {
+          "family": "0",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            37.76229508196721,
+            18.0327868852459
+          ]
+        },
+        {
+          "family": "4",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -61.29090909090909,
+            59.09090909090909
+          ]
+        },
+        {
+          "family": "8",
+          "familiar": 0.12861741498770632,
+          "difference": 7.121934899938476e-07,
+          "unknown": 0.8713818728188036,
+          "similarity": 0.9999944627285002,
+          "evaluable": 0.1286181271811963,
+          "center": [
+            105.25,
+            31.826923076923077
+          ]
+        },
+        {
+          "family": "21",
+          "familiar": 0.9985459688785434,
+          "difference": 0.0014540311214565893,
+          "unknown": 0.0,
+          "similarity": 0.9985459688785434,
+          "evaluable": 1.0,
+          "center": [
+            97.83928571428571,
+            72.08928571428571
+          ]
+        },
+        {
+          "family": "209",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -5.3333333333333295,
+            14.38888888888889
+          ]
+        },
+        {
+          "family": "208",
+          "familiar": 0.0,
+          "difference": 0.0,
+          "unknown": 1.0,
+          "similarity": 0.0,
+          "evaluable": 0.0,
+          "center": [
+            -12.277777777777777,
+            -32.05555555555556
+          ]
+        }
+      ],
+      "map_coverage": 0.01519775390625,
+      "familiar": 0.1878605639777083,
+      "difference": 0.00024245721915776386,
+      "unknown": 0.8118969788031339,
+      "difference_changed": 0.0005892734043300152,
+      "unknown_changed": 0.5184919238090515,
+      "difference_unchanged": null,
+      "unknown_unchanged": null
+    }
+  ],
+  "verdict": "fix_scale_and_partial_correspondence_before_learning",
+  "independent_learning_evidence_added": 0,
+  "limitations": [
+    "Frozen diagnostic, not an implemented learning algorithm.",
+    "Layout scrambling is a structural control, not a guaranteed different semantic class.",
+    "Three maps cover predicted template support only; unexplained foreground needs segmentation association.",
+    "Occlusion mask is evaluation-only; flat occluders may remain confidently different, not unknown."
+  ]
+}

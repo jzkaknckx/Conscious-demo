@@ -1,0 +1,614 @@
+{
+  "source": "results/supervised_graph/voc2007_20260922_222716_908742",
+  "classes": [
+    "cat",
+    "dog",
+    "car"
+  ],
+  "scope": "posthoc cached evidence analysis; no model selection",
+  "splits": {
+    "readout_fit": {
+      "samples": 27,
+      "baselines": {
+        "untrained_seed0_head": {
+          "accuracy": 0.2222222238779068,
+          "macro_f1": 0.12121212482452393,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              0,
+              9
+            ],
+            [
+              0,
+              0,
+              12
+            ],
+            [
+              0,
+              0,
+              6
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            0,
+            27
+          ]
+        },
+        "always_car": {
+          "accuracy": 0.2222222238779068,
+          "macro_f1": 0.12121212482452393,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              0,
+              9
+            ],
+            [
+              0,
+              0,
+              12
+            ],
+            [
+              0,
+              0,
+              6
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            0,
+            27
+          ]
+        },
+        "always_dog_fit_majority": {
+          "accuracy": 0.4444444477558136,
+          "macro_f1": 0.20512820780277252,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              9,
+              0
+            ],
+            [
+              0,
+              12,
+              0
+            ],
+            [
+              0,
+              6,
+              0
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            27,
+            0
+          ]
+        },
+        "weak_score_argmax": {
+          "accuracy": 0.3333333432674408,
+          "macro_f1": 0.29461538791656494,
+          "balanced_accuracy": 0.31481480598449707,
+          "confusion": [
+            [
+              1,
+              5,
+              3
+            ],
+            [
+              1,
+              6,
+              5
+            ],
+            [
+              2,
+              2,
+              2
+            ]
+          ],
+          "prediction_counts": [
+            4,
+            13,
+            10
+          ]
+        },
+        "weak_score_times_coverage": {
+          "accuracy": 0.37037035822868347,
+          "macro_f1": 0.3212820589542389,
+          "balanced_accuracy": 0.34259259700775146,
+          "confusion": [
+            [
+              1,
+              4,
+              4
+            ],
+            [
+              1,
+              7,
+              4
+            ],
+            [
+              2,
+              2,
+              2
+            ]
+          ],
+          "prediction_counts": [
+            4,
+            13,
+            10
+          ]
+        },
+        "weak_score_times_coverage_times_evaluable": {
+          "accuracy": 0.40740740299224854,
+          "macro_f1": 0.3611110746860504,
+          "balanced_accuracy": 0.4166666567325592,
+          "confusion": [
+            [
+              0,
+              5,
+              4
+            ],
+            [
+              3,
+              7,
+              2
+            ],
+            [
+              2,
+              0,
+              4
+            ]
+          ],
+          "prediction_counts": [
+            5,
+            12,
+            10
+          ]
+        }
+      },
+      "constant_feature_columns": [
+        4,
+        5,
+        10,
+        11,
+        16,
+        17
+      ],
+      "candidate_class_mean_features": [
+        [
+          0.3524590730667114,
+          0.21729306876659393,
+          0.7009990811347961,
+          1.132293462753296,
+          1.0,
+          1.0
+        ],
+        [
+          0.635519802570343,
+          0.13994865119457245,
+          0.8355455994606018,
+          1.0011746883392334,
+          1.0,
+          1.0
+        ],
+        [
+          0.565786600112915,
+          0.12336505204439163,
+          0.8211479187011719,
+          0.845810055732727,
+          1.0,
+          1.0
+        ]
+      ]
+    },
+    "validation": {
+      "samples": 26,
+      "baselines": {
+        "untrained_seed0_head": {
+          "accuracy": 0.5384615659713745,
+          "macro_f1": 0.23333333432674408,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              0,
+              6
+            ],
+            [
+              0,
+              0,
+              6
+            ],
+            [
+              0,
+              0,
+              14
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            0,
+            26
+          ]
+        },
+        "always_car": {
+          "accuracy": 0.5384615659713745,
+          "macro_f1": 0.23333333432674408,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              0,
+              6
+            ],
+            [
+              0,
+              0,
+              6
+            ],
+            [
+              0,
+              0,
+              14
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            0,
+            26
+          ]
+        },
+        "always_dog_fit_majority": {
+          "accuracy": 0.23076923191547394,
+          "macro_f1": 0.125,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              14,
+              0
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            26,
+            0
+          ]
+        },
+        "weak_score_argmax": {
+          "accuracy": 0.5384615659713745,
+          "macro_f1": 0.42307695746421814,
+          "balanced_accuracy": 0.460317462682724,
+          "confusion": [
+            [
+              0,
+              5,
+              1
+            ],
+            [
+              1,
+              4,
+              1
+            ],
+            [
+              3,
+              1,
+              10
+            ]
+          ],
+          "prediction_counts": [
+            4,
+            10,
+            12
+          ]
+        },
+        "weak_score_times_coverage": {
+          "accuracy": 0.5769230723381042,
+          "macro_f1": 0.4285714328289032,
+          "balanced_accuracy": 0.4841269552707672,
+          "confusion": [
+            [
+              0,
+              5,
+              1
+            ],
+            [
+              0,
+              4,
+              2
+            ],
+            [
+              2,
+              1,
+              11
+            ]
+          ],
+          "prediction_counts": [
+            2,
+            10,
+            14
+          ]
+        },
+        "weak_score_times_coverage_times_evaluable": {
+          "accuracy": 0.3461538553237915,
+          "macro_f1": 0.2791762053966522,
+          "balanced_accuracy": 0.3095238208770752,
+          "confusion": [
+            [
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              3,
+              3
+            ],
+            [
+              4,
+              4,
+              6
+            ]
+          ],
+          "prediction_counts": [
+            4,
+            13,
+            9
+          ]
+        }
+      },
+      "constant_feature_columns": [
+        4,
+        5,
+        10,
+        11,
+        16,
+        17
+      ],
+      "candidate_class_mean_features": [
+        [
+          0.3882341980934143,
+          0.1860121637582779,
+          0.7337033152580261,
+          1.1744046211242676,
+          1.0,
+          1.0
+        ],
+        [
+          0.6171078085899353,
+          0.15453635156154633,
+          0.8394937515258789,
+          1.0636308193206787,
+          1.0,
+          1.0
+        ],
+        [
+          0.6667101383209229,
+          0.12561625242233276,
+          0.8651543855667114,
+          0.9538576602935791,
+          1.0,
+          1.0
+        ]
+      ]
+    },
+    "test": {
+      "samples": 31,
+      "baselines": {
+        "untrained_seed0_head": {
+          "accuracy": 0.5161290168762207,
+          "macro_f1": 0.22695034742355347,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              0,
+              6
+            ],
+            [
+              0,
+              0,
+              9
+            ],
+            [
+              0,
+              0,
+              16
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            0,
+            31
+          ]
+        },
+        "always_car": {
+          "accuracy": 0.5161290168762207,
+          "macro_f1": 0.22695034742355347,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              0,
+              6
+            ],
+            [
+              0,
+              0,
+              9
+            ],
+            [
+              0,
+              0,
+              16
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            0,
+            31
+          ]
+        },
+        "always_dog_fit_majority": {
+          "accuracy": 0.29032257199287415,
+          "macro_f1": 0.14999999105930328,
+          "balanced_accuracy": 0.3333333432674408,
+          "confusion": [
+            [
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              9,
+              0
+            ],
+            [
+              0,
+              16,
+              0
+            ]
+          ],
+          "prediction_counts": [
+            0,
+            31,
+            0
+          ]
+        },
+        "weak_score_argmax": {
+          "accuracy": 0.5806451439857483,
+          "macro_f1": 0.39961013197898865,
+          "balanced_accuracy": 0.43981480598449707,
+          "confusion": [
+            [
+              0,
+              4,
+              2
+            ],
+            [
+              1,
+              4,
+              4
+            ],
+            [
+              0,
+              2,
+              14
+            ]
+          ],
+          "prediction_counts": [
+            1,
+            10,
+            20
+          ]
+        },
+        "weak_score_times_coverage": {
+          "accuracy": 0.4838709533214569,
+          "macro_f1": 0.33383455872535706,
+          "balanced_accuracy": 0.3611111342906952,
+          "confusion": [
+            [
+              0,
+              4,
+              2
+            ],
+            [
+              1,
+              3,
+              5
+            ],
+            [
+              1,
+              3,
+              12
+            ]
+          ],
+          "prediction_counts": [
+            2,
+            10,
+            19
+          ]
+        },
+        "weak_score_times_coverage_times_evaluable": {
+          "accuracy": 0.29032257199287415,
+          "macro_f1": 0.26256871223449707,
+          "balanced_accuracy": 0.25462964177131653,
+          "confusion": [
+            [
+              1,
+              4,
+              1
+            ],
+            [
+              1,
+              2,
+              6
+            ],
+            [
+              2,
+              8,
+              6
+            ]
+          ],
+          "prediction_counts": [
+            4,
+            14,
+            13
+          ]
+        }
+      },
+      "constant_feature_columns": [
+        4,
+        5,
+        10,
+        11,
+        16,
+        17
+      ],
+      "candidate_class_mean_features": [
+        [
+          0.3668830096721649,
+          0.20567354559898376,
+          0.6920787692070007,
+          1.1563220024108887,
+          1.0,
+          1.0
+        ],
+        [
+          0.5518995523452759,
+          0.14609381556510925,
+          0.8156575560569763,
+          1.0813684463500977,
+          1.0,
+          1.0
+        ],
+        [
+          0.6574780344963074,
+          0.13098394870758057,
+          0.8525518774986267,
+          0.9720253944396973,
+          1.0,
+          1.0
+        ]
+      ]
+    }
+  }
+}

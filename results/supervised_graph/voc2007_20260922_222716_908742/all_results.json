@@ -1,0 +1,273 @@
+{
+  "run_id": "voc2007_20260922_222716_908742",
+  "graph_version": 35,
+  "memory": {
+    "GmemI": 12467,
+    "GmemII": 758,
+    "GmemIII": 34
+  },
+  "readout_metrics": {
+    "validation": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          0,
+          0,
+          6
+        ],
+        [
+          0,
+          0,
+          0,
+          6
+        ],
+        [
+          0,
+          0,
+          0,
+          14
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 0.0,
+      "accepted_accuracy": null,
+      "unresolved_rate": 1.0,
+      "samples": 26
+    },
+    "test": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          0,
+          0,
+          6
+        ],
+        [
+          0,
+          0,
+          0,
+          9
+        ],
+        [
+          0,
+          0,
+          0,
+          16
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 0.0,
+      "accepted_accuracy": null,
+      "unresolved_rate": 1.0,
+      "samples": 31
+    }
+  },
+  "head_results": {
+    "accepted": {
+      "status": "SKIPPED",
+      "reason": "constant evidence vectors; head cannot recover missing information"
+    },
+    "weak": {
+      "status": "FIT",
+      "feature_source": "weak",
+      "history": [
+        {
+          "epoch": 0,
+          "validation_loss": 0.8847208023071289
+        },
+        {
+          "epoch": 1,
+          "validation_loss": 0.8877469301223755
+        },
+        {
+          "epoch": 2,
+          "validation_loss": 0.8909618854522705
+        },
+        {
+          "epoch": 3,
+          "validation_loss": 0.8943642377853394
+        },
+        {
+          "epoch": 4,
+          "validation_loss": 0.8979438543319702
+        },
+        {
+          "epoch": 5,
+          "validation_loss": 0.9016867876052856
+        }
+      ],
+      "metrics": {
+        "validation": {
+          "accuracy": 0.5384615384615384,
+          "macro_f1": 0.2333333333333333,
+          "recall": {
+            "cat": 0.0,
+            "dog": 0.0,
+            "car": 1.0
+          },
+          "confusion": [
+            [
+              0,
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              0,
+              14,
+              0
+            ]
+          ],
+          "prediction_columns": [
+            "cat",
+            "dog",
+            "car",
+            "REJECTED_OR_UNRESOLVED"
+          ],
+          "coverage": 1.0,
+          "accepted_accuracy": 0.5384615384615384,
+          "unresolved_rate": 0.0,
+          "samples": 26
+        },
+        "test": {
+          "accuracy": 0.5161290322580645,
+          "macro_f1": 0.22695035460992907,
+          "recall": {
+            "cat": 0.0,
+            "dog": 0.0,
+            "car": 1.0
+          },
+          "confusion": [
+            [
+              0,
+              0,
+              6,
+              0
+            ],
+            [
+              0,
+              0,
+              9,
+              0
+            ],
+            [
+              0,
+              0,
+              16,
+              0
+            ]
+          ],
+          "prediction_columns": [
+            "cat",
+            "dog",
+            "car",
+            "REJECTED_OR_UNRESOLVED"
+          ],
+          "coverage": 1.0,
+          "accepted_accuracy": 0.5161290322580645,
+          "unresolved_rate": 0.0,
+          "samples": 31
+        }
+      }
+    }
+  },
+  "training_recall": {
+    "TARGET_HIT": 34
+  },
+  "detection": {
+    "iou_threshold": 0.5,
+    "ap": {
+      "cat": null,
+      "dog": 0.0,
+      "car": null
+    },
+    "map": 0.0,
+    "proposal_recall": {
+      "dog": 1.0
+    },
+    "errors": {
+      "unmatched_or_localization": 0,
+      "duplicate": 0
+    },
+    "counts": {
+      "cat": {
+        "truth": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "recall": null
+      },
+      "dog": {
+        "truth": 1,
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "recall": 0.0
+      },
+      "car": {
+        "truth": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "recall": null
+      }
+    }
+  },
+  "resume_check": {
+    "graph_version_equal": true,
+    "ledger_equal": true,
+    "counts_equal": true,
+    "replay_idempotent": true,
+    "query_equivalent": true
+  },
+  "pending_maintenance": {
+    "changed": true,
+    "graph_version": 35,
+    "region_states": {
+      "pending": 279,
+      "resolved_local": 328
+    },
+    "unresolved_entities": 31
+  },
+  "familiarity_pilot": {
+    "verdict": "fix_scale_and_partial_correspondence_before_learning",
+    "cohort_objects": 3,
+    "limitations": [
+      "Frozen diagnostic, not an implemented learning algorithm.",
+      "Layout scrambling is a structural control, not a guaranteed different semantic class.",
+      "Three maps cover predicted template support only; unexplained foreground needs segmentation association.",
+      "Occlusion mask is evaluation-only; flat occluders may remain confidently different, not unknown."
+    ]
+  }
+}

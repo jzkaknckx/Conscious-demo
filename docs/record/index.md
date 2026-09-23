@@ -2,6 +2,8 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-23_bilingual_readme.md | 重写英文首页与完整中文版，加入原理图和真实 Notebook 图示，整理算法体系、实测亮点及部署方法 | chatgpt | 2026-09-23 |
+| 2026-09-23_full_experiment_review.md | 审查完整 CUDA 实验：34/34 回查、84 留出对象无实体、weak 分类全 car；定位局部证据冲突和探针对应问题，给出分阶段改进与缓存基线 | chatgpt | 2026-09-23 |
 | 2026-09-22_generalization_diagnostics_familiarity_pilot.md | 完善留出拒绝诊断、弱证据分类对照、pending 生命周期与恢复检查；默认开启 Notebook 全流程，六条件先导发现缩放/遮挡对应仍失败 | chatgpt | 2026-09-22 |
 | 2026-09-22_recall_generalization_experiments.md | 审查 34/34 训练回查、57 个留出对象全未决及单图空检测；澄清候选统计，提出失败漏斗、扰动阶梯和分类证据改进 | chatgpt | 2026-09-22 |
 | 2026-09-22_phd_research_proposal.md | 综合全部算法文档形成申博研究计划；纳入最新 34/34 完整训练回查，区分记忆保持与泛化，提出跨观察巩固及实验路线 | chatgpt | 2026-09-22 |

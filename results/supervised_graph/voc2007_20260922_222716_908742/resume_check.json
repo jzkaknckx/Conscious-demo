@@ -1,0 +1,7 @@
+{
+  "graph_version_equal": true,
+  "ledger_equal": true,
+  "counts_equal": true,
+  "replay_idempotent": true,
+  "query_equivalent": true
+}

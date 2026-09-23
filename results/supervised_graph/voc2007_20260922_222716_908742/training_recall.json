@@ -1,0 +1,1777 @@
+{
+  "graph_version": 35,
+  "rows": [
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 0,
+      "hits": [
+        0
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999951124191284,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999951124191284
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 0,
+        "point": [
+          200.0,
+          86.0
+        ],
+        "bbox": [
+          134.0,
+          5.0000000000000036,
+          358.0,
+          323.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 1,
+      "hits": [
+        1
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999287128448486
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999287128448486
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 1,
+        "point": [
+          103.0,
+          86.0
+        ],
+        "bbox": [
+          229.0,
+          213.0,
+          384.0,
+          285.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "007490",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 2,
+      "hits": [
+        2
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.5998481512069702
+        },
+        "top_k": [
+          [
+            "car",
+            0.5998481512069702
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 2,
+        "point": [
+          111.00000000000003,
+          118.00000000000001
+        ],
+        "bbox": [
+          103.00000000000004,
+          210.00000000000006,
+          264.00000000000006,
+          278.00000000000006
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "class_id": "cat",
+      "target_entity_id": 3,
+      "hits": [
+        3
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.9999942183494568,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.9999942183494568
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 3,
+        "point": [
+          156.00000000000003,
+          131.00000000000006
+        ],
+        "bbox": [
+          182.00000000000003,
+          60.000000000000036,
+          326.0,
+          167.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "007900",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 4,
+      "hits": [
+        4
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999955296516418,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999955296516418
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 4,
+        "point": [
+          153.99999999999997,
+          89.0
+        ],
+        "bbox": [
+          186.0,
+          115.0,
+          325.0,
+          286.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005156",
+      "object_id": "2",
+      "class_id": "car",
+      "target_entity_id": 5,
+      "hits": [
+        5
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999977350234985
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999977350234985
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 5,
+        "point": [
+          128.99999999999997,
+          55.0
+        ],
+        "bbox": [
+          6.999999999999986,
+          109.99999999999999,
+          165.99999999999997,
+          238.99999999999977
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "001239",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 6,
+      "hits": [
+        6
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999974966049194,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999974966049194
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 6,
+        "point": [
+          152.0,
+          102.99999999999997
+        ],
+        "bbox": [
+          107.00000000000001,
+          58.99999999999997,
+          320.0,
+          159.99999999999997
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "001239",
+      "object_id": "1",
+      "class_id": "dog",
+      "target_entity_id": 7,
+      "hits": [
+        7
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.6263614892959595,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.6263614892959595
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 7,
+        "point": [
+          120.0,
+          114.0
+        ],
+        "bbox": [
+          227.00000000000006,
+          137.0,
+          381.00000000000006,
+          375.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "001239",
+      "object_id": "2",
+      "class_id": "dog",
+      "target_entity_id": 8,
+      "hits": [
+        8
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999983310699463,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999983310699463
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 8,
+        "point": [
+          61.00000000000001,
+          153.00000000000003
+        ],
+        "bbox": [
+          117.0,
+          93.00000000000003,
+          286.0,
+          307.00000000000006
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008558",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 9,
+      "hits": [
+        9
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999964833259583,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999964833259583
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 9,
+        "point": [
+          154.99999999999997,
+          164.0
+        ],
+        "bbox": [
+          101.99999999999996,
+          35.0,
+          295.0,
+          198.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008558",
+      "object_id": "1",
+      "class_id": "dog",
+      "target_entity_id": 10,
+      "hits": [
+        10
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999964833259583,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999964833259583
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 10,
+        "point": [
+          58.00000000000001,
+          130.00000000000003
+        ],
+        "bbox": [
+          283.0,
+          107.00000000000003,
+          475.0,
+          328.00000000000006
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008558",
+      "object_id": "2",
+      "class_id": "dog",
+      "target_entity_id": 11,
+      "hits": [
+        11
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999958872795105,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999958872795105
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 11,
+        "point": [
+          134.0,
+          185.99999999999997
+        ],
+        "bbox": [
+          101.00000000000001,
+          164.99999999999997,
+          284.0000000000001,
+          349.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "004228",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 12,
+      "hits": [
+        12
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.8308756947517395
+        },
+        "top_k": [
+          [
+            "car",
+            0.8308756947517395
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 12,
+        "point": [
+          141.96473518572415,
+          133.00000000000003
+        ],
+        "bbox": [
+          40.93586211903581,
+          70.00000000000006,
+          428.9358621190358,
+          262.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "004228",
+      "object_id": "2",
+      "class_id": "car",
+      "target_entity_id": 13,
+      "hits": [
+        13
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.999997615814209
+        },
+        "top_k": [
+          [
+            "car",
+            0.999997615814209
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 13,
+        "point": [
+          119.99999999999999,
+          97.00000000000001
+        ],
+        "bbox": [
+          38.999999999999986,
+          55.0,
+          121.99999999999999,
+          86.99999999999999
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 14,
+      "hits": [
+        14
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.5948569774627686
+        },
+        "top_k": [
+          [
+            "car",
+            0.5948569774627686
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 14,
+        "point": [
+          99.00000000000001,
+          83.00000000000001
+        ],
+        "bbox": [
+          9.000000000000004,
+          155.0,
+          55.00000000000001,
+          180.0000000000002
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "7",
+      "class_id": "car",
+      "target_entity_id": 15,
+      "hits": [
+        15
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.8651308417320251
+        },
+        "top_k": [
+          [
+            "car",
+            0.8651308417320251
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 15,
+        "point": [
+          95.99999999999999,
+          134.99999999999997
+        ],
+        "bbox": [
+          292.0,
+          162.00000000000003,
+          327.0,
+          186.00000000000003
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "8",
+      "class_id": "car",
+      "target_entity_id": 16,
+      "hits": [
+        16
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999958276748657
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999958276748657
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 16,
+        "point": [
+          87.00000000000001,
+          108.00000000000001
+        ],
+        "bbox": [
+          325.99999999999994,
+          180.0,
+          378.99999999999994,
+          205.99999999999997
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "9",
+      "class_id": "car",
+      "target_entity_id": 17,
+      "hits": [
+        17
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999974966049194
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999974966049194
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 17,
+        "point": [
+          102.0,
+          117.99999999999999
+        ],
+        "bbox": [
+          421.0,
+          173.0,
+          459.0,
+          198.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "11",
+      "class_id": "car",
+      "target_entity_id": 18,
+      "hits": [
+        18
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999964237213135
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999964237213135
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 18,
+        "point": [
+          125.99999999999999,
+          130.0
+        ],
+        "bbox": [
+          443.0,
+          200.0,
+          493.0,
+          237.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "12",
+      "class_id": "car",
+      "target_entity_id": 19,
+      "hits": [
+        19
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999972581863403
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999972581863403
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 19,
+        "point": [
+          190.99999999999997,
+          109.99999999999999
+        ],
+        "bbox": [
+          101.99999999999997,
+          197.99999999999994,
+          197.99999999999997,
+          230.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005071",
+      "object_id": "14",
+      "class_id": "car",
+      "target_entity_id": 20,
+      "hits": [
+        20
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999972581863403
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999972581863403
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 20,
+        "point": [
+          125.00000000000003,
+          141.00000000000003
+        ],
+        "bbox": [
+          64.0,
+          163.00000000000003,
+          121.0,
+          187.00000000000003
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "002056",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 21,
+      "hits": [
+        21
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999991655349731
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999991655349731
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 21,
+        "point": [
+          93.00000000000001,
+          145.00000000000003
+        ],
+        "bbox": [
+          330.0,
+          259.0,
+          375.0,
+          380.99999999999994
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "000036",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 22,
+      "hits": [
+        22
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.9999991655349731,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.9999991655349731
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 22,
+        "point": [
+          141.0,
+          170.00000000000003
+        ],
+        "bbox": [
+          26.00000000000001,
+          78.0,
+          319.0,
+          343.99999999999966
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008980",
+      "object_id": "0",
+      "class_id": "dog",
+      "target_entity_id": 23,
+      "hits": [
+        23
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "dog",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.881732165813446,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "dog",
+            0.881732165813446
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 23,
+        "point": [
+          91.99999999999999,
+          86.99999999999999
+        ],
+        "bbox": [
+          51.99999999999998,
+          56.99999999999997,
+          372.00000000000006,
+          427.9999999999999
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008968",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 24,
+      "hits": [
+        24
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999971985816956
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999971985816956
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 24,
+        "point": [
+          126.00000000000001,
+          53.00000000000001
+        ],
+        "bbox": [
+          85.00000000000004,
+          49.000000000000014,
+          443.0,
+          332.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "000209",
+      "object_id": "0",
+      "class_id": "cat",
+      "target_entity_id": 25,
+      "hits": [
+        25
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.9999985098838806,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.9999985098838806
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 25,
+        "point": [
+          153.0,
+          75.00000000000001
+        ],
+        "bbox": [
+          13.000000000000014,
+          75.00000000000003,
+          400.0,
+          375.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "001404",
+      "object_id": "0",
+      "class_id": "cat",
+      "target_entity_id": 26,
+      "hits": [
+        26
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.9999951720237732,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.9999951720237732
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 26,
+        "point": [
+          84.00000000000001,
+          46.0
+        ],
+        "bbox": [
+          56.00000000000003,
+          20.999999999999986,
+          443.0,
+          360.99999999999994
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "006459",
+      "object_id": "6",
+      "class_id": "car",
+      "target_entity_id": 27,
+      "hits": [
+        27
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999979138374329
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999979138374329
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 27,
+        "point": [
+          110.0,
+          122.0
+        ],
+        "bbox": [
+          373.99999999999994,
+          141.0,
+          432.99999999999994,
+          176.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "007905",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 28,
+      "hits": [
+        28
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999992251396179
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999992251396179
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 28,
+        "point": [
+          145.00000000000003,
+          149.00000000000003
+        ],
+        "bbox": [
+          14.000000000000078,
+          86.00000000000011,
+          496.00000000000017,
+          330.00000000000034
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005273",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 29,
+      "hits": [
+        29
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999983906745911
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999983906745911
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 29,
+        "point": [
+          138.99999999999997,
+          151.99999999999997
+        ],
+        "bbox": [
+          106.99999999999997,
+          53.99999999999998,
+          285.0,
+          155.99999999999994
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "005273",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 30,
+      "hits": [
+        30
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.999998152256012
+        },
+        "top_k": [
+          [
+            "car",
+            0.999998152256012
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 30,
+        "point": [
+          158.00000000000003,
+          126.00000000000003
+        ],
+        "bbox": [
+          234.00000000000003,
+          83.00000000000003,
+          418.00000000000006,
+          153.00000000000003
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "003261",
+      "object_id": "0",
+      "class_id": "car",
+      "target_entity_id": 31,
+      "hits": [
+        31
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9898666143417358
+        },
+        "top_k": [
+          [
+            "car",
+            0.9898666143417358
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 31,
+        "point": [
+          217.99999999999997,
+          135.99999999999997
+        ],
+        "bbox": [
+          216.99999999999997,
+          177.0,
+          238.99999999999997,
+          198.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008169",
+      "object_id": "0",
+      "class_id": "cat",
+      "target_entity_id": 32,
+      "hits": [
+        32
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "cat",
+        "scores": {
+          "cat": 0.4916153848171234,
+          "dog": 0.0,
+          "car": 0.0
+        },
+        "top_k": [
+          [
+            "cat",
+            0.4916153848171234
+          ],
+          [
+            "dog",
+            0.0
+          ],
+          [
+            "car",
+            0.0
+          ]
+        ],
+        "entity_id": 32,
+        "point": [
+          167.0,
+          133.0
+        ],
+        "bbox": [
+          275.00000000000006,
+          162.00000000000003,
+          436.0,
+          343.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    },
+    {
+      "image_id": "008169",
+      "object_id": "1",
+      "class_id": "car",
+      "target_entity_id": 33,
+      "hits": [
+        33
+      ],
+      "prediction": {
+        "rejection_reason": null,
+        "status": "PREDICTED",
+        "class_id": "car",
+        "scores": {
+          "cat": 0.0,
+          "dog": 0.0,
+          "car": 0.9999985694885254
+        },
+        "top_k": [
+          [
+            "car",
+            0.9999985694885254
+          ],
+          [
+            "cat",
+            0.0
+          ],
+          [
+            "dog",
+            0.0
+          ]
+        ],
+        "entity_id": 33,
+        "point": [
+          95.00000000000001,
+          89.00000000000003
+        ],
+        "bbox": [
+          10.000000000000004,
+          173.0,
+          91.00000000000001,
+          226.0
+        ],
+        "search_complete": false,
+        "assignment_search_complete": false,
+        "absence_proven": false,
+        "graph_version": 35
+      },
+      "classification_correct": true,
+      "status": "TARGET_HIT",
+      "structural_fallback": true,
+      "graph_version": 35
+    }
+  ],
+  "status_counts": {
+    "TARGET_HIT": 34
+  },
+  "evaluation_kind": "training_recall_not_generalization"
+}
