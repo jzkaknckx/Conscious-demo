@@ -2,6 +2,9 @@
 
 | 文件名 | 更改概括 | 提交者 | 提交时间 |
 | --- | --- | --- | --- |
+| 2026-09-23_research_progress_report.md | 新增申博研究进展报告，详述已完成结构、Gpos 数学推导与最新实验，规划尺度／遮挡、巩固和判别工作及研究产出 | chatgpt | 2026-09-23 |
+| 2026-09-23_post_joint_assignment_review.md | 审查联合分配完整结果：平移/亮度 3/3、留出仍全未决；只读分解定位 curv 尺度损失及遮挡几何平均问题，提出权重/稳健评分/分类收敛对照 | chatgpt | 2026-09-23 |
+| 2026-09-23_joint_assignment_implementation.md | 实现冲突分量受限联合分配、探针身份门控与尺度离线诊断；分类头增加标准化/初始化及多种子对照，默认关闭无框检测 | chatgpt | 2026-09-23 |
 | 2026-09-23_bilingual_readme.md | 重写英文首页与完整中文版，加入原理图和真实 Notebook 图示，整理算法体系、实测亮点及部署方法 | chatgpt | 2026-09-23 |
 | 2026-09-23_full_experiment_review.md | 审查完整 CUDA 实验：34/34 回查、84 留出对象无实体、weak 分类全 car；定位局部证据冲突和探针对应问题，给出分阶段改进与缓存基线 | chatgpt | 2026-09-23 |
 | 2026-09-22_generalization_diagnostics_familiarity_pilot.md | 完善留出拒绝诊断、弱证据分类对照、pending 生命周期与恢复检查；默认开启 Notebook 全流程，六条件先导发现缩放/遮挡对应仍失败 | chatgpt | 2026-09-22 |

@@ -103,6 +103,10 @@ class ClassifierTrainer:
         self.history = []
         self.mode = 'single_label'
         self.feature_source = 'accepted'
+        self.feature_mean = torch.zeros(6*len(classes), device=self.device)
+        self.feature_scale = torch.ones(6*len(classes), device=self.device)
+        self.feature_active = torch.ones(6*len(classes), dtype=torch.bool, device=self.device)
+        self.best_epoch = -1
 
     def _validate_batch(self, batch, split):
         if batch['split'] != split or batch['graph_version'] != self.graph_version or tuple(batch['classes']) != self.classes:
@@ -114,7 +118,7 @@ class ClassifierTrainer:
             raise ValueError('Source image identity is required for every row')
         return x.to(self.device), y.to(self.device)
 
-    def fit(self, training, validation, memory_source_ids, multilabel=False):
+    def fit(self, training, validation, memory_source_ids, multilabel=False, standardize=True):
         self.feature_source = training.get('feature_source', 'accepted')
         if validation.get('feature_source', 'accepted') != self.feature_source:
             raise ValueError('Training and validation evidence sources differ')
@@ -149,8 +153,40 @@ class ClassifierTrainer:
             weights = counts.sum()/counts.float()/len(self.classes)
             def loss(logits, target):
                 return F.cross_entropy(logits, target, weight=weights)
+        # Fit preprocessing on readout_fit only; validation never estimates statistics.
+        self.feature_mean = x.mean(0) if standardize else torch.zeros_like(x[0])
+        std = x.std(0, unbiased=False)
+        self.feature_scale = torch.where(std > 1e-6, std, torch.ones_like(std)) if standardize else torch.ones_like(std)
+        self.feature_active = std > 1e-6 if standardize else torch.ones_like(std,dtype=torch.bool)
+        x = (x-self.feature_mean)/self.feature_scale*self.feature_active
+        vx = (vx-self.feature_mean)/self.feature_scale*self.feature_active
+        self.history = []
+        updates = 0
+        def monitor(epoch):
+            self.head.eval()
+            with torch.no_grad():
+                tx, vv = self.head(x), self.head(vx)
+                record = {'epoch': epoch, 'updates': updates, 'training_loss': float(loss(tx,y)),
+                          'validation_loss': float(loss(vv,vy))}
+                if not multilabel:
+                    for name, logits, labels in (('training',tx,y),('validation',vv,vy)):
+                        pred = logits.argmax(1)
+                        cm = torch.bincount(labels*len(self.classes)+pred,
+                            minlength=len(self.classes)**2).reshape(len(self.classes),len(self.classes))
+                        tp=cm.diag().float()
+                        record[name+'_accuracy']=float((pred==labels).float().mean())
+                        record[name+'_macro_f1']=float((2*tp/(cm.sum(0)+cm.sum(1)).clamp_min(1)).mean())
+                        record[name+'_recall']=(tp/cm.sum(1).clamp_min(1)).tolist()
+                        record[name+'_predicted_counts']=cm.sum(0).tolist()
+                return record
+        baseline = monitor(-1)
+        self.history.append(baseline)
+        if not math.isfinite(baseline['validation_loss']):
+            raise ValueError('Nonfinite initial validation loss')
         generator = torch.Generator().manual_seed(self.config.seed)
-        best, best_state, patience = math.inf, None, 0
+        best, patience = baseline['validation_loss'], 0
+        best_state = (copy.deepcopy(self.head.state_dict()), copy.deepcopy(self.optimizer.state_dict()))
+        self.best_epoch = -1
         for epoch in range(self.config.epochs):
             self.head.train()
             order = torch.randperm(len(x), generator=generator).to(self.device)
@@ -160,12 +196,13 @@ class ClassifierTrainer:
                 value = loss(self.head(x[ids]), y[ids])
                 value.backward()
                 self.optimizer.step()
-            self.head.eval()
-            with torch.no_grad():
-                value = float(loss(self.head(vx), vy))
-            self.history.append({'epoch': epoch, 'validation_loss': value})
+                updates += 1
+            record = monitor(epoch)
+            value = record['validation_loss']
+            self.history.append(record)
             if value < best:
                 best, patience = value, 0
+                self.best_epoch = epoch
                 best_state = (copy.deepcopy(self.head.state_dict()), copy.deepcopy(self.optimizer.state_dict()))
             else:
                 patience += 1
@@ -182,13 +219,16 @@ class ClassifierTrainer:
         if graph_version != self.graph_version:
             raise ValueError('Graph changed: rebuild readout cache and refit/calibrate the classifier')
         self.head.eval()
-        logits = self.head(features.to(self.device))
+        logits = self.head((features.to(self.device)-self.feature_mean)/self.feature_scale*self.feature_active)
         return logits.sigmoid() if self.mode == 'multilabel' else logits.softmax(-1)
 
     def state_dict(self):
         return {'classes': self.classes, 'graph_version': self.graph_version, 'config': asdict(self.config),
                 'head': copy.deepcopy(self.head.state_dict()), 'optimizer': copy.deepcopy(self.optimizer.state_dict()),
-                'mode': self.mode, 'history': copy.deepcopy(self.history), 'feature_source': self.feature_source}
+                'mode': self.mode, 'history': copy.deepcopy(self.history), 'feature_source': self.feature_source,
+                'feature_mean': self.feature_mean.detach().cpu().clone(),
+                'feature_scale': self.feature_scale.detach().cpu().clone(),
+                'feature_active': self.feature_active.detach().cpu().clone(), 'best_epoch': self.best_epoch}
 
     def load_state_dict(self, state):
         if tuple(state['classes']) != self.classes or state['graph_version'] != self.graph_version or state['config'] != asdict(self.config):
@@ -197,6 +237,16 @@ class ClassifierTrainer:
         self.optimizer.load_state_dict(state['optimizer'])
         self.mode, self.history = state['mode'], copy.deepcopy(state['history'])
         self.feature_source = state.get('feature_source', 'accepted')
+        self.feature_mean = state.get('feature_mean', torch.zeros(self.head.in_features)).to(self.device)
+        self.feature_scale = state.get('feature_scale', torch.ones(self.head.in_features)).to(self.device)
+        if (self.feature_mean.shape != (self.head.in_features,) or self.feature_scale.shape != (self.head.in_features,)
+                or not torch.isfinite(self.feature_mean).all() or not torch.isfinite(self.feature_scale).all()
+                or (self.feature_scale <= 0).any()):
+            raise ValueError('Invalid classifier normalization')
+        self.feature_active = state.get('feature_active',torch.ones(self.head.in_features,dtype=torch.bool)).to(self.device)
+        if self.feature_active.dtype != torch.bool or self.feature_active.shape != (self.head.in_features,):
+            raise ValueError('Invalid classifier active columns')
+        self.best_epoch = state.get('best_epoch')
 
 
 def classification_metrics(targets, predictions, classes):

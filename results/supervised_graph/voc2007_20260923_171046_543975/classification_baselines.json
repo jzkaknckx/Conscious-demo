@@ -1,0 +1,474 @@
+{
+  "validation": {
+    "weak_score": {
+      "accuracy": 0.5,
+      "macro_f1": 0.37142857142857144,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.5,
+        "car": 0.7142857142857143
+      },
+      "confusion": [
+        [
+          0,
+          5,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          3,
+          0
+        ],
+        [
+          3,
+          1,
+          10,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.5,
+      "unresolved_rate": 0.0,
+      "samples": 26
+    },
+    "weak_score_coverage": {
+      "accuracy": 0.5384615384615384,
+      "macro_f1": 0.3862068965517242,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.5,
+        "car": 0.7857142857142857
+      },
+      "confusion": [
+        [
+          0,
+          5,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          3,
+          0
+        ],
+        [
+          2,
+          1,
+          11,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.5384615384615384,
+      "unresolved_rate": 0.0,
+      "samples": 26
+    },
+    "fit_majority": {
+      "accuracy": 0.23076923076923078,
+      "macro_f1": 0.125,
+      "recall": {
+        "cat": 0.0,
+        "dog": 1.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          14,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.23076923076923078,
+      "unresolved_rate": 0.0,
+      "samples": 26
+    },
+    "constant_cat": {
+      "accuracy": 0.23076923076923078,
+      "macro_f1": 0.125,
+      "recall": {
+        "cat": 1.0,
+        "dog": 0.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          6,
+          0,
+          0,
+          0
+        ],
+        [
+          6,
+          0,
+          0,
+          0
+        ],
+        [
+          14,
+          0,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.23076923076923078,
+      "unresolved_rate": 0.0,
+      "samples": 26
+    },
+    "constant_dog": {
+      "accuracy": 0.23076923076923078,
+      "macro_f1": 0.125,
+      "recall": {
+        "cat": 0.0,
+        "dog": 1.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          14,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.23076923076923078,
+      "unresolved_rate": 0.0,
+      "samples": 26
+    },
+    "constant_car": {
+      "accuracy": 0.5384615384615384,
+      "macro_f1": 0.2333333333333333,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.0,
+        "car": 1.0
+      },
+      "confusion": [
+        [
+          0,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          0,
+          14,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.5384615384615384,
+      "unresolved_rate": 0.0,
+      "samples": 26
+    }
+  },
+  "test": {
+    "weak_score": {
+      "accuracy": 0.5161290322580645,
+      "macro_f1": 0.35873015873015873,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.3333333333333333,
+        "car": 0.8125
+      },
+      "confusion": [
+        [
+          0,
+          4,
+          2,
+          0
+        ],
+        [
+          2,
+          3,
+          4,
+          0
+        ],
+        [
+          1,
+          2,
+          13,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.5161290322580645,
+      "unresolved_rate": 0.0,
+      "samples": 31
+    },
+    "weak_score_coverage": {
+      "accuracy": 0.4838709677419355,
+      "macro_f1": 0.3338345864661654,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.3333333333333333,
+        "car": 0.75
+      },
+      "confusion": [
+        [
+          0,
+          4,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          5,
+          0
+        ],
+        [
+          1,
+          3,
+          12,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.4838709677419355,
+      "unresolved_rate": 0.0,
+      "samples": 31
+    },
+    "fit_majority": {
+      "accuracy": 0.2903225806451613,
+      "macro_f1": 0.15,
+      "recall": {
+        "cat": 0.0,
+        "dog": 1.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          9,
+          0,
+          0
+        ],
+        [
+          0,
+          16,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.2903225806451613,
+      "unresolved_rate": 0.0,
+      "samples": 31
+    },
+    "constant_cat": {
+      "accuracy": 0.1935483870967742,
+      "macro_f1": 0.10810810810810811,
+      "recall": {
+        "cat": 1.0,
+        "dog": 0.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          6,
+          0,
+          0,
+          0
+        ],
+        [
+          9,
+          0,
+          0,
+          0
+        ],
+        [
+          16,
+          0,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.1935483870967742,
+      "unresolved_rate": 0.0,
+      "samples": 31
+    },
+    "constant_dog": {
+      "accuracy": 0.2903225806451613,
+      "macro_f1": 0.15,
+      "recall": {
+        "cat": 0.0,
+        "dog": 1.0,
+        "car": 0.0
+      },
+      "confusion": [
+        [
+          0,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          9,
+          0,
+          0
+        ],
+        [
+          0,
+          16,
+          0,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.2903225806451613,
+      "unresolved_rate": 0.0,
+      "samples": 31
+    },
+    "constant_car": {
+      "accuracy": 0.5161290322580645,
+      "macro_f1": 0.22695035460992907,
+      "recall": {
+        "cat": 0.0,
+        "dog": 0.0,
+        "car": 1.0
+      },
+      "confusion": [
+        [
+          0,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          0,
+          9,
+          0
+        ],
+        [
+          0,
+          0,
+          16,
+          0
+        ]
+      ],
+      "prediction_columns": [
+        "cat",
+        "dog",
+        "car",
+        "REJECTED_OR_UNRESOLVED"
+      ],
+      "coverage": 1.0,
+      "accepted_accuracy": 0.5161290322580645,
+      "unresolved_rate": 0.0,
+      "samples": 31
+    }
+  }
+}

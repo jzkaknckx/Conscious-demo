@@ -1,0 +1,59 @@
+[
+  {
+    "file": "car_translation.png",
+    "source": "results/supervised_graph/voc2007_20260923_171046_543975/familiarity_pilot/007490_0_translation.png",
+    "sha256": "35d31418e2e83af97d62ac612bf5f3cc76ec8044edbd049be73b95532bb2f82e",
+    "result": {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "translation",
+      "target_hit": true,
+      "target_entity_id": 1,
+      "candidate_id": 1,
+      "action": "reinforce_known",
+      "anchor_families": 6,
+      "familiar": 0.9400347383075459,
+      "difference": 0.059965261692454,
+      "unknown": 9.251858538542972e-17,
+      "map_coverage": 0.032928466796875
+    }
+  },
+  {
+    "file": "dog_occlusion.png",
+    "source": "results/supervised_graph/voc2007_20260923_171046_543975/familiarity_pilot/003671_0_occlusion.png",
+    "sha256": "4f4a4620714c7424594bf60b4311ba689f2e4eb4c2739bc4b19c2abefa760b39",
+    "result": {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "occlusion",
+      "target_hit": false,
+      "target_entity_id": 0,
+      "candidate_id": 0,
+      "action": "hold_correspondence",
+      "anchor_families": 3,
+      "familiar": 0.93082501535764,
+      "difference": 0.06917498464235997,
+      "unknown": 7.401486830834377e-17,
+      "map_coverage": 0.01629638671875
+    }
+  },
+  {
+    "file": "cat_layout_negative.png",
+    "source": "results/supervised_graph/voc2007_20260923_171046_543975/familiarity_pilot/007530_1_layout_negative.png",
+    "sha256": "5583aae6b34270e70a9ac43f65a0a2e4d986d5e208569af9eb445853a7b469ed",
+    "result": {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "layout_negative",
+      "target_hit": false,
+      "target_entity_id": 3,
+      "candidate_id": 18,
+      "action": "insufficient_correspondence",
+      "anchor_families": 0,
+      "familiar": 0.1271701602850813,
+      "difference": 0.2642836841836204,
+      "unknown": 0.6085461555312984,
+      "map_coverage": 0.0363006591796875
+    }
+  }
+]

@@ -93,12 +93,34 @@ class GeneralizationDiagnosticsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'evidence sources differ'):
             trainer.fit(fit,dict(val,feature_source='accepted'),['memory'])
 
+    def test_normalization_uses_fit_only_and_baseline_is_recorded(self):
+        cfg=SupervisedConfig(epochs=1)
+        trainer=ClassifierTrainer(('cat','dog'),2,cfg,device='cpu')
+        x=torch.arange(24,dtype=torch.float32).reshape(2,12)
+        x[:,0]=4.
+        batch=dict(features=x,targets=torch.tensor([0,1]),classes=('cat','dog'),graph_version=2)
+        fit=dict(batch,split='readout_fit',source_ids=['fit1','fit2'])
+        val=dict(batch,features=x+100.,split='validation',source_ids=['val1','val2'])
+        history=trainer.fit(fit,val,['memory'])
+        torch.testing.assert_close(trainer.feature_mean,x.mean(0))
+        self.assertEqual(float(trainer.feature_scale[0]),1.)
+        self.assertFalse(trainer.feature_active[0])
+        altered=x.clone();altered[:,0]+=1000.
+        torch.testing.assert_close(trainer.predict(x,2),trainer.predict(altered,2))
+        self.assertEqual(history[0]['epoch'],-1)
+        self.assertEqual(history[0]['updates'],0)
+        self.assertIn('validation_predicted_counts',history[0])
+        self.assertEqual(history[1]['updates'],1)
+
     def test_pilot_does_not_ignore_failed_scale_and_occlusion(self):
         cfg=ProbeConfig()
         rows=[dict(variant=v,anchor_families=3,anchor_span=.5,candidate_ambiguous=False,
-                   candidate_id=1,target_entity_id=1,action='reinforce_known') for v in cfg.variants]
+                   candidate_id=1,target_entity_id=1,identity_verified=True,action='reinforce_known') for v in cfg.variants]
         rows[-1].update(candidate_id=2,action='insufficient_correspondence')
         self.assertEqual(pilot_verdict(rows,cfg),'continue_readonly_validation')
+        rows[1]['identity_verified']=False
+        self.assertEqual(pilot_verdict(rows,cfg),'fix_local_correspondence_first')
+        rows[1]['identity_verified']=True
         rows[2]['anchor_families']=0
         self.assertEqual(pilot_verdict(rows,cfg),'fix_scale_and_partial_correspondence_before_learning')
         self.assertEqual(pilot_verdict(rows[:2],cfg),'insufficient_controls')

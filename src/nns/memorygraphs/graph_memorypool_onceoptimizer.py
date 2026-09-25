@@ -1,4 +1,5 @@
 import math
+from .local_assignment import repair as repair_local_assignment, collisions as assignment_collisions
 import time
 from dataclasses import dataclass, field
 from collections import Counter, deque
@@ -319,6 +320,10 @@ class MemoryConfig:
     graph_match_margin = 0.04
     graph_evaluable_min = 0.7
     graph_coverage_min = 0.7
+    graph_joint_assignment = True
+    graph_assignment_topk = 5
+    graph_assignment_beam = 32
+    graph_assignment_max_slots = 16
     graph_geometry_radius = 2
     graph_geometry_sigma = 2.0
     graph_cycle_tolerance = 1.0
@@ -2714,6 +2719,7 @@ class StructureMatch:
     role_bits: int = 0
     evaluated_bits: int = 0
     rejection_reasons: List[str] = field(default_factory=list)
+    assignment_diagnostics: dict = field(default_factory=dict)
 
     def summary(self):
         return {'template_id': self.template_id, 'level': self.level,
@@ -2724,7 +2730,8 @@ class StructureMatch:
                 'matched_roles': self.role_bits.bit_count(),
                 'evaluated_roles': self.evaluated_bits.bit_count(),
                 'role_bits_hex': hex(self.role_bits), 'evaluated_bits_hex': hex(self.evaluated_bits),
-                'version': self.version, 'rejection_reasons': self.rejection_reasons}
+                'version': self.version, 'rejection_reasons': self.rejection_reasons,
+                'assignment_diagnostics': getattr(self, 'assignment_diagnostics', {})}
 
 
 @dataclass
@@ -3316,6 +3323,8 @@ class SpatialStructureMatcher:
                         provider.stats['full_assignment_centers'] += int(survivors.sum())
             for k in np.flatnonzero(survivors):
                 center = batch[k]
+                overrides, assignment_audit = repair_local_assignment(
+                    self, view, provider, center, data, k, slot_weights, shifts, penalty, budget)
                 assignments, missing, member_positions = {}, [], {}
                 group_votes = defaultdict(list)
                 log_score = evaluable = matched = 0.
@@ -3329,18 +3338,18 @@ class SpatialStructureMatcher:
                         continue
                     evaluated_bits |= 1 << bit
                     evaluable += weight
-                    value = float(scores[k])
+                    value, selected_point = overrides.get(key, (float(scores[k]), tuple(chosen[k])))
                     log_score += weight * math.log(max(value, 1e-8))
                     hit = value >= self.cfg.graph_recall_threshold
                     if hit:
                         matched += weight
                         bits |= 1 << bit
-                        inferred = chosen[k] - item['xy'] + np.asarray(item.get('member_xy', (0., 0.)))
+                        inferred = np.asarray(selected_point) - item['xy'] + np.asarray(item.get('member_xy', (0., 0.)))
                         group_votes[item['group']].append((value, inferred))
-                    assignments[key] = {'point': tuple(chosen[k]), 'score': value,
+                    assignments[key] = {'point': tuple(selected_point), 'score': value,
                                         'supported': hit, 'node_id': item['node_id']}
                     if item['anchor'] and hit:
-                        member_positions[item['group']] = tuple(chosen[k])
+                        member_positions[item['group']] = tuple(selected_point)
                 for group, votes in group_votes.items():
                     if group not in member_positions:
                         weights = np.asarray([v[0] for v in votes])
@@ -3353,16 +3362,8 @@ class SpatialStructureMatcher:
                         geometry.append(float(np.linalg.norm(residual)))
                 error = max(geometry, default=0.)
                 # Different predicted roles may not collapse to exactly the same evidence point.
-                occupied, conflict = {}, False
-                for item in view.slots:
-                    a = assignments.get(item['key'])
-                    if not a or not a['supported']:
-                        continue
-                    evidence_key = (provider.nodes[item['node_id']].modality_id,
-                                    tuple(round(x, 4) for x in a['point']))
-                    if evidence_key in occupied and math.dist(occupied[evidence_key], item['xy']) > .5:
-                        conflict = True
-                    occupied[evidence_key] = item['xy']
+                conflict = bool(assignment_collisions(view.slots,
+                    {key:(a['score'],a['point']) for key,a in assignments.items() if a['supported']}, provider.nodes))
                 score = math.exp(log_score / evaluable) if evaluable > 0 else 0.
                 coverage = matched / evaluable if evaluable else 0.
                 accepted = (score >= self.cfg.graph_verify_threshold and
@@ -3372,6 +3373,7 @@ class SpatialStructureMatcher:
                 all_results.append(StructureMatch(view.template_id, view.level, tuple(center), score,
                     evaluable, coverage, error, assignments, member_positions, missing, view.version,
                     accepted, bits, evaluated_bits))
+                all_results[-1].assignment_diagnostics = assignment_audit
                 all_results[-1].rejection_reasons = [name for name, failed in (
                     ('score', score < self.cfg.graph_verify_threshold),
                     ('evaluable_coverage', evaluable < self.cfg.graph_evaluable_min),
@@ -3549,7 +3551,8 @@ class HierarchyRetriever:
                 raise ValueError(name + ' must be finite and positive.')
         for name in ('graph_query_stride', 'graph_poses_per_node', 'graph_response_cache',
                      'graph_query_chunk', 'graph_max_members', 'graph_min_members',
-                     'graph_shared_response_cache_bytes', 'graph_slot_batch'):
+                     'graph_shared_response_cache_bytes', 'graph_slot_batch', 'graph_assignment_topk',
+                     'graph_assignment_beam', 'graph_assignment_max_slots'):
             value = getattr(self.cfg, name)
             if int(value) != value or value < 1:
                 raise ValueError(name + ' must be a positive integer.')
@@ -3598,7 +3601,8 @@ class HierarchyRetriever:
                     'best': None if best is None else {'point': best.point, 'score': best.score,
                         'evaluable': best.evaluable_coverage, 'coverage': best.matched_coverage,
                         'geometry_error': best.geometry_error, 'accepted': best.accepted,
-                        'rejection_reasons': getattr(best, 'rejection_reasons', [])}})
+                        'rejection_reasons': getattr(best, 'rejection_reasons', []),
+                        'assignment_diagnostics': getattr(best, 'assignment_diagnostics', {})}})
         for sid, centers in candidates.items():
             matches = self.matcher.evaluate(index.views[sid], provider, centers)
             refinements += len(matches)
@@ -3666,7 +3670,7 @@ class HierarchyRetriever:
             'invalid_regions': index.invalid, 'invalid_entities': invalid_entities,
             'elapsed': time.perf_counter() - start,
             'limitations': ['Translation only; sparse search is approximate.',
-                           'Deterministic local assignment rejects conflicts; no combinatorial backtracking.']}
+                           'Bounded joint reassignment attempts local conflicts; search is not exhaustive.']}
         policy = self.cfg.graph_structural_recall_policy
         if policy not in {'missing', 'weak_or_missing', 'always'}:
             raise ValueError('Invalid structural recall policy')

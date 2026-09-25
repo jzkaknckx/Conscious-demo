@@ -1,0 +1,7 @@
+{
+  "run_id": "voc2007_20260923_171046_543975",
+  "graph_version": 35,
+  "ledger_size": 34,
+  "resume_from": "/home/p/code/Conscious-linux/Conscious-demo/results/supervised_graph/voc2007_20260921_231411_853393/memory.pt",
+  "device": "cuda"
+}

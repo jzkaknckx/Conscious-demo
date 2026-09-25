@@ -1,0 +1,292 @@
+{
+  "scope": "CPU frozen oracle diagnostic; normal retrieval unchanged",
+  "source": "results/supervised_graph/voc2007_20260923_171046_543975",
+  "rows": [
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "scale",
+      "score": 0.47960400357155847,
+      "coverage": 0.7218786787249042,
+      "evaluable": 1.0000000000000007,
+      "reasons": [
+        "score"
+      ],
+      "modalities": {
+        "0": {
+          "evaluable_mass": 0.13703703703703762,
+          "loss": 0.0015750987588979647,
+          "low_mass": 0.0,
+          "matched_mass": 0.13703703703703762,
+          "slots": 135
+        },
+        "2": {
+          "evaluable_mass": 0.5185185185185186,
+          "loss": 0.6249985482771413,
+          "low_mass": 0.0,
+          "matched_mass": 0.24039719724342085,
+          "slots": 59
+        },
+        "3": {
+          "evaluable_mass": 0.24074074074074114,
+          "loss": 0.0779540347156065,
+          "low_mass": 0.0,
+          "matched_mass": 0.24074074074074114,
+          "slots": 74
+        },
+        "4": {
+          "evaluable_mass": 0.10370370370370384,
+          "loss": 0.03026682638145249,
+          "low_mass": 0.0,
+          "matched_mass": 0.10370370370370384,
+          "slots": 90
+        }
+      },
+      "loss": 0.7347945081330982,
+      "low_mass": 0.0
+    },
+    {
+      "image_id": "003671",
+      "object_id": "0",
+      "variant": "occlusion",
+      "score": 0.23355545385855883,
+      "coverage": 0.9110900984890187,
+      "evaluable": 1.0000000000000007,
+      "reasons": [
+        "score"
+      ],
+      "modalities": {
+        "0": {
+          "evaluable_mass": 0.13703703703703762,
+          "loss": 0.0703690552278346,
+          "low_mass": 0.0036822296979277308,
+          "matched_mass": 0.13188191545993877,
+          "slots": 135
+        },
+        "2": {
+          "evaluable_mass": 0.5185185185185186,
+          "loss": 0.6886467026750297,
+          "low_mass": 0.03703703703703706,
+          "matched_mass": 0.47820142632635115,
+          "slots": 59
+        },
+        "3": {
+          "evaluable_mass": 0.24074074074074114,
+          "loss": 0.6040810711926313,
+          "low_mass": 0.03703703703703705,
+          "matched_mass": 0.20370370370370391,
+          "slots": 74
+        },
+        "4": {
+          "evaluable_mass": 0.10370370370370384,
+          "loss": 0.09123891121563654,
+          "low_mass": 0.004800488028508696,
+          "matched_mass": 0.09730305299902557,
+          "slots": 90
+        }
+      },
+      "loss": 1.4543357403111319,
+      "low_mass": 0.08255679180051055
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "scale",
+      "score": 0.6081082343000472,
+      "coverage": 0.8959974661949787,
+      "evaluable": 0.9853950289692999,
+      "reasons": [
+        "score"
+      ],
+      "modalities": {
+        "0": {
+          "evaluable_mass": 0.2053511599453866,
+          "loss": 0.004441390442808359,
+          "low_mass": 0.0,
+          "matched_mass": 0.2053511599453866,
+          "slots": 168
+        },
+        "2": {
+          "evaluable_mass": 0.2649811531769409,
+          "loss": 0.3716863308681654,
+          "low_mass": 0.0,
+          "matched_mass": 0.17123228072028646,
+          "slots": 46
+        },
+        "3": {
+          "evaluable_mass": 0.21197856022535144,
+          "loss": 0.08575466868391274,
+          "low_mass": 0.0,
+          "matched_mass": 0.20172489887698455,
+          "slots": 96
+        },
+        "1": {
+          "evaluable_mass": 0.1691369062831539,
+          "loss": 0.0016198019781185837,
+          "low_mass": 0.0,
+          "matched_mass": 0.1691369062831539,
+          "slots": 13
+        },
+        "4": {
+          "evaluable_mass": 0.14855222036916885,
+          "loss": 0.033900203945232854,
+          "low_mass": 0.0,
+          "matched_mass": 0.14855222036916885,
+          "slots": 114
+        }
+      },
+      "loss": 0.49740239591823787,
+      "low_mass": 0.0
+    },
+    {
+      "image_id": "007490",
+      "object_id": "0",
+      "variant": "occlusion",
+      "score": 0.5376304248971814,
+      "coverage": 0.9416013022673634,
+      "evaluable": 0.999999999999994,
+      "reasons": [
+        "score"
+      ],
+      "modalities": {
+        "0": {
+          "evaluable_mass": 0.2069444444444459,
+          "loss": 0.01541192333470245,
+          "low_mass": 0.0006480889157475167,
+          "matched_mass": 0.20532422215507712,
+          "slots": 171
+        },
+        "2": {
+          "evaluable_mass": 0.2611111111111119,
+          "loss": 0.2472973662863992,
+          "low_mass": 0.004484342073672128,
+          "matched_mass": 0.22711711495893155,
+          "slots": 46
+        },
+        "3": {
+          "evaluable_mass": 0.21388888888888927,
+          "loss": 0.3248780870832011,
+          "low_mass": 0.013626870034532862,
+          "matched_mass": 0.19344999547131028,
+          "slots": 99
+        },
+        "1": {
+          "evaluable_mass": 0.1666666666666671,
+          "loss": 0.0,
+          "low_mass": 0.0,
+          "matched_mass": 0.1666666666666671,
+          "slots": 13
+        },
+        "4": {
+          "evaluable_mass": 0.1513888888888891,
+          "loss": 0.03299652073950193,
+          "low_mass": 0.0015637239156727513,
+          "matched_mass": 0.14904330301537996,
+          "slots": 117
+        }
+      },
+      "loss": 0.6205838974438047,
+      "low_mass": 0.020323024939625258
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "scale",
+      "score": 0.5884464358960261,
+      "coverage": 0.8339126769753056,
+      "evaluable": 1.0000000000000009,
+      "reasons": [
+        "score"
+      ],
+      "modalities": {
+        "0": {
+          "evaluable_mass": 0.12658730158730178,
+          "loss": 0.003076305391404182,
+          "low_mass": 0.0,
+          "matched_mass": 0.12658730158730178,
+          "slots": 98
+        },
+        "1": {
+          "evaluable_mass": 0.3333333333333336,
+          "loss": 0.008097964423574987,
+          "low_mass": 0.0,
+          "matched_mass": 0.3333333333333336,
+          "slots": 36
+        },
+        "2": {
+          "evaluable_mass": 0.2019841269841273,
+          "loss": 0.40943046830939056,
+          "low_mass": 0.0,
+          "matched_mass": 0.037130995862109835,
+          "slots": 41
+        },
+        "3": {
+          "evaluable_mass": 0.2115079365079366,
+          "loss": 0.07577223565605953,
+          "low_mass": 0.0,
+          "matched_mass": 0.21027374460525955,
+          "slots": 70
+        },
+        "4": {
+          "evaluable_mass": 0.12658730158730172,
+          "loss": 0.033892400662414994,
+          "low_mass": 0.0,
+          "matched_mass": 0.12658730158730172,
+          "slots": 76
+        }
+      },
+      "loss": 0.5302693744428442,
+      "low_mass": 0.0
+    },
+    {
+      "image_id": "007530",
+      "object_id": "1",
+      "variant": "occlusion",
+      "score": 0.2025601665069895,
+      "coverage": 0.8781933012863261,
+      "evaluable": 1.0000000000000009,
+      "reasons": [
+        "score"
+      ],
+      "modalities": {
+        "0": {
+          "evaluable_mass": 0.12658730158730178,
+          "loss": 1.3914943806769417e-08,
+          "low_mass": 0.0,
+          "matched_mass": 0.12658730158730178,
+          "slots": 98
+        },
+        "1": {
+          "evaluable_mass": 0.3333333333333336,
+          "loss": 1.5967057764370647,
+          "low_mass": 0.11433003738817556,
+          "matched_mass": 0.21152663461965945,
+          "slots": 36
+        },
+        "2": {
+          "evaluable_mass": 0.2019841269841273,
+          "loss": 0.0,
+          "low_mass": 0.0,
+          "matched_mass": 0.2019841269841273,
+          "slots": 41
+        },
+        "3": {
+          "evaluable_mass": 0.2115079365079366,
+          "loss": 1.2502686595756039e-05,
+          "low_mass": 0.0,
+          "matched_mass": 0.2115079365079366,
+          "slots": 70
+        },
+        "4": {
+          "evaluable_mass": 0.12658730158730172,
+          "loss": 2.4974879155984457e-08,
+          "low_mass": 0.0,
+          "matched_mass": 0.12658730158730172,
+          "slots": 76
+        }
+      },
+      "loss": 1.5967183180134834,
+      "low_mass": 0.11433003738817556
+    }
+  ]
+}

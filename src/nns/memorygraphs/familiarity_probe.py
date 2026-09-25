@@ -1,5 +1,6 @@
 """Frozen familiarity/difference pilot. Labels and write witnesses are evaluation-only."""
 from dataclasses import dataclass, replace
+import copy
 from pathlib import Path
 from collections import defaultdict, Counter
 import math
@@ -13,6 +14,8 @@ from .experiment_diagnostics import save_json, query_audit
 @dataclass(frozen=True)
 class ProbeConfig:
     max_objects: int = 3
+    candidate_limit: int = 3
+    known_transform_diagnostics: bool = True
     shift_pixels: int = 4
     scale: float = .95
     brightness: float = .85
@@ -35,10 +38,12 @@ class FamiliarityProbe:
         hypotheses = {}
         for row in traces:
             if row['level'] == 3 and row.get('best'):
-                best = row['best']; rank=best['score']*best['coverage']
+                best = row['best']; rank=(bool(best['accepted']),
+                    best['evaluable'] >= cfg.graph_evaluable_min,
+                    best['score']*best['coverage']*best['evaluable'])
                 if row['template_id'] not in hypotheses or rank > hypotheses[row['template_id']][0]:
                     hypotheses[row['template_id']] = (rank, best)
-        candidates = sorted(hypotheses, key=lambda eid:(-hypotheses[eid][0],eid))
+        candidates = sorted(hypotheses, key=lambda eid:hypotheses[eid][0], reverse=True)
         maps = np.zeros((3,h,w),np.float32);maps[2]=1.
         if not candidates:
             return {'action':'insufficient_correspondence','reason':'no_L3_hypothesis',
@@ -50,7 +55,9 @@ class FamiliarityProbe:
         for slot in view.slots:
             role=slot['group'];member=entity.component_edges[role]
             families[member.get('family_id',role)].append(slot)
-        ambiguous=(len(candidates)>1 and hypotheses[eid][0]-hypotheses[candidates[1]][0]<cfg.graph_match_margin)
+        ambiguous=(len(candidates)>1 and hypotheses[eid][0][:2] == hypotheses[candidates[1]][0][:2]
+                   and hypotheses[eid][0][2]-hypotheses[candidates[1]][0][2]<cfg.graph_match_margin)
+        identity_verified = bool(match.accepted and best['accepted'])
         rows=[];anchors=[];numerator=np.zeros((3,h,w));denominator=np.zeros((h,w))
         radius=max(1,int(cfg.graph_geometry_radius))
         for family,slots in families.items():
@@ -61,7 +68,8 @@ class FamiliarityProbe:
             roles={s['group'] for s in slots}
             quality=min(entity.component_edges[r].get('reliability',1.) for r in roles)
             ambiguity=.5 if ambiguous else 0.
-            comparable=quality*coverage*(1-ambiguity)
+            comparable=float(np.clip(quality*coverage*(1-ambiguity),0.,1.))
+            similarity=float(np.clip(similarity,0.,1.))
             familiar=comparable*similarity;difference=comparable*(1-similarity);unknown=1-comparable
             points=[tuple(np.asarray(best['point'])+s['xy']) for s in slots]
             center=np.mean(points,axis=0)
@@ -82,12 +90,17 @@ class FamiliarityProbe:
         mean={k:float(np.mean([r[k] for r in rows])) for k in ('familiar','difference','unknown')}
         sufficient=len(anchors)>=self.config.min_anchor_families and span>=self.config.min_anchor_span and not ambiguous
         if not sufficient:action='insufficient_correspondence'
+        elif not identity_verified:action='hold_correspondence'
         elif mean['unknown']>1-cfg.graph_evaluable_min:action='request_more_observation'
         elif mean['familiar']>=cfg.graph_learn_threshold and mean['difference']<=1-cfg.graph_learn_threshold:action='reinforce_known'
         elif mean['familiar']>=cfg.graph_coverage_min:action='consider_local_change'
         else:action='record_new_combination_candidate'
         return {'candidate_id':eid,'candidate_pose':best['point'],'action':action,'diagnostic_only':True,
                 'anchor_families':len(anchors),'anchor_span':span,'candidate_ambiguous':ambiguous,
+                'identity_verified':identity_verified, 'rejection_reasons':match.rejection_reasons,
+                'assignment_diagnostics':match.assignment_diagnostics,
+                'candidate_hypotheses':[{'entity_id':c,'rank':hypotheses[c][0],
+                    'best':hypotheses[c][1]} for c in candidates[:self.config.candidate_limit]],
                 'families':rows,'map_coverage':float(active.mean()),**mean},maps
 
 
@@ -134,17 +147,25 @@ def run_familiarity_pilot(experiment, output_dir, config=None, on_result=None):
         if len(chosen)>=config.max_objects:break
     chosen=(chosen+fallback)[:config.max_objects]
     for annotation,obs in chosen:
+        baseline_pose = None
         target=learner.ledger[obs.ledger_key]['entity_id']
         for variant in config.variants:
             perturbed,changed=perturb_observation(obs,variant,config)
             features=experiment.encoder(perturbed)
             query=learner.model.query_hierarchy(features,valid_mask=perturbed.valid_mask,trace=True)
             decision,maps=probe.analyze(features,perturbed.valid_mask,query)
+            if variant == 'identity':
+                target_matches = [m for m in query.entities if m.template_id == target]
+                if target_matches: baseline_pose = target_matches[0].point
             prediction=experiment.readout.predict(experiment.readout.encode(query,learner.model,version),learner.model)
             row={'image_id':annotation.image_id,'object_id':annotation.object_id,'variant':variant,
                  'target_entity_id':target,'target_hit':any(m.template_id==target for m in query.entities),
                  'class_id':annotation.class_id,'prediction':prediction,'graph_version':version,**decision}
+            if config.known_transform_diagnostics:
+                row['known_transform_diagnostic'] = known_transform_diagnostic(
+                    learner.model, features, perturbed.valid_mask, query, target, baseline_pose, variant, config)
             active=(maps[0]+maps[1])>0
+            row['changed_comparable_fraction']=float(active[changed].mean()) if changed.any() else None
             for label,mask in (('changed',changed & active),('unchanged',~changed & active)):
                 row['difference_'+label]=float(maps[1,mask].mean()) if mask.any() else None
                 row['unknown_'+label]=float(maps[2,mask].mean()) if mask.any() else None
@@ -174,7 +195,7 @@ def run_familiarity_pilot(experiment, output_dir, config=None, on_result=None):
 def pilot_verdict(rows, config):
     """Conservative investment gate: identity success alone does not support learning."""
     def anchored(row):
-        return (row['anchor_families'] >= config.min_anchor_families
+        return (row.get('identity_verified',False) and row['anchor_families'] >= config.min_anchor_families
                 and row.get('anchor_span', 0.) >= config.min_anchor_span
                 and not row.get('candidate_ambiguous', True)
                 and row['candidate_id'] == row['target_entity_id'])
@@ -190,3 +211,32 @@ def pilot_verdict(rows, config):
            r['candidate_id'] == r['target_entity_id'] for r in by_variant['layout_negative']):
         return 'difference_decision_not_discriminative'
     return 'continue_readonly_validation'
+
+
+@torch.no_grad()
+def known_transform_diagnostic(model, features, valid_mask, query, target, baseline_pose, variant, config):
+    """Oracle controls are evaluation-only, never candidate proposals or write evidence."""
+    if baseline_pose is None or variant == 'layout_negative':
+        return {'status':'not_applicable', 'oracle_only':True}
+    provider=FeatureResponseCache(features,model.gmem_i,model.cfg,valid_mask)
+    h,w=provider.shape
+    scale=config.scale if variant=='scale' else 1.
+    center=np.array([(w-1)/2,(h-1)/2])
+    pose=center+scale*(np.asarray(baseline_pose)-center)
+    if variant=='translation':pose[0]+=config.shift_pixels
+    view=entity_view(model.gmem_iii.entity_nodes[target],model.gmem_ii,model.cfg)
+    matcher=SpatialStructureMatcher(model.cfg)
+    unscaled=matcher.evaluate(view,provider,[pose])[0]
+    transformed=copy.deepcopy(view)
+    for slot in transformed.slots:
+        slot['xy']=np.asarray(slot['xy'])*scale
+        if 'member_xy' in slot:slot['member_xy']=np.asarray(slot['member_xy'])*scale
+    for edge in transformed.constraints:edge['delta']=np.asarray(edge['delta'])*scale
+    match=matcher.evaluate(transformed,provider,[pose])[0] if scale!=1 else unscaled
+    traces=query.diagnostics.get('trace',[])+query.diagnostics.get('initial_sparse',{}).get('trace',[])
+    return {'oracle_only':True,'scale':scale,'known_pose':pose.tolist(),
+        'target_in_template_trace':any(r['level']==3 and r['template_id']==target for r in traces),
+        'ordinary_target_hit':any(m.template_id==target for m in query.entities),
+        'known_center_original_geometry':unscaled.summary(),
+        'known_center_transformed_geometry':match.summary(),
+        'limitation':'Template presence does not prove correct pose was proposed; oracle result is not retrieval accuracy.'}
